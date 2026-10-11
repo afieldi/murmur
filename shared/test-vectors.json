@@ -411,6 +411,26 @@
       },
       "input": "die straße ist lang",
       "expected": "Die straße ist lang."
+    },
+    {
+      "name": "a byte order mark counts as a space, as in JavaScript",
+      "input": "hello﻿comma there friend",
+      "expected": "Hello, there friend."
+    },
+    {
+      "name": "a next line character is not a space in JavaScript",
+      "input": "hello there friend",
+      "expected": "hello there friend."
+    },
+    {
+      "name": "a line separator ends a line, as in JavaScript",
+      "input": "first line one    second line two",
+      "expected": "First line one second line two."
+    },
+    {
+      "name": "a carriage return ends a line, as in JavaScript",
+      "input": "first line one\r   second line two",
+      "expected": "First line one\rsecond line two."
     }
   ]
 }
