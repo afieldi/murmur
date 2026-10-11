@@ -8,10 +8,13 @@ import Testing
         let bucks = JS.regex("bucks")
         let cases: [(String, String)] = [
             ("$$", "five $ now"), ("$&", "five bucks now"), ("$`", "five five  now"), ("$'", "five  now now"),
-            ("$1", "five $1 now"), ("$<x>", "five $<x> now"), ("a$", "five a$ now"), ("$", "five $ now")
+            ("$1", "five $1 now"), ("$<x>", "five $<x> now"), ("a$", "five a$ now"), ("$", "five $ now"),
+            // A prepended mark fuses with the $ into one Swift Character;
+            // JavaScript still sees the $.
+            ("\u{0600}$&", "five \u{0600}bucks now"), ("\u{0D4E}$'", "five \u{0D4E} now now")
         ]
         for (template, expected) in cases {
-            #expect(JS.replace("five bucks now", bucks, with: template) == expected, "\(template)")
+            expectSameUnits(JS.replace("five bucks now", bucks, with: template), expected, template)
         }
     }
 
@@ -35,9 +38,17 @@ import Testing
         #expect(JS.round(-0.4) == 0)
     }
 
+    /// Swift's == calls ; and the Greek question mark equal; the parity
+    /// checks must not, so they compare code units.
+    @Test func parityChecksCompareCodeUnits() {
+        #expect("A\u{037E}" == "A;")
+        withKnownIssue { expectSameUnits("A\u{037E}", "A;") }
+        expectSameUnits("A;", "A;")
+    }
+
     @Test func trimUsesJavaScriptWhitespace() {
-        #expect(JS.trim("\u{FEFF}\u{3000} hi \u{2028}\n") == "hi")
-        #expect(JS.trim("\u{85}hi") == "\u{85}hi")
+        expectSameUnits(JS.trim("\u{FEFF}\u{3000} hi \u{2028}\n"), "hi")
+        expectSameUnits(JS.trim("\u{85}hi"), "\u{85}hi")
     }
 
     /// What node prints for /\bé/, /\bcaf\b/, /\bé\b/, and /é\b/ on "café":

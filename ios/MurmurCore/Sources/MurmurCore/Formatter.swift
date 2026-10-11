@@ -119,7 +119,7 @@ func phrasesLongestFirst(_ map: [String: String]) -> [(phrase: String, symbol: S
         let la = a.phrase.utf16.count
         let lb = b.phrase.utf16.count
         if la != lb { return la > lb }
-        if a.symbol != b.symbol { return JS.less(a.symbol, b.symbol) }
+        if !JS.same(a.symbol, b.symbol) { return JS.less(a.symbol, b.symbol) }
         return JS.less(a.phrase, b.phrase)
     }
 }
@@ -155,8 +155,8 @@ func wordsToDigits(_ text: String, units: [String: Int], tens: [String: Int]) ->
     var out = JS.replace(text, pairs) { match, source in
         let ten = tens[source.substring(with: match.range(at: 1)).lowercased()]
         let unit = units[source.substring(with: match.range(at: 2)).lowercased()]
-        // ICU folds a few exotic letters JavaScript would not match at all
-        // (the long s, the Kelvin sign); leave those words alone.
+        // JS.caseless matches only what JavaScript's i flag does, so every
+        // match lowercases to a known name; this guard is only a safety net.
         guard let ten, let unit else { return source.substring(with: match.range) }
         return String(ten + unit)
     }

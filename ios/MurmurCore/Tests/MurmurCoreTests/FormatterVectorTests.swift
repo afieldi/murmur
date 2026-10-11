@@ -55,17 +55,29 @@ let formatSpec: FormatSpec = {
         let dictionary = vector.settings?.dictionary ?? []
         let formatted = formatTranscript(applyDictionary(vector.input, dictionary), options: options, spec: formatSpec)
         let result = applyExpansions(enforceDictionaryCasing(formatted, dictionary), vector.settings?.expansions ?? [])
-        #expect(result == vector.expected)
+        expectSameUnits(result, vector.expected)
     }
 
     /// Desktop's test of the same name: b c's symbol X sorts before a b's
     /// Y, so b c goes first and leaves "aX".
     @Test func equalLengthPhrasesGoBySymbolThenPhrase() throws {
+        let spec = try specWithSpokenPunctuation(["a b": "Y", "b c": "X"])
+        expectSameUnits(formatTranscript("a b c", options: FormatOptions(), spec: spec), "AX")
+    }
+
+    /// Symbols compare as code units, as in JavaScript: ; sorts before the
+    /// Greek question mark Swift's == calls equal to it, so b c goes first.
+    /// Node gives "A;".
+    @Test func symbolsCompareCodeUnits() throws {
+        let spec = try specWithSpokenPunctuation(["a b": "\u{037E}", "b c": ";"])
+        expectSameUnits(formatTranscript("a b c", options: FormatOptions(), spec: spec), "A;")
+    }
+
+    private func specWithSpokenPunctuation(_ map: [String: String]) throws -> FormatSpec {
         let data = try SharedData(directory: repoShared).data(named: "format-spec.json")
         var raw = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        raw["spokenPunctuation"] = ["map": ["a b": "Y", "b c": "X"]]
-        let spec = try JSONDecoder().decode(FormatSpec.self, from: JSONSerialization.data(withJSONObject: raw))
-        #expect(formatTranscript("a b c", options: FormatOptions(), spec: spec) == "AX")
+        raw["spokenPunctuation"] = ["map": map]
+        return try JSONDecoder().decode(FormatSpec.self, from: JSONSerialization.data(withJSONObject: raw))
     }
 
     @Test func everyUnitHasItsOwnValue() {

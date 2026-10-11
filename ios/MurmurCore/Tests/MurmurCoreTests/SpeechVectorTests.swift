@@ -81,7 +81,21 @@ let hallucinationList: HallucinationList? = try? SharedData(directory: repoShare
             #expect(SpeechGate.isHallucination(verdict.text, phrases: list.phrases) == verdict.expected, "\(verdict.text)")
         }
         for strip in file.trailing {
-            #expect(SpeechGate.stripTrailingHallucinations(strip.text, phrases: list.artifactTails) == strip.expected, "\(strip.text)")
+            expectSameUnits(SpeechGate.stripTrailingHallucinations(strip.text, phrases: list.artifactTails), strip.expected, strip.text)
         }
+    }
+
+    /// JavaScript compares code units, so a precomposed é never equals an e
+    /// plus a combining accent: node gives false.
+    @Test func hallucinationsCompareCodeUnits() {
+        #expect(!SpeechGate.isHallucination("Caf\u{00E9}", phrases: ["cafe\u{0301}"]))
+    }
+
+    /// normalizeTranscript matches desktop only while every phrase is ASCII
+    /// (lowercased() has no final sigma rule); a non-ASCII phrase needs one.
+    @Test func everyHallucinationPhraseIsASCII() throws {
+        let list = try #require(hallucinationList)
+        let nonASCII = (list.phrases + list.artifactTails).filter { !$0.unicodeScalars.allSatisfy(\.isASCII) }
+        #expect(nonASCII.isEmpty, "\(nonASCII)")
     }
 }

@@ -88,7 +88,8 @@ public enum SpeechGate {
     /// Lowercase, strip punctuation, and collapse whitespace, for exact
     /// matching. lowercased() matches JavaScript's toLowerCase except for
     /// a Greek capital sigma ending a word (σ here, ς there), which can
-    /// never make a transcript equal one of the English phrases.
+    /// never make a transcript equal one of the phrases while every phrase
+    /// is ASCII (SpeechVectorTests.everyHallucinationPhraseIsASCII).
     public static func normalizeTranscript(_ text: String) -> String {
         var units: [UInt16] = []
         var pendingSpace = false
@@ -109,7 +110,7 @@ public enum SpeechGate {
     public static func isHallucination(_ text: String, phrases: [String]) -> Bool {
         let normalized = normalizeTranscript(text)
         if normalized.isEmpty { return true }
-        return phrases.contains { normalizeTranscript($0) == normalized }
+        return phrases.contains { JS.same(normalizeTranscript($0), normalized) }
     }
 
     /// Strip trailing sentences matching the phrases from a transcript of

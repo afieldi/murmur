@@ -3,6 +3,12 @@ import Foundation
 import Testing
 @testable import MurmurCore
 
+/// Desktop parity means the same UTF-16 code units. Swift's == is looser:
+/// it calls canonically equivalent strings equal (é and e plus an accent).
+func expectSameUnits(_ actual: String, _ expected: String, _ context: String = "", sourceLocation: SourceLocation = #_sourceLocation) {
+    #expect(JS.same(actual, expected), "\(context) got \(actual.debugDescription), want \(expected.debugDescription)", sourceLocation: sourceLocation)
+}
+
 /// The repo's shared/ folder, found from this file's own path:
 /// MurmurCoreTests, Tests, MurmurCore, ios, then the repo root.
 let repoShared = URL(fileURLWithPath: #filePath)

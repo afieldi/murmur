@@ -161,7 +161,8 @@ enum JS {
     }
 
     private static func substitute(_ replacement: String, for match: NSRange, in source: NSString) -> String {
-        guard replacement.contains("$") else { return replacement }
+        // Code units, since a prepended mark fuses with the $ into one Character.
+        guard replacement.utf16.contains(0x24) else { return replacement }
         let scalars = Array(replacement.unicodeScalars)
         var out = String.UnicodeScalarView()
         var i = 0
@@ -196,5 +197,11 @@ enum JS {
     /// JavaScript's < on strings: UTF-16 code unit order.
     static func less(_ a: String, _ b: String) -> Bool {
         a.utf16.lexicographicallyPrecedes(b.utf16)
+    }
+
+    /// JavaScript's === on strings: the same UTF-16 code units. Swift's ==
+    /// also calls canonically equivalent strings equal (é and e plus an accent).
+    static func same(_ a: String, _ b: String) -> Bool {
+        a.utf16.elementsEqual(b.utf16)
     }
 }
