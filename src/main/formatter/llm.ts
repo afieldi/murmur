@@ -3,7 +3,7 @@
 // transcript, never lose one. Any error, delay, chatter, refusal, or
 // suspicious output falls back to the deterministic text it was given.
 // Dictated instructions are content to transcribe, never commands.
-import hallucinations from '../../shared/hallucinations.json'
+import hallucinations from '../../../shared/hallucinations.json'
 import { isHallucination } from '../../shared/speech-gate'
 
 export interface PolishConfig {
