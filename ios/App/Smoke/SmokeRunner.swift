@@ -39,6 +39,7 @@ enum SmokeRunner {
             ("transcription", checkTranscription),
             ("waitingTakes", checkWaitingTakes),
             ("polish", checkPolish),
+            ("mailbox", checkMailbox),
             ("sharedJson", { try checkSharedJson(expected: request.sharedCount) })
         ]
         var results: [String: Bool] = [:]
@@ -193,6 +194,18 @@ enum SmokeRunner {
             guard text == formatted else { throw SmokeFailure("\(baseUrl) changed the text to \(text)") }
             guard reasons.list.withLock({ $0.count }) == 1 else { throw SmokeFailure("polish at \(baseUrl) did not fall back") }
         }
+    }
+
+    /// A mailbox round trip in the app group: the app posts a take, a
+    /// simulated keyboard reads it once, and a second read gets nothing.
+    static func checkMailbox() throws {
+        guard let container = AppGroup.containerURL else { throw SmokeFailure("no container for \(AppGroup.identifier)") }
+        let mailbox = Mailbox(file: container.appending(path: "smoke-mailbox-\(UUID().uuidString).json"))
+        defer { try? FileManager.default.removeItem(at: mailbox.file) }
+        let take = UUID()
+        mailbox.write(MailboxEntry(take: take, phase: .ready, words: "smoke words for the keyboard", at: .now))
+        guard mailbox.claim(take) == "smoke words for the keyboard" else { throw SmokeFailure("the keyboard did not get the words") }
+        guard mailbox.claim(take) == nil, mailbox.claim() == nil else { throw SmokeFailure("a second read got the words again") }
     }
 
     /// Fallback reasons, collected across the smoke's async bridge.
