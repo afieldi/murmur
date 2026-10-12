@@ -225,6 +225,62 @@
       "smartLists": true,
       "ok": false,
       "reason": "length ratio"
+    },
+    {
+      "name": "a label line before the text, with a Windows line end",
+      "input": "Send the report to the whole team today please",
+      "candidate": "Result:\r\nSend the report to the whole team today, please.",
+      "smartLists": false,
+      "ok": false,
+      "reason": "preamble line"
+    },
+    {
+      "name": "a dropped entry in a list with Windows line ends",
+      "input": "I want to make a list. First I want to add eggs, then bacon, then toast.",
+      "candidate": "I want to make a list:\r\n1. eggs\r\n2. bacon",
+      "smartLists": true,
+      "ok": false,
+      "reason": "missing entries"
+    },
+    {
+      "name": "digits from another script are not list markers",
+      "input": "first email the team then update the deck then send it to the client",
+      "candidate": "To do:\n١. Email the team.\n٢. Update the deck.\n٣. Send it to the client.",
+      "smartLists": true,
+      "ok": false,
+      "reason": "preamble line"
+    },
+    {
+      "name": "a long s never counts as the enumerator first",
+      "input": "firſt eggs then bacon then toast",
+      "candidate": "1. eggs\n2. bacon",
+      "smartLists": true,
+      "ok": true,
+      "text": "1. eggs\n2. bacon"
+    },
+    {
+      "name": "the plain first does count, so an entry is missing",
+      "input": "first eggs then bacon then toast",
+      "candidate": "1. eggs\n2. bacon",
+      "smartLists": true,
+      "ok": false,
+      "reason": "missing entries"
+    },
+    {
+      "name": "a colon in the input is found by code units",
+      "input": "Note:́ send the report to the whole team today",
+      "candidate": "Note:\nSend the report to the whole team today.",
+      "smartLists": false,
+      "ok": true,
+      "text": "Note:\nSend the report to the whole team today."
+    },
+    {
+      "name": "an answer that is only quote marks",
+      "input": "Send it. Thank you.",
+      "candidate": "\"\"",
+      "smartLists": false,
+      "ok": false,
+      "reason": "empty"
     }
   ],
   "hints": [

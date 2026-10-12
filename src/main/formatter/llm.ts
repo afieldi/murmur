@@ -108,6 +108,9 @@ export function validatePolish(
     (text.startsWith('"') && text.endsWith('"')) ||
     (text.startsWith('“') && text.endsWith('”'))
   if (quoted && !input.trim().startsWith('"')) text = text.slice(1, -1).trim()
+  // An answer of only quote marks is empty too: keeping it would replace
+  // the dictation with nothing.
+  if (text.length === 0) return { ok: false, reason: 'empty' }
 
   const lower = text.toLowerCase()
   if (META_OPENERS.some((opener) => lower.startsWith(opener))) {

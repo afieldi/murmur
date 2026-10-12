@@ -15,7 +15,7 @@ enum CleanupCopy {
 
     static func polish(model: String) -> String {
         let who = model.isEmpty ? "Your cleanup model" : "Your cleanup model (\(model))"
-        return "\(who) fixes slips and punctuation after formatting. If it fails or answers with anything but your words, murmur keeps the formatted text."
+        return "\(who) fixes slips and punctuation after formatting. If it errors, chats, or answers much longer or shorter than what you said, murmur keeps the formatted text."
     }
 
     static let smartLists = "Spoken sequences (first, then, then) become numbered lists, and saying bullet point or next item starts a dash line."

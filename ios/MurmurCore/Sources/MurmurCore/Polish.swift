@@ -54,6 +54,9 @@ public enum Polish {
         if quoted && JS.trim(input).utf16.first != 0x22 {
             text = JS.trim(units.count > 2 ? String(decoding: units[1..<(units.count - 1)], as: UTF16.self) : "")
         }
+        // An answer of only quote marks is empty too: keeping it would
+        // replace the dictation with nothing.
+        if text.isEmpty { return .reject("empty") }
 
         let lower = text.lowercased()
         if rules.metaOpeners.contains(where: { lower.utf16.starts(with: $0.utf16) }) { return .reject("meta chatter") }

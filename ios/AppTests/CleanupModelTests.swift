@@ -53,6 +53,14 @@ import Testing
         #expect(CleanupCopy.polish(model: "").hasPrefix("Your cleanup model fixes"))
     }
 
+    /// Polish's line promises only what its checks catch: an answer much
+    /// longer or shorter than what you said, never every answer.
+    @Test func polishPromisesOnlyWhatItsChecksCatch() {
+        let line = CleanupCopy.polish(model: "m")
+        #expect(!line.contains("anything but your words"))
+        #expect(line.contains("much longer or shorter"))
+    }
+
     /// The product name stays lowercase even where a sentence starts.
     @Test func murmurStaysLowercase() {
         let lines = [FormatOptions.Level.off, .light, .full].map(CleanupCopy.level) + [CleanupCopy.polish(model: "m"), CleanupCopy.smartLists]
