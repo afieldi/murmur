@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // One take in the app (ios/prd.json IOS-006): record, keep silence from
-// typing, send one WAV to the chosen provider, and show the words, Heard
-// nothing, or why it failed. A failed take waits with its audio for a
-// retry, as on desktop (src/main/retry.ts): one thing runs at a time, and
-// a take's audio goes only once its words are safe.
+// typing, send one WAV to the chosen provider, clean up the words
+// (IOS-007), and show them, Heard nothing, or why it failed. A failed
+// take waits with its audio for a retry, as on desktop (src/main/retry.ts):
+// one thing runs at a time, and a take's audio goes only once its words
+// are safe.
 import Foundation
 import MurmurCore
 
@@ -11,6 +12,10 @@ import MurmurCore
 struct TakeRules: Sendable {
     let gate: SpeechGateSpec
     let hallucinations: HallucinationList
+    let format: FormatSpec
+    let polish: PolishRules
+
+    var cleanup: CleanupRules { CleanupRules(format: format, polish: polish, hallucinations: hallucinations) }
 }
 
 @Observable @MainActor final class TakeModel {
@@ -45,6 +50,7 @@ struct TakeRules: Sendable {
     @ObservationIgnored private let rules: TakeRules
     @ObservationIgnored private let catalog: ProviderCatalog
     @ObservationIgnored private let connections: ConnectionStore
+    @ObservationIgnored private let cleanup: CleanupStore
     @ObservationIgnored private let ring: any KeyRing
     @ObservationIgnored private let send: ConnectionTest.Send
     @ObservationIgnored private let copy: @MainActor (String) -> Void
@@ -52,7 +58,7 @@ struct TakeRules: Sendable {
 
     init(
         microphone: any Microphone, store: WaitingStore, rules: TakeRules, catalog: ProviderCatalog,
-        connections: ConnectionStore, ring: any KeyRing, send: @escaping ConnectionTest.Send,
+        connections: ConnectionStore, cleanup: CleanupStore, ring: any KeyRing, send: @escaping ConnectionTest.Send,
         copy: @escaping @MainActor (String) -> Void, now: @escaping @MainActor () -> Date = { .now }
     ) {
         self.microphone = microphone
@@ -60,6 +66,7 @@ struct TakeRules: Sendable {
         self.rules = rules
         self.catalog = catalog
         self.connections = connections
+        self.cleanup = cleanup
         self.ring = ring
         self.send = send
         self.copy = copy
@@ -175,14 +182,18 @@ struct TakeRules: Sendable {
         waiting = store.list()
     }
 
-    /// The words, nil when the provider heard only silence, or why it failed.
+    /// The cleaned-up words; nil when the provider heard only silence or
+    /// cleanup left nothing (a take of only um); or why it failed.
     private func words(for wav: Data) async -> Result<String?, TakeFailure> {
         let settings = connections.load(catalog: catalog)
         let baseUrl = settings.transcription.baseUrl
         guard let key = (try? ring.key(for: baseUrl)) ?? nil else { return .failure(.noKey) }
         switch await Transcription.run(wav: wav, baseUrl: baseUrl, model: settings.transcription.sttModel, key: key, send: send) {
         case .words(let text):
-            return .success(TakeAudio.heard(text, list: rules.hallucinations))
+            guard let heard = TakeAudio.heard(text, list: rules.hallucinations) else { return .success(nil) }
+            let connection = settings.polishConnection { [ring] in (try? ring.key(for: $0)) ?? nil }
+            let finished = await Cleanup.finish(heard, settings: cleanup.load(), rules: rules.cleanup, connection: connection, send: send)
+            return .success(finished.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : finished)
         case .failed(let kind, let detail):
             return .failure(TakeFailure(kind: kind.rawValue, detail: detail))
         }

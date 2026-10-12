@@ -51,6 +51,8 @@ final class FakeProvider: Sendable {
         rules = try BundledRules.takeRules()
         defaults = try #require(UserDefaults(suiteName: "murmur.tests.\(UUID().uuidString)"))
         try ring.save(try #require(APIKey("gsk_groqgroq1111")), for: groq)
+        // These tests are about the take; cleanup's own tests turn polish on.
+        CleanupStore(defaults: defaults).save(CleanupSettings(polish: false))
     }
 
     func model(_ provider: FakeProvider) -> TakeModel {
@@ -60,7 +62,7 @@ final class FakeProvider: Sendable {
     func model(send: @escaping ConnectionTest.Send) -> TakeModel {
         TakeModel(
             microphone: microphone, store: store, rules: rules, catalog: catalog,
-            connections: ConnectionStore(defaults: defaults), ring: ring, send: send,
+            connections: ConnectionStore(defaults: defaults), cleanup: CleanupStore(defaults: defaults), ring: ring, send: send,
             copy: { [sink] text in sink.copied.append(text) },
             now: { [sink] in sink.now }
         )
@@ -203,6 +205,44 @@ final class FakeProvider: Sendable {
     @Test func dictateKeepsOneModelAcrossVisits() throws {
         let first = try #require(TakeModel.live())
         #expect(TakeModel.live() === first)
+    }
+
+    /// The words are cleaned up before they show: formatted, then polished
+    /// by the cleanup model (IOS-007).
+    @Test func aTakeIsCleanedUpBeforeItShows() async throws {
+        CleanupStore(defaults: defaults).save(CleanupSettings())
+        let provider = FakeProvider([(200, #"{"text":"um send the invoice tomorrow"}"#), (200, #"{"choices":[{"message":{"content":"Send the invoice tomorrow."}}]}"#)])
+        let model = model(provider)
+        await take(model)
+        #expect(model.state == .words("Send the invoice tomorrow."))
+        #expect(provider.requests.map { $0.url?.lastPathComponent } == ["transcriptions", "completions"])
+    }
+
+    /// A polish that fails keeps the formatted words, and the take is
+    /// delivered, not left waiting.
+    @Test func aPolishThatFailsKeepsTheFormattedWords() async throws {
+        CleanupStore(defaults: defaults).save(CleanupSettings())
+        let model = model(FakeProvider([(200, #"{"text":"um send the invoice tomorrow"}"#), (500, "{}")]))
+        await take(model)
+        #expect(model.state == .words(formatTranscript("um send the invoice tomorrow", options: FormatOptions(), spec: rules.format)))
+        #expect(model.waiting.isEmpty)
+    }
+
+    @Test func wordsThatCleanUpToNothingAreHeardNothing() async {
+        let model = model(.says("um uh"))
+        await take(model)
+        #expect(model.state == .heardNothing(sent: true))
+    }
+
+    @Test func aRetriedTakeIsCleanedUpToo() async throws {
+        let provider = FakeProvider([(503, "{}")])
+        let model = model(provider)
+        await take(model)
+        provider.answer([(200, #"{"text":"um send it to dana"}"#)])
+        await model.retry(model.waiting.map(\.id))
+        let cleaned = formatTranscript("um send it to dana", options: FormatOptions(), spec: rules.format)
+        #expect(model.state == .words(cleaned))
+        #expect(sink.copied == [cleaned])
     }
 
     @Test func aRetryThatFailsAgainUpdatesTheReason() async throws {

@@ -41,12 +41,15 @@ enum BundledRules {
         try shared().decode(ProviderCatalog.self, from: "provider-catalog.json")
     }
 
-    /// The speech gate's numbers and the phrases models invent on silence.
+    /// The speech gate's numbers, the phrases models invent on silence, the
+    /// formatter's rules, and polish's prompt and checks.
     static func takeRules() throws -> TakeRules {
         let shared = try shared()
         return TakeRules(
             gate: try shared.decode(SpeechGateSpec.self, from: "speech-gate.json"),
-            hallucinations: try shared.decode(HallucinationList.self, from: "hallucinations.json")
+            hallucinations: try shared.decode(HallucinationList.self, from: "hallucinations.json"),
+            format: try shared.decode(FormatSpec.self, from: "format-spec.json"),
+            polish: try shared.decode(PolishRules.self, from: "polish.json")
         )
     }
 }

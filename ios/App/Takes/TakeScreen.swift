@@ -261,7 +261,7 @@ extension TakeModel {
         let session = URLSession(configuration: .ephemeral)
         let model = TakeModel(
             microphone: DeviceMicrophone(), store: .standard, rules: rules, catalog: catalog,
-            connections: ConnectionStore(), ring: KeychainKeyRing(), send: { try await session.data(for: $0) },
+            connections: ConnectionStore(), cleanup: CleanupStore(), ring: KeychainKeyRing(), send: { try await session.data(for: $0) },
             copy: { UIPasteboard.general.string = $0 }
         )
         shared = model
@@ -337,7 +337,7 @@ struct TakePreview: View {
         let status = scene == .failed ? 503 : 200
         let words = scene == .inventedPhrase ? "Thank you." : "Send the invoice to Dana tomorrow morning, and copy the team on the thread."
         let model = TakeModel(
-            microphone: microphone, store: store, rules: rules, catalog: catalog, connections: ConnectionStore(defaults: defaults), ring: ring,
+            microphone: microphone, store: store, rules: rules, catalog: catalog, connections: ConnectionStore(defaults: defaults), cleanup: CleanupStore(defaults: defaults), ring: ring,
             send: { request in
                 let body = Data(#"{"text":"\#(words)"}"#.utf8)
                 return (body, HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!)
