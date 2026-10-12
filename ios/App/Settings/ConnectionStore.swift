@@ -29,11 +29,24 @@ struct ConnectionStore {
 }
 
 enum BundledRules {
-    /// The provider catalog the build copied into the app (shared/).
-    static func catalog() throws -> ProviderCatalog {
+    /// The rule files the build copied into the app (shared/).
+    private static func shared() throws -> SharedData {
         guard let directory = Bundle.main.url(forResource: "shared", withExtension: nil) else {
             throw SharedDataError.missing("shared")
         }
-        return try SharedData(directory: directory).decode(ProviderCatalog.self, from: "provider-catalog.json")
+        return SharedData(directory: directory)
+    }
+
+    static func catalog() throws -> ProviderCatalog {
+        try shared().decode(ProviderCatalog.self, from: "provider-catalog.json")
+    }
+
+    /// The speech gate's numbers and the phrases models invent on silence.
+    static func takeRules() throws -> TakeRules {
+        let shared = try shared()
+        return TakeRules(
+            gate: try shared.decode(SpeechGateSpec.self, from: "speech-gate.json"),
+            hallucinations: try shared.decode(HallucinationList.self, from: "hallucinations.json")
+        )
     }
 }
