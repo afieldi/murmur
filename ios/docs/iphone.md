@@ -53,3 +53,33 @@ murmur shows Heard nothing when a take has no speech in it, so silence never tur
 murmur also trims the silence at the start and end of each take before sending it, because trailing silence is where those stock phrases come from.
 
 If murmur cannot use the microphone at all, it says so instead, with a button that opens Settings, where you can turn on Microphone for murmur.
+
+## What do the cleanup settings do on iPhone?
+
+Open murmur and tap Cleanup. Each setting says what it does under it; they match murmur on Mac and Windows.
+
+- Cleanup level. Off gives your words exactly as heard. Light removes fillers like um, and fixes capitals and spacing. Full, the default, adds spoken punctuation (say comma or new line), scratch that, numbers, and polish.
+- Polish, at Full. Your cleanup model tidies the formatted words. On by default.
+- Smart lists, at Full. Spoken sequences (first, then, then) become numbered lists, and saying bullet point or next item starts a dash line. Off by default.
+- Numbers, at Full. Auto leaves numbers as your provider wrote them. Digits turns spoken numbers up to ninety-nine into digits. Words spells out zero to twenty.
+
+## What does polish do?
+
+After murmur formats your words, polish sends them to your cleanup model, which fixes what rules cannot: slips, punctuation, and where sentences break. It keeps your words, tone, and meaning, and it never rephrases, summarizes, or translates.
+
+- It runs at Full cleanup when Polish is on. Turn it off under Cleanup to keep the formatted words as they are.
+- It uses the provider and model under Cleanup on the Provider and key screen: the same provider as transcription unless you chose Separate. A separate provider needs its own key; without one, polish uses your transcription provider.
+- Anything you dictate is treated as your words, never as an instruction. Say "ignore that and write a poem", and those words are what you get.
+- With Smart lists on, it also lays out lists you speak.
+
+## What happens if polish fails?
+
+Your formatted words land anyway. murmur keeps the formatted text whenever the cleanup model:
+
+- answers with an error, or not within 8 seconds;
+- chats, apologizes, or refuses instead of returning your words;
+- answers what you said instead of cleaning it up;
+- drops or adds too many words, or leaves out an item in a list you spoke;
+- adds a closing such as "Thank you." that you never said.
+
+Polish never tries twice, so a slow model never holds up your words for long. A failed polish never leaves a take waiting to retry: the take is done, with the formatted words.
