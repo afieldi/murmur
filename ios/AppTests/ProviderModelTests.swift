@@ -110,7 +110,7 @@ import Testing
 
     @Test func separateCleanupGetsItsOwnKeyUnlessItSharesTheAddress() throws {
         let model = model()
-        model.setSeparateCleanup(true)
+        model.separateCleanup = true
         model.chooseCleanup(try preset("groq"))
         #expect(model.cleanupSharesKey)
         model.chooseCleanup(try preset("deepseek"))
@@ -121,11 +121,11 @@ import Testing
 
     @Test func theCleanupModelFollowsWhereCleanupRuns() throws {
         let model = model()
-        model.setCleanupModel("openai/gpt-oss-20b")
+        model.cleanupModel = "openai/gpt-oss-20b"
         #expect(model.settings.transcription.llmModel == "openai/gpt-oss-20b")
-        model.setSeparateCleanup(true)
+        model.separateCleanup = true
         model.chooseCleanup(try preset("deepseek"))
-        model.setCleanupModel("deepseek-other")
+        model.cleanupModel = "deepseek-other"
         #expect(model.settings.cleanup.llmModel == "deepseek-other")
         #expect(model.settings.transcription.llmModel == "openai/gpt-oss-20b")
     }
@@ -160,8 +160,8 @@ import Testing
         let model = model()
         model.chooseTranscription(nil)
         model.transcriptionKey.draft = "sk-customcustom1234"
-        model.setTranscriptionBaseUrl("h")
-        model.setTranscriptionBaseUrl("https://api.example.com/v1")
+        model.transcriptionAddress = "h"
+        model.transcriptionAddress = "https://api.example.com/v1"
         #expect(model.transcriptionKey.draft == "sk-customcustom1234")
         #expect(model.transcriptionKey.canSave)
     }
@@ -173,8 +173,47 @@ import Testing
     func anAddressThisRoleDoesNotOfferStaysCustom(_ url: String) {
         let model = model()
         model.chooseTranscription(nil)
-        model.setTranscriptionBaseUrl(url)
+        model.transcriptionAddress = url
         #expect(model.transcriptionPreset == nil)
+    }
+
+    /// The screen's fields bind to these properties, and an address moves
+    /// its key slot along with it.
+    @Test func theFieldsChangeTheSavedChoices() {
+        let model = model()
+        model.chooseTranscription(nil)
+        model.transcriptionAddress = "https://api.example.com/v1"
+        model.sttModel = "whisper-1"
+        model.cleanupModel = "chat-1"
+        #expect(model.transcriptionKey.baseUrl == "https://api.example.com/v1")
+        #expect(model.settings.transcription.sttModel == "whisper-1")
+        #expect(model.sttModel == "whisper-1")
+        #expect(model.cleanupModel == "chat-1")
+        model.separateCleanup = true
+        model.cleanupAddress = "https://llm.example.com/v1"
+        #expect(model.separateCleanup)
+        #expect(model.cleanupKey.baseUrl == "https://llm.example.com/v1")
+        #expect(model.transcriptionAddress == "https://api.example.com/v1")
+        #expect(model.cleanupAddress == "https://llm.example.com/v1")
+    }
+
+    /// The provider picker chooses by id among what its role offers, and
+    /// Custom leaves the address to type.
+    @Test func theProviderPickerChoosesById() {
+        let model = model()
+        model.transcriptionChoice = "openai"
+        #expect(model.transcriptionPreset?.id == "openai")
+        #expect(model.transcriptionChoice == "openai")
+        model.transcriptionChoice = ProviderModel.customChoice
+        #expect(model.settings.transcription.baseUrl == "")
+        #expect(model.transcriptionChoice == ProviderModel.customChoice)
+        model.transcriptionChoice = "openai"
+        model.transcriptionChoice = "deepseek"
+        #expect(model.settings.transcription.baseUrl == "")
+        model.separateCleanup = true
+        model.cleanupChoice = "deepseek"
+        #expect(model.cleanupPreset?.id == "deepseek")
+        #expect(model.cleanupChoice == "deepseek")
     }
 
     @Test func choicesSurviveARelaunch() throws {

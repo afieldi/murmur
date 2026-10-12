@@ -14,13 +14,12 @@ struct ProviderScreen: View {
             Section {
                 presetPicker(role: .transcription)
                 if model.transcriptionPreset == nil {
-                    AddressField(url: model.settings.transcription.baseUrl, set: model.setTranscriptionBaseUrl)
+                    AddressField(url: $model.transcriptionAddress)
                 }
                 ModelField(
                     label: "Transcription model",
-                    value: model.settings.transcription.sttModel,
-                    options: model.transcriptionPreset?.sttModels.map(\.id) ?? [],
-                    set: model.setSttModel
+                    value: $model.sttModel,
+                    options: model.transcriptionPreset?.sttModels.map(\.id) ?? []
                 )
                 KeySlotView(
                     slot: model.transcriptionKey,
@@ -35,7 +34,7 @@ struct ProviderScreen: View {
             .listRowBackground(Tokens.panel)
 
             Section {
-                Picker("Cleanup runs on", selection: Binding(get: { model.settings.cleanup.separate }, set: model.setSeparateCleanup)) {
+                Picker("Cleanup runs on", selection: $model.separateCleanup) {
                     Text("Same as transcription").tag(false)
                     Text("Separate").tag(true)
                 }
@@ -43,14 +42,13 @@ struct ProviderScreen: View {
                 if model.settings.cleanup.separate {
                     presetPicker(role: .cleanup)
                     if model.cleanupPreset == nil {
-                        AddressField(url: model.settings.cleanup.baseUrl, set: model.setCleanupBaseUrl)
+                        AddressField(url: $model.cleanupAddress)
                     }
                 }
                 ModelField(
                     label: "Cleanup model",
-                    value: model.settings.cleanupModel,
-                    options: model.cleanupPreset?.llmModels.map(\.id) ?? [],
-                    set: model.setCleanupModel
+                    value: $model.cleanupModel,
+                    options: model.cleanupPreset?.llmModels.map(\.id) ?? []
                 )
                 if model.cleanupSharesKey {
                     Text("Uses your transcription key.")
@@ -85,17 +83,9 @@ struct ProviderScreen: View {
     }
 
     private func presetPicker(role: ProviderRole) -> some View {
-        let presets = model.catalog.presets(for: role)
-        let current = role == .transcription ? model.transcriptionPreset : model.cleanupPreset
-        return Picker("Provider", selection: Binding<String>(
-            get: { current?.id ?? "custom" },
-            set: { id in
-                let preset = presets.first { $0.id == id }
-                if role == .transcription { model.chooseTranscription(preset) } else { model.chooseCleanup(preset) }
-            }
-        )) {
-            ForEach(presets, id: \.id) { Text($0.name).tag($0.id) }
-            Text("Custom").tag("custom")
+        Picker("Provider", selection: role == .transcription ? $model.transcriptionChoice : $model.cleanupChoice) {
+            ForEach(model.catalog.presets(for: role), id: \.id) { Text($0.name).tag($0.id) }
+            Text("Custom").tag(ProviderModel.customChoice)
         }
     }
 }
@@ -115,11 +105,10 @@ struct SectionTitle: View {
 
 /// A custom provider's base URL, with what to fix said under it.
 struct AddressField: View {
-    let url: String
-    let set: @MainActor (String) -> Void
+    @Binding var url: String
 
     var body: some View {
-        TextField("Base URL", text: Binding(get: { url }, set: set), prompt: Text("https://api.example.com/v1"))
+        TextField("Base URL", text: $url, prompt: Text("https://api.example.com/v1"))
             .keyboardType(.URL)
             .textContentType(.URL)
             .textInputAutocapitalization(.never)
@@ -135,18 +124,17 @@ struct AddressField: View {
 /// so the row says Model and VoiceOver hears the full name.
 struct ModelField: View {
     let label: String
-    let value: String
+    @Binding var value: String
     let options: [String]
-    let set: @MainActor (String) -> Void
 
     var body: some View {
         if options.isEmpty {
-            TextField("Model", text: Binding(get: { value }, set: set), prompt: Text("Model id"))
+            TextField("Model", text: $value, prompt: Text("Model id"))
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .accessibilityLabel(label)
         } else {
-            Picker("Model", selection: Binding(get: { value }, set: set)) {
+            Picker("Model", selection: $value) {
                 ForEach(options, id: \.self) { id in
                     Text(id).tag(id)
                 }

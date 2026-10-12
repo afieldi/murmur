@@ -66,15 +66,50 @@ final class ProviderModel {
         }
     }
 
-    func setSeparateCleanup(_ separate: Bool) { update { $0.cleanup.separate = separate } }
-    func setTranscriptionBaseUrl(_ url: String) { update { $0.transcription.baseUrl = url } }
-    func setSttModel(_ model: String) { update { $0.transcription.sttModel = model } }
-    func setCleanupBaseUrl(_ url: String) { update { $0.cleanup.baseUrl = url } }
+    // The screen binds its fields to these by key path ($model.sttModel).
+    // It never hands Binding a closure: Swift 6.3 (Xcode 26.6, the CI
+    // runner) crashes turning a main-actor closure into Binding's setter.
+
+    /// The provider picker's tag: a preset id, or customChoice.
+    static let customChoice = "custom"
+
+    var transcriptionChoice: String {
+        get { transcriptionPreset?.id ?? Self.customChoice }
+        set { chooseTranscription(catalog.presets(for: .transcription).first { $0.id == newValue }) }
+    }
+
+    var cleanupChoice: String {
+        get { cleanupPreset?.id ?? Self.customChoice }
+        set { chooseCleanup(catalog.presets(for: .cleanup).first { $0.id == newValue }) }
+    }
+
+    var separateCleanup: Bool {
+        get { settings.cleanup.separate }
+        set { update { $0.cleanup.separate = newValue } }
+    }
+
+    var transcriptionAddress: String {
+        get { settings.transcription.baseUrl }
+        set { update { $0.transcription.baseUrl = newValue } }
+    }
+
+    var cleanupAddress: String {
+        get { settings.cleanup.baseUrl }
+        set { update { $0.cleanup.baseUrl = newValue } }
+    }
+
+    var sttModel: String {
+        get { settings.transcription.sttModel }
+        set { update { $0.transcription.sttModel = newValue } }
+    }
 
     /// The cleanup model, wherever cleanup runs.
-    func setCleanupModel(_ model: String) {
-        update {
-            if $0.cleanup.separate { $0.cleanup.llmModel = model } else { $0.transcription.llmModel = model }
+    var cleanupModel: String {
+        get { settings.cleanupModel }
+        set {
+            update {
+                if $0.cleanup.separate { $0.cleanup.llmModel = newValue } else { $0.transcription.llmModel = newValue }
+            }
         }
     }
 
