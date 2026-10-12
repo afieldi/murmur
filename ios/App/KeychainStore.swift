@@ -46,6 +46,20 @@ struct KeychainStore: Sendable {
         try check(status)
     }
 
+    /// The Keychain access group an item landed in, or nil when there is
+    /// no item. Tests and the smoke use it to prove keys never sit in the
+    /// app group, which the keyboard can read.
+    func accessGroup(account: String) throws -> String? {
+        var query = baseQuery(account)
+        query[kSecReturnAttributes] = true
+        query[kSecMatchLimit] = kSecMatchLimitOne
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == errSecItemNotFound { return nil }
+        try check(status)
+        return (item as? [String: Any])?[kSecAttrAccessGroup as String] as? String
+    }
+
     private func baseQuery(_ account: String) -> [CFString: Any] {
         [kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: account]
     }
