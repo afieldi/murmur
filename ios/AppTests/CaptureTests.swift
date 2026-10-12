@@ -27,6 +27,12 @@ import Testing
         (samples.reduce(0.0) { $0 + Double($1 * $1) } / Double(samples.count)).squareRoot()
     }
 
+    /// Music that is playing keeps playing, and stays in your AirPods or
+    /// other Bluetooth headphones while the iPhone's own mic records.
+    @Test func musicStaysWhereItIsPlaying() {
+        #expect(DeviceMicrophone.sessionOptions == [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP])
+    }
+
     /// The microphone calls the tap on its own audio thread, so the tap
     /// must never belong to the main actor.
     @Test func theTapRunsOffTheMainThread() throws {

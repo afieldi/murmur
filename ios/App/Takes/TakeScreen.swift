@@ -248,16 +248,24 @@ struct InlineAction: ButtonStyle {
 }
 
 extension TakeModel {
-    /// The real screen: the device microphone, today's provider and key,
-    /// and a session that keeps no cookies or cache.
+    private static var shared: TakeModel?
+
+    /// The real screen's model: the device microphone, today's provider
+    /// and key, and a session that keeps no cookies or cache. There is one
+    /// for the app's life, so a take still transcribing when you leave
+    /// Dictate is there when you come back, and two visits never retry
+    /// the same take at once.
     static func live() -> TakeModel? {
+        if let shared { return shared }
         guard let catalog = try? BundledRules.catalog(), let rules = try? BundledRules.takeRules() else { return nil }
         let session = URLSession(configuration: .ephemeral)
-        return TakeModel(
+        let model = TakeModel(
             microphone: DeviceMicrophone(), store: .standard, rules: rules, catalog: catalog,
             connections: ConnectionStore(), ring: KeychainKeyRing(), send: { try await session.data(for: $0) },
             copy: { UIPasteboard.general.string = $0 }
         )
+        shared = model
+        return model
     }
 }
 

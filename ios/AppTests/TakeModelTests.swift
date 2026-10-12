@@ -54,9 +54,13 @@ final class FakeProvider: Sendable {
     }
 
     func model(_ provider: FakeProvider) -> TakeModel {
+        model(send: provider.send)
+    }
+
+    func model(send: @escaping ConnectionTest.Send) -> TakeModel {
         TakeModel(
             microphone: microphone, store: store, rules: rules, catalog: catalog,
-            connections: ConnectionStore(defaults: defaults), ring: ring, send: provider.send,
+            connections: ConnectionStore(defaults: defaults), ring: ring, send: send,
             copy: { [sink] text in sink.copied.append(text) },
             now: { [sink] in sink.now }
         )
@@ -173,6 +177,32 @@ final class FakeProvider: Sendable {
         #expect(sink.copied.last == "First.\n\nSecond.")
         #expect(model.waiting.isEmpty)
         #expect(model.message == "Done: 2 takes. Their words are above and on your clipboard.")
+    }
+
+    /// Retry all delivers in the order the takes were spoken, so a message
+    /// dictated in parts pastes back in order.
+    @Test func retryAllKeepsTheOrderSpoken() async throws {
+        await take(model(FakeProvider([(503, "{}")])))
+        pass(5)
+        microphone.samples = ScriptedMicrophone.tone + ScriptedMicrophone.tone
+        await take(model(FakeProvider([(503, "{}")])))
+        let older = try store.audio(try #require(store.list().last?.id))
+        let answersByTake: ConnectionTest.Send = { request in
+            let words = request.httpBody?.range(of: older) != nil ? "Older." : "Newer."
+            return (Data(#"{"text":"\#(words)"}"#.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
+        let model = model(send: answersByTake)
+        await model.retry(model.waiting.map(\.id))
+        #expect(model.state == .words("Older.\n\nNewer."))
+        #expect(sink.copied.last == "Older.\n\nNewer.")
+    }
+
+    /// The app keeps one take model, so a take still transcribing when you
+    /// leave Dictate is there when you come back, and two visits can never
+    /// retry the same take at once.
+    @Test func dictateKeepsOneModelAcrossVisits() throws {
+        let first = try #require(TakeModel.live())
+        #expect(TakeModel.live() === first)
     }
 
     @Test func aRetryThatFailsAgainUpdatesTheReason() async throws {

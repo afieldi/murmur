@@ -123,9 +123,10 @@ struct TakeRules: Sendable {
         state = .idle
     }
 
-    /// Runs the waiting takes one at a time through today's provider.
-    /// Their words show here and go to the clipboard, so a retried take is
-    /// safe before its audio is deleted.
+    /// Runs the waiting takes one at a time through today's provider, in
+    /// the order they were spoken (ids sort by time). Their words show
+    /// here and go to the clipboard, so a retried take is safe before its
+    /// audio is deleted.
     func retry(_ ids: [String]) async {
         guard !ids.isEmpty, !isRecording, !isBusy else { return }
         retrying = ids
@@ -134,7 +135,7 @@ struct TakeRules: Sendable {
         defer { retrying = [] }
         var delivered: [String] = []
         var failed = 0
-        for id in ids {
+        for id in ids.sorted() {
             guard let audio = try? store.audio(id) else { continue }
             switch await words(for: audio) {
             case .success(.some(let words)):

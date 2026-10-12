@@ -30,10 +30,15 @@ enum MicrophoneError: Error {
         }
     }
 
-    /// Music that is playing keeps playing (mixWithOthers).
+    /// Music that is playing keeps playing (mixWithOthers), and stays in
+    /// Bluetooth headphones (allowBluetoothA2DP) while the iPhone's own
+    /// mic records; without it, playAndRecord moves the music to the
+    /// speaker for the length of the take.
+    nonisolated static let sessionOptions: AVAudioSession.CategoryOptions = [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP]
+
     func start() throws {
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker])
+        try session.setCategory(.playAndRecord, mode: .default, options: Self.sessionOptions)
         try session.setActive(true)
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
