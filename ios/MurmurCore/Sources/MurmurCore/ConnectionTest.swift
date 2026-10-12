@@ -48,22 +48,22 @@ public enum ConnectionTest {
         case 401, 403:
             return .keyRejected(status: status)
         default:
-            let words = message(in: body) ?? "The provider answered with code \(status)."
-            // A provider that echoes the key back never gets it shown.
-            return .providerMessage(words.replacingOccurrences(of: key.secret, with: key.masked))
+            return .providerMessage(message(in: body, hiding: key) ?? "The provider answered with code \(status).")
         }
     }
 
     /// The error text OpenAI-compatible servers send, in the shapes they
     /// use: {"error": {"message"}}, {"error": "…"}, {"message"}, or
-    /// {"detail"}. Long text is cut to 200 characters.
-    static func message(in body: Data) -> String? {
+    /// {"detail"}. A provider that echoes the key back gets the mask in
+    /// its place, before long text is cut to 200 characters, so a key
+    /// across the cut never shows in part.
+    static func message(in body: Data, hiding key: APIKey) -> String? {
         guard let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else { return nil }
         let candidates: [Any?] = [
             (object["error"] as? [String: Any])?["message"], object["error"], object["message"], object["detail"]
         ]
         for case let text as String in candidates {
-            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmed = text.replacingOccurrences(of: key.secret, with: key.masked).trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty { continue }
             return trimmed.count > 200 ? String(trimmed.prefix(200)) + "…" : trimmed
         }

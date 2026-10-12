@@ -23,8 +23,17 @@ final class ProviderModel {
         cleanupKey = KeySlot(baseUrl: settings.cleanupBaseUrl, catalog: catalog, ring: ring, send: send)
     }
 
-    var transcriptionPreset: ProviderCatalog.Provider? { catalog.preset(forBaseUrl: settings.transcription.baseUrl) }
-    var cleanupPreset: ProviderCatalog.Provider? { catalog.preset(forBaseUrl: settings.cleanupBaseUrl) }
+    var transcriptionPreset: ProviderCatalog.Provider? { offered(.transcription, settings.transcription.baseUrl) }
+    var cleanupPreset: ProviderCatalog.Provider? { offered(.cleanup, settings.cleanupBaseUrl) }
+
+    /// The preset an address belongs to, if this role offers it. Any other
+    /// address, even one of a preset the role leaves out (Local, or a chat
+    /// provider typed in for transcription), stays Custom, so its field and
+    /// note stay on screen.
+    private func offered(_ role: ProviderRole, _ baseUrl: String) -> ProviderCatalog.Provider? {
+        guard let preset = catalog.preset(forBaseUrl: baseUrl) else { return nil }
+        return catalog.presets(for: role).contains { $0.id == preset.id } ? preset : nil
+    }
 
     /// Separate cleanup at transcription's address uses transcription's key.
     var cleanupSharesKey: Bool {
@@ -115,10 +124,11 @@ final class KeySlot {
 
     /// Follows a new address: that provider's saved key, and no verdict,
     /// since one earned against another address never vouches for this one.
+    /// A key being pasted stays, as on desktop, so fixing a custom address
+    /// one keystroke at a time never loses it.
     func point(at baseUrl: String) {
         guard BaseURL.normalized(baseUrl) != BaseURL.normalized(self.baseUrl) else { return }
         self.baseUrl = baseUrl
-        draft = ""
         test = .idle
         reload()
     }

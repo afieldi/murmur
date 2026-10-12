@@ -20,11 +20,11 @@ struct KeySlotView: View {
             .accessibilityLabel("\(provider) key saved, ending in \(masked.suffix(4))")
             Button("Remove key") { confirmingRemove = true }
                 .buttonStyle(RowAction())
-                .confirmationDialog("Remove your \(provider) key from this iPhone?", isPresented: $confirmingRemove, titleVisibility: .visible) {
+                .confirmationDialog(KeyCopy.removeQuestion(provider), isPresented: $confirmingRemove, titleVisibility: .visible) {
                     Button("Remove key", role: .destructive) { slot.remove() }
                 }
         } else {
-            SecureField("Paste your \(provider) key", text: $slot.draft)
+            SecureField(KeyCopy.pastePrompt(provider), text: $slot.draft)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .privacySensitive()

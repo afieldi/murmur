@@ -37,10 +37,24 @@ extension KeyNote {
 }
 
 enum ProviderName {
-    /// A preset's name, else the custom address's host, else a plain stand-in.
+    /// The stand-in for a custom provider with no address yet.
+    static let unknown = "your provider"
+
+    /// A preset's name, else the custom address's host, else the stand-in.
     static func of(_ preset: ProviderCatalog.Provider?, baseUrl: String) -> String {
         if let preset { return preset.name }
         if let host = URLComponents(string: baseUrl)?.host, !host.isEmpty { return host }
-        return "your provider"
+        return unknown
+    }
+}
+
+/// The key field's words, which must read naturally with the stand-in too.
+enum KeyCopy {
+    static func pastePrompt(_ provider: String) -> String {
+        provider == ProviderName.unknown ? "Paste your key" : "Paste your \(provider) key"
+    }
+
+    static func removeQuestion(_ provider: String) -> String {
+        provider == ProviderName.unknown ? "Remove this key from this iPhone?" : "Remove your \(provider) key from this iPhone?"
     }
 }

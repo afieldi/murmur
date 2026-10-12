@@ -59,6 +59,20 @@ import Testing
         #expect(ConnectionTest.verdict(status: 500, body: Data(#"{"message":"\#(long)"}"#.utf8), key: key) == .providerMessage(String(repeating: "a", count: 200) + "…"))
     }
 
+    /// The key is masked before a long message is cut, so a key that
+    /// straddles the cut never shows in part.
+    @Test func aKeyAcrossTheCutIsStillMasked() throws {
+        let long = try #require(APIKey("gsk_" + String(repeating: "Q", count: 52)))
+        let message = String(repeating: "a", count: 185) + " key " + long.secret + " was refused"
+        let verdict = ConnectionTest.verdict(status: 429, body: Data(#"{"message":"\#(message)"}"#.utf8), key: long)
+        guard case .providerMessage(let words) = verdict else {
+            Issue.record("expected the provider's words, got \(verdict)")
+            return
+        }
+        #expect(!words.contains("gsk_Q"), "\(words)")
+        #expect(words.contains("••••QQQQ"))
+    }
+
     @Test func aMessageNeverRepeatsTheKey() {
         let verdict = ConnectionTest.verdict(status: 429, body: Data(#"{"error":{"message":"Too many requests for gsk_abcdefgh1234"}}"#.utf8), key: key)
         #expect(verdict == .providerMessage("Too many requests for ••••1234"))

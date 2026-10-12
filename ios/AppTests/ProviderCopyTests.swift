@@ -29,6 +29,16 @@ import Testing
         #expect(ProviderName.of(nil, baseUrl: "") == "your provider")
     }
 
+    /// A custom provider with no address yet reads naturally, never as
+    /// "your your provider".
+    @Test func anUnnamedProviderReadsNaturally() {
+        let unnamed = ProviderName.of(nil, baseUrl: "")
+        #expect(KeyCopy.pastePrompt(unnamed) == "Paste your key")
+        #expect(KeyCopy.removeQuestion(unnamed) == "Remove this key from this iPhone?")
+        #expect(KeyCopy.pastePrompt("Groq") == "Paste your Groq key")
+        #expect(KeyCopy.removeQuestion("Groq") == "Remove your Groq key from this iPhone?")
+    }
+
     /// The product name stays lowercase even where a sentence starts.
     @Test func murmurStaysLowercase() {
         for verdict in [ConnectionVerdict.works, .keyRejected(status: 401), .keyRejected(status: 403), .noConnection] {

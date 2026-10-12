@@ -155,6 +155,28 @@ import Testing
         #expect(model().transcriptionPreset?.id == "groq")
     }
 
+    /// Fixing a custom address never wipes a key pasted before it.
+    @Test func editingACustomAddressKeepsThePastedKey() {
+        let model = model()
+        model.chooseTranscription(nil)
+        model.transcriptionKey.draft = "sk-customcustom1234"
+        model.setTranscriptionBaseUrl("h")
+        model.setTranscriptionBaseUrl("https://api.example.com/v1")
+        #expect(model.transcriptionKey.draft == "sk-customcustom1234")
+        #expect(model.transcriptionKey.canSave)
+    }
+
+    /// An address that belongs to a preset this role does not offer (Local
+    /// for transcription, or a chat-only provider) stays Custom, so the
+    /// address field and its note stay on screen.
+    @Test(arguments: ["http://localhost:8000/v1", "https://api.deepseek.com"])
+    func anAddressThisRoleDoesNotOfferStaysCustom(_ url: String) {
+        let model = model()
+        model.chooseTranscription(nil)
+        model.setTranscriptionBaseUrl(url)
+        #expect(model.transcriptionPreset == nil)
+    }
+
     @Test func choicesSurviveARelaunch() throws {
         model().chooseTranscription(try preset("mistral"))
         #expect(model().transcriptionPreset?.id == "mistral")
