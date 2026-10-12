@@ -1,21 +1,22 @@
 # murmur for iPhone Roadmap
 
-> Generated from ios/prd.json (2/29 stories verified). Do not edit by hand: change ios/prd.json, then run `npm run roadmap`.
+> Generated from ios/prd.json (4/29 stories verified). Do not edit by hand: change ios/prd.json, then run `npm run roadmap`.
 
 ## Done and verified
 
+- [x] **IOS-001** The ios/ scaffold
 - [x] **IOS-002** CI job on a Mac
 - [x] **IOS-003** MurmurCore passes desktop's answer key
+- [x] **IOS-004** Bundle ids and the App Store Connect record
 
 ## Built, awaiting live verification
 
 Automated criteria pass; the remaining step is a human loop noted in ios/prd.json and HANDOFF.md.
 
-- [ ] **IOS-001** The ios/ scaffold
+(none yet)
 
 ## To do
 
-- [ ] **IOS-004** Bundle ids and the App Store Connect record
 - [ ] **IOS-005** Provider and key setup
 - [ ] **IOS-006** Record and transcribe in the app
 - [ ] **IOS-007** Cleanup that fails open
