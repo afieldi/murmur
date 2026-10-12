@@ -30,3 +30,26 @@ In the iPhone's Keychain, and only there.
 - Tap Remove key on the Provider screen to delete it. murmur asks first.
 
 What you say goes only to the provider you picked, straight from your iPhone.
+
+## What happens when a dictation fails on iPhone?
+
+murmur keeps the recording, and you can retry it.
+
+- If your provider cannot be reached, does not answer in time, has a problem on its end, turns down your key, or refuses the audio, murmur says Not transcribed, gives the reason in plain words, and keeps the recording.
+- A problem with the server or the network gets one more try by itself before murmur calls the take failed. A refused key or request is never retried by itself.
+- The recording waits under Waiting to retry on the Dictate screen. Tap Retry to send it again with the provider and key you have now, or Retry all to send each one in turn.
+- A retried take's words show on the screen and go to your clipboard, so they are safe before the recording is deleted.
+- To delete a recording, tap Discard, then tap Delete audio? when it turns red. A quick double tap never deletes.
+- murmur keeps the 20 most recent waiting recordings. They stay on this iPhone: they go only to your provider when you retry, and they are left out of iCloud backups.
+- A take that fails while the iPhone is locked still saves, as long as the iPhone has been unlocked once since it started.
+
+## Why did murmur hear nothing?
+
+murmur shows Heard nothing when a take has no speech in it, so silence never turns into words. Two checks make sure of it, the same ones murmur uses on Mac and Windows:
+
+- Before sending, murmur measures the recording. With less than a fifth of a second of speech in it, nothing is sent. Speak a little closer to the microphone, and check that another app is not using it.
+- Speech models sometimes answer silence with a stock phrase, such as "Thank you." or "Thanks for watching." When that phrase is all that comes back, murmur keeps nothing. A thank-you inside your own sentences is kept.
+
+murmur also trims the silence at the start and end of each take before sending it, because trailing silence is where those stock phrases come from.
+
+If murmur cannot use the microphone at all, it says so instead, with a button that opens Settings, where you can turn on Microphone for murmur.
