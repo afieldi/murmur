@@ -42,4 +42,26 @@ public enum Wav {
         if value.isNaN { return 0 }
         return Int16(JS.round(Swift.max(-1, Swift.min(1, value)) * 32767))
     }
+
+    /// Audio length from a PCM WAV header: data bytes over byte rate, as
+    /// desktop's wavDurationMs reads it. Zero for anything else.
+    public static func durationMs(_ wav: Data) -> Int {
+        let bytes = [UInt8](wav)
+        func ascii(_ at: Int) -> String { String(decoding: bytes[at..<(at + 4)], as: UTF8.self) }
+        func u32(_ at: Int) -> Int { (0..<4).reduce(0) { $0 | Int(bytes[at + $1]) << (8 * $1) } }
+        guard bytes.count >= 12, ascii(0) == "RIFF", ascii(8) == "WAVE" else { return 0 }
+        var byteRate = 0
+        var offset = 12
+        while offset + 8 <= bytes.count {
+            let id = ascii(offset)
+            let size = u32(offset + 4)
+            if id == "fmt ", offset + 20 <= bytes.count { byteRate = u32(offset + 16) }
+            if id == "data" {
+                let length = Swift.min(size, bytes.count - offset - 8)
+                return byteRate > 0 ? Int(JS.round(Double(length) / Double(byteRate) * 1000)) : 0
+            }
+            offset += 8 + size + size % 2
+        }
+        return 0
+    }
 }
