@@ -38,6 +38,7 @@ enum SmokeRunner {
             ("speechGate", checkSpeechGate),
             ("transcription", checkTranscription),
             ("waitingTakes", checkWaitingTakes),
+            ("polish", checkPolish),
             ("sharedJson", { try checkSharedJson(expected: request.sharedCount) })
         ]
         var results: [String: Bool] = [:]
@@ -171,6 +172,32 @@ enum SmokeRunner {
         guard retried == .words(StubProtocol.words) else { throw SmokeFailure("the retry gave \(retried)") }
         try store.remove(id)
         guard store.list().isEmpty else { throw SmokeFailure("the delivered take is still waiting") }
+    }
+
+    /// Polish pointed at a stand-in that errors, then at one that chats:
+    /// both give back the formatted text unchanged, and say why.
+    static func checkPolish() throws {
+        guard let key = APIKey(StubProtocol.key) else { throw SmokeFailure("the dummy key did not parse") }
+        let rules = try BundledRules.takeRules()
+        let heard = "um send the report tomorrow and copy the whole team on it please"
+        let formatted = formatTranscript(heard, options: FormatOptions(), spec: rules.format)
+        let session = StubProtocol.session()
+        for baseUrl in [StubProtocol.chatErrorBaseUrl, StubProtocol.chattyBaseUrl] {
+            let connection = PolishConnection(baseUrl: baseUrl, model: "smoke-model", key: key)
+            let reasons = Reasons()
+            let text = waitFor {
+                await Cleanup.finish(heard, settings: CleanupSettings(), rules: rules.cleanup, connection: connection, send: { try await session.data(for: $0) }) { reason in
+                    reasons.list.withLock { $0.append(reason) }
+                }
+            }
+            guard text == formatted else { throw SmokeFailure("\(baseUrl) changed the text to \(text)") }
+            guard reasons.list.withLock({ $0.count }) == 1 else { throw SmokeFailure("polish at \(baseUrl) did not fall back") }
+        }
+    }
+
+    /// Fallback reasons, collected across the smoke's async bridge.
+    private final class Reasons: Sendable {
+        let list = Mutex<[String]>([])
     }
 
     /// Runs async work to the end from the smoke's synchronous start.

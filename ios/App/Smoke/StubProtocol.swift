@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// A local stand-in provider for the smoke (ios/prd.json IOS-005, IOS-006):
-// it answers Test connection and transcriptions inside the app, through
-// the real URLSession, without a network or a server.
+// A local stand-in provider for the smoke (ios/prd.json IOS-005, IOS-006,
+// IOS-007): it answers Test connection, transcriptions, and polish inside
+// the app, through the real URLSession, without a network or a server.
 import Foundation
 import MurmurCore
 
@@ -28,6 +28,10 @@ final class StubProtocol: URLProtocol {
 
     /// What the words host hears when a whole take reaches it.
     static let words = "smoke words from the stand-in"
+
+    /// The cleanup stand-ins (IOS-007): one that errors, one that chats.
+    static let chatErrorBaseUrl = "https://chaterror.stub.invalid/v1"
+    static let chattyBaseUrl = "https://chatty.stub.invalid/v1"
 
     /// The only key the stand-ins accept, so a missing header fails.
     static let key = "smoke-not-a-real-key-1234"
@@ -56,6 +60,10 @@ final class StubProtocol: URLProtocol {
             (status, body) = !authorized ? (401, "{}") : Self.isWholeTake(request) ? (200, #"{"text":"\#(Self.words)"}"#) : (400, "{}")
         case ("down", _):
             (status, body) = (503, #"{"error":{"message":"Service unavailable"}}"#)
+        case ("chaterror", _):
+            (status, body) = (500, #"{"error":{"message":"Internal error"}}"#)
+        case ("chatty", _):
+            (status, body) = (200, #"{"choices":[{"message":{"content":"Sure! Here is the cleaned text: send the report."}}]}"#)
         case (_, .offline?):
             client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
             return
