@@ -1,14 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import SwiftUI
 
-/// A quiet placeholder until Home (IOS-012) replaces it.
+/// A quiet placeholder until Home (IOS-012) replaces it: the way to the
+/// Provider screen, and nothing else.
 struct ContentView: View {
     var body: some View {
-        Text("murmur")
-            .font(.largeTitle.weight(.semibold))
-            .foregroundStyle(Tokens.brand)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        NavigationStack {
+            List {
+                NavigationLink("Provider and key") { ProviderRoute() }
+                    .listRowBackground(Tokens.panel)
+            }
+            .scrollContentBackground(.hidden)
             .background(Tokens.ink)
+            .foregroundStyle(Tokens.text)
+            .navigationTitle("murmur")
+        }
+        .tint(Tokens.brand)
+        .preferredColorScheme(.dark)
     }
 }
 
