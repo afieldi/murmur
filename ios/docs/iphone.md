@@ -83,3 +83,26 @@ Your formatted words land anyway. murmur keeps the formatted text whenever the c
 - adds a closing such as "Thank you." that you never said.
 
 Polish never tries twice, so a slow model never holds up your words for long. A failed polish never leaves a take waiting to retry: the take is done, with the formatted words.
+
+## How do I add the murmur keyboard?
+
+Add it once in Settings, turn on Full Access, then pick it with the globe key.
+
+1. Open Settings, then General, then Keyboard, then Keyboards.
+2. Tap Add New Keyboard, and pick murmur.
+3. Tap murmur in the list, and turn on Allow Full Access.
+4. In any text field, hold the globe key and pick murmur. The Keyboard screen in murmur has a box to try it in.
+
+The keyboard is a dictation pad: the pill to talk, and globe, space, delete, and return. Tap the pill, speak, and tap it again; your words land where the cursor is. Typing letters stays with your other keyboards. In password and phone number fields, iOS always shows its own keyboard instead.
+
+For now the pill works while murmur is open. Starting a take from another app comes with murmur's listening session.
+
+## Why does murmur need Full Access?
+
+Full Access lets the keyboard and the murmur app share a small drawer. The keyboard leaves a note saying start or stop, and the app leaves your words for the keyboard to type. Without Full Access, iOS walls the keyboard off from the app, so the pill cannot work; the keyboard says so and shows the steps to turn it on.
+
+The keyboard itself never connects to the internet. A test checks that every time murmur is built. Only the app talks to your provider, and only your newest take's words pass through the drawer, cleared as soon as they are typed.
+
+## What is Insert last?
+
+If you leave the text field before your words are ready, murmur does not type them into whatever field you moved to. The keyboard shows Insert last instead. Tap it to type your newest take where your cursor is now. A take is typed once: after that, its words are cleared from the keyboard.
