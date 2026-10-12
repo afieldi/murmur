@@ -5,6 +5,7 @@
 // and a failed check explains itself on a line starting "smoke <name>:".
 import Foundation
 import MurmurCore
+import Synchronization
 
 struct SmokeRequest: Equatable {
     /// How many shared rule files the build bundled; -1 when not given,
@@ -32,6 +33,8 @@ enum SmokeRunner {
         let checks: [(name: String, run: () throws -> Void)] = [
             ("appGroup", checkAppGroup),
             ("keychain", checkKeychain),
+            ("keyRing", checkKeyRing),
+            ("connectionTest", checkConnectionTest),
             ("sharedJson", { try checkSharedJson(expected: request.sharedCount) })
         ]
         var results: [String: Bool] = [:]
@@ -79,6 +82,55 @@ enum SmokeRunner {
         guard try store.read(account: account) == nil else {
             throw SmokeFailure("delete left the item behind")
         }
+    }
+
+    /// A dummy key through the key ring: saved, read back, filed in the
+    /// app's own Keychain access group (never the app group, which the
+    /// keyboard can read), kept out of the app's defaults, and deleted.
+    static func checkKeyRing() throws {
+        let ring = KeychainKeyRing()
+        let url = "https://smoke.invalid/v1/"
+        defer { try? ring.remove(for: url) }
+        guard let key = APIKey(StubProtocol.key) else { throw SmokeFailure("the dummy key did not parse") }
+        try ring.save(key, for: url)
+        guard try ring.key(for: "https://smoke.invalid/v1") == key else {
+            throw SmokeFailure("read back a different key")
+        }
+        let group = try ring.store.accessGroup(account: BaseURL.normalized(url)) ?? ""
+        guard group != AppGroup.identifier, group.hasSuffix("." + (Bundle.main.bundleIdentifier ?? "?")) else {
+            throw SmokeFailure("the key sits in access group \(group)")
+        }
+        guard !"\(UserDefaults.standard.dictionaryRepresentation())".contains(key.secret) else {
+            throw SmokeFailure("the key reached the app's defaults")
+        }
+        try ring.remove(for: url)
+        guard try ring.key(for: url) == nil else { throw SmokeFailure("remove left the key behind") }
+    }
+
+    /// Test connection against the local stand-in, once for each answer.
+    static func checkConnectionTest() throws {
+        guard let key = APIKey(StubProtocol.key) else { throw SmokeFailure("the dummy key did not parse") }
+        let session = StubProtocol.session()
+        for answer in StubProtocol.Answer.allCases {
+            let verdict = waitFor { await ConnectionTest.run(baseUrl: answer.baseUrl, key: key, send: { try await session.data(for: $0) }) }
+            guard verdict == answer.expected else {
+                throw SmokeFailure("\(answer.rawValue) gave \(verdict), expected \(answer.expected)")
+            }
+        }
+    }
+
+    /// Runs async work to the end from the smoke's synchronous start.
+    private static func waitFor<T: Sendable>(_ work: @escaping @Sendable () async -> T) -> T {
+        let result = Mutex<T?>(nil)
+        let done = DispatchSemaphore(value: 0)
+        Task.detached {
+            let value = await work()
+            result.withLock { $0 = value }
+            done.signal()
+        }
+        done.wait()
+        guard let value = result.withLock({ $0 }) else { preconditionFailure("the work signaled without a value") }
+        return value
     }
 
     static func checkSharedJson(expected: Int) throws {
