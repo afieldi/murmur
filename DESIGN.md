@@ -11,7 +11,7 @@ The ground. Every renderer and website color is a token in `src/renderer/tokens.
 | ink | The background. |
 | panel, panel-lift | Cards and raised surfaces. |
 | text, text-dim | Words, and quieter words. |
-| brand (gold) | Headlines, micro-labels, static highlights, and dried paint. |
+| brand (gold) | Headlines, micro-labels, static highlights, and dried paint. On iPhone, also tappable action rows, dimmed while they cannot run (LaBroi, 2026-10-12). |
 | amber | Live only: the pill while you speak, wet paint. Always brighter than gold. |
 | red | Record, error, and the button that confirms a delete (LaBroi, 2026-10-08). Never decorative. |
 | ok | Success states. |
