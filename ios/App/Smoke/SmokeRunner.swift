@@ -35,6 +35,9 @@ enum SmokeRunner {
             ("keychain", checkKeychain),
             ("keyRing", checkKeyRing),
             ("connectionTest", checkConnectionTest),
+            ("speechGate", checkSpeechGate),
+            ("transcription", checkTranscription),
+            ("waitingTakes", checkWaitingTakes),
             ("sharedJson", { try checkSharedJson(expected: request.sharedCount) })
         ]
         var results: [String: Bool] = [:]
@@ -117,6 +120,57 @@ enum SmokeRunner {
                 throw SmokeFailure("\(answer.rawValue) gave \(verdict), expected \(answer.expected)")
             }
         }
+    }
+
+    /// A generated tone passes the speech gate and a generated silence
+    /// does not; a phrase models invent on silence is heard as nothing.
+    static func checkSpeechGate() throws {
+        let rules = try BundledRules.takeRules()
+        guard TakeAudio.upload(ScriptedMicrophone.tone, gate: rules.gate) != nil else {
+            throw SmokeFailure("the tone did not pass the gate")
+        }
+        guard TakeAudio.upload(ScriptedMicrophone.silence, gate: rules.gate) == nil else {
+            throw SmokeFailure("silence passed the gate")
+        }
+        guard TakeAudio.heard("Thank you.", list: rules.hallucinations) == nil,
+              TakeAudio.heard("Send the invoice tomorrow.", list: rules.hallucinations) != nil
+        else { throw SmokeFailure("the hallucination filter misjudged a transcript") }
+    }
+
+    /// A take, gated and encoded, goes to the local stand-in through the
+    /// real URLSession, and its words come back.
+    static func checkTranscription() throws {
+        guard let key = APIKey(StubProtocol.key) else { throw SmokeFailure("the dummy key did not parse") }
+        let rules = try BundledRules.takeRules()
+        guard let wav = TakeAudio.upload(ScriptedMicrophone.tone, gate: rules.gate) else { throw SmokeFailure("the tone did not pass the gate") }
+        let session = StubProtocol.session()
+        let result = waitFor { await Transcription.run(wav: wav, baseUrl: StubProtocol.wordsBaseUrl, model: "smoke-model", key: key, send: { try await session.data(for: $0) }) }
+        guard case .words(let text) = result, TakeAudio.heard(text, list: rules.hallucinations) == StubProtocol.words else {
+            throw SmokeFailure("the stand-in gave \(result)")
+        }
+    }
+
+    /// A take that fails waits in a scratch folder with protection that
+    /// allows writing after first unlock, then a retry delivers it and its
+    /// audio goes.
+    static func checkWaitingTakes() throws {
+        guard let key = APIKey(StubProtocol.key) else { throw SmokeFailure("the dummy key did not parse") }
+        let store = WaitingStore(directory: FileManager.default.temporaryDirectory.appending(path: "smoke-waiting-\(UUID().uuidString)", directoryHint: .isDirectory))
+        defer { try? FileManager.default.removeItem(at: store.directory) }
+        let rules = try BundledRules.takeRules()
+        guard let wav = TakeAudio.upload(ScriptedMicrophone.tone, gate: rules.gate) else { throw SmokeFailure("the tone did not pass the gate") }
+        let session = StubProtocol.session()
+        let down = waitFor { await Transcription.run(wav: wav, baseUrl: StubProtocol.downBaseUrl, model: "smoke-model", key: key, send: { try await session.data(for: $0) }) }
+        guard case .failed(let kind, let detail) = down, kind == .server else { throw SmokeFailure("the down host gave \(down)") }
+        let id = try store.save(wav, startedAt: .now, failure: TakeFailure(kind: kind.rawValue, detail: detail))
+        guard store.list().map(\.id) == [id], store.take(id)?.failure?.kind == "server" else { throw SmokeFailure("the failed take did not list") }
+        let protection = try store.directory.appending(path: "\(id).wav").resourceValues(forKeys: [.fileProtectionKey]).fileProtection
+        guard protection == .completeUntilFirstUserAuthentication else { throw SmokeFailure("the audio has protection \(String(describing: protection))") }
+        let audio = try store.audio(id)
+        let retried = waitFor { await Transcription.run(wav: audio, baseUrl: StubProtocol.wordsBaseUrl, model: "smoke-model", key: key, send: { try await session.data(for: $0) }) }
+        guard retried == .words(StubProtocol.words) else { throw SmokeFailure("the retry gave \(retried)") }
+        try store.remove(id)
+        guard store.list().isEmpty else { throw SmokeFailure("the delivered take is still waiting") }
     }
 
     /// Runs async work to the end from the smoke's synchronous start.
