@@ -2,11 +2,11 @@
 // The signals between the keyboard and the app (ios/prd.json IOS-008):
 // Darwin notifications, which cross processes and carry nothing. The
 // keyboard says start, stop, and cancel; the app says changed, and the
-// mailbox holds what changed.
+// mailbox holds what changed, or busy, when another take is running.
 import Foundation
 
 enum Signal: String, CaseIterable, Sendable {
-    case start, stop, cancel, changed
+    case start, stop, cancel, changed, busy
 
     /// Named under the app group, so a self-built copy never hears ours.
     var name: String { "\(AppGroup.identifier).\(rawValue)" }

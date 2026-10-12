@@ -17,12 +17,19 @@ enum Pad {
         case offerInsertLast
     }
 
-    /// startedAt is when this keyboard asked for a take, nil when it is not
-    /// waiting on one; sameField is whether the cursor is still in the field
-    /// the take began in.
-    static func react(to entry: MailboxEntry?, startedAt: Date?, sameField: Bool) -> Reaction {
-        guard let entry else { return .none }
-        let ours = startedAt.map { entry.at >= $0.addingTimeInterval(-1) } ?? false
+    /// What the pad says when the app does not answer, when another take
+    /// is running, and when a take it was listening to stops answering.
+    static let noAnswer = "Open murmur, then tap the pill again."
+    static let busy = "murmur is busy with another take. Try again in a moment."
+    static let stoppedAnswering = "murmur stopped answering. Open murmur to see why."
+
+    /// mine is the take this keyboard asked for, nil when it is not waiting
+    /// on one; sameField is whether the cursor is still in the field the take
+    /// began in; a keyboard that is not on screen does nothing, so it never
+    /// takes words meant for the keyboard you are looking at.
+    static func react(to entry: MailboxEntry?, mine: UUID?, sameField: Bool, visible: Bool) -> Reaction {
+        guard visible, let entry else { return .none }
+        let ours = entry.take == mine
         switch entry.phase {
         case .ready where entry.words != nil:
             return ours && sameField ? .insert(entry.take) : .offerInsertLast

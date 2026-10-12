@@ -13,7 +13,7 @@ import Testing
     let announced = Announced()
 
     @MainActor final class Announced {
-        var count = 0
+        var signals: [Signal] = []
     }
 
     init() throws {
@@ -33,9 +33,18 @@ import Testing
     }
 
     func bridge(_ model: TakeModel) -> KeyboardBridge {
-        let bridge = KeyboardBridge(model: model, mailbox: mailbox) { [announced] in announced.count += 1 }
+        let bridge = KeyboardBridge(model: model, mailbox: mailbox) { [announced] signal in announced.signals.append(signal) }
         bridge.listen()
         return bridge
+    }
+
+    /// What the keyboard does: ask with its own id, then signal start.
+    @discardableResult
+    func start(_ bridge: KeyboardBridge, at: Date = .now) -> UUID {
+        let take = UUID()
+        mailbox.ask(take, at: at)
+        bridge.hear(.start)
+        return take
     }
 
     /// Waits for the mailbox to reach a phase, as the keyboard would.
@@ -47,30 +56,39 @@ import Testing
         return mailbox.read()
     }
 
-    @Test func aKeyboardTakeComesBackThroughTheMailbox() async throws {
-        let model = try model(.says("Send the invoice tomorrow."))
-        let bridge = bridge(model)
-        bridge.hear(.start)
-        #expect(try await waitFor(.listening) != nil)
+    func waitUntilRecording(_ model: TakeModel) async throws {
         for _ in 0..<100 where !model.isRecording {
             try await Task.sleep(for: .milliseconds(20))
         }
+    }
+
+    @Test func aKeyboardTakeComesBackThroughTheMailbox() async throws {
+        let model = try model(.says("Send the invoice tomorrow."))
+        let bridge = bridge(model)
+        let take = start(bridge)
+        #expect(try await waitFor(.listening)?.take == take)
+        try await waitUntilRecording(model)
         #expect(model.isRecording)
         bridge.hear(.stop)
         let ready = try #require(try await waitFor(.ready))
+        #expect(ready.take == take)
         #expect(ready.words == "Send the invoice tomorrow.")
-        #expect(mailbox.claim(ready.take) == "Send the invoice tomorrow.")
-        #expect(announced.count >= 2)
+        #expect(mailbox.claim(take) == "Send the invoice tomorrow.")
+        #expect(announced.signals.filter { $0 == .changed }.count >= 2)
     }
 
-    /// A take started on the Dictate screen never goes to the mailbox.
+    /// A take started on the Dictate screen never goes to the mailbox, while
+    /// a keyboard take after it does.
     @Test func aDictateScreenTakeStaysInTheApp() async throws {
         let model = try model(.says("Private words."))
-        _ = bridge(model)
+        let bridge = bridge(model)
         await model.start()
         await model.stop()
         try await Task.sleep(for: .milliseconds(100))
         #expect(mailbox.read() == nil)
+        let take = start(bridge)
+        #expect(try await waitFor(.listening)?.take == take)
+        withExtendedLifetime(bridge) {}
     }
 
     /// The model may still hold the last take's words when the keyboard
@@ -80,7 +98,7 @@ import Testing
         await model.start()
         await model.stop()
         let bridge = bridge(model)
-        bridge.hear(.start)
+        start(bridge)
         let first = try #require(mailbox.read())
         #expect(first.phase == .listening && first.words == nil)
     }
@@ -88,11 +106,22 @@ import Testing
     @Test func aCancelledTakeEndsAsNothing() async throws {
         let model = try model(.says("never sent"))
         let bridge = bridge(model)
-        bridge.hear(.start)
-        _ = try await waitFor(.listening)
-        try await Task.sleep(for: .milliseconds(50))
+        start(bridge)
+        try await waitUntilRecording(model)
         bridge.hear(.cancel)
         #expect(try await waitFor(.nothing) != nil)
+        #expect(!model.isRecording)
+    }
+
+    /// A cancel that arrives while the take is still starting (the keyboard
+    /// went away first) drops the take once it starts.
+    @Test func aCancelWhileStartingDropsTheTake() async throws {
+        let model = try model(.says("never sent"))
+        let bridge = bridge(model)
+        start(bridge)
+        bridge.hear(.cancel)
+        #expect(try await waitFor(.nothing) != nil)
+        try await Task.sleep(for: .milliseconds(50))
         #expect(!model.isRecording)
     }
 
@@ -100,9 +129,8 @@ import Testing
         microphone.samples = ScriptedMicrophone.silence
         let model = try model(.says("Thank you."))
         let bridge = bridge(model)
-        bridge.hear(.start)
-        _ = try await waitFor(.listening)
-        try await Task.sleep(for: .milliseconds(50))
+        start(bridge)
+        try await waitUntilRecording(model)
         bridge.hear(.stop)
         #expect(try await waitFor(.nothing) != nil)
     }
@@ -110,8 +138,69 @@ import Testing
     @Test func noMicrophoneEndsAsFailed() async throws {
         microphone.allowed = false
         let bridge = bridge(try model(.says("hi")))
-        bridge.hear(.start)
+        start(bridge)
         #expect(try await waitFor(.failed) != nil)
+    }
+
+    /// A start that cannot record ends failed every time, even when the
+    /// model's state does not change (denied twice), and the bridge is free
+    /// for the next take.
+    @Test func aDeniedStartEndsFailedEveryTime() async throws {
+        microphone.allowed = false
+        let model = try model(.says("hi"))
+        let bridge = bridge(model)
+        for _ in 0..<2 {
+            let take = start(bridge)
+            for _ in 0..<100 where mailbox.read()?.phase != .failed {
+                try await Task.sleep(for: .milliseconds(20))
+            }
+            #expect(mailbox.read()?.phase == .failed)
+            #expect(mailbox.read()?.take == take)
+        }
+        microphone.allowed = true
+        start(bridge)
+        try await waitUntilRecording(model)
+        #expect(model.isRecording)
+    }
+
+    /// After a denied keyboard start, a Dictate screen take still never
+    /// reaches the mailbox.
+    @Test func aDictateTakeAfterADeniedStartStaysInTheApp() async throws {
+        microphone.allowed = false
+        let model = try model(.says("Private words."))
+        let bridge = bridge(model)
+        let denied = start(bridge)
+        #expect(try await waitFor(.failed)?.take == denied)
+        microphone.allowed = true
+        await model.start()
+        await model.stop()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(mailbox.read()?.take == denied)
+        #expect(mailbox.read()?.words == nil)
+        withExtendedLifetime(bridge) {}
+    }
+
+    /// A start that waited (murmur was not running when it was sent) is
+    /// dropped instead of recording a take no keyboard is waiting on.
+    @Test func aStaleStartIsIgnored() async throws {
+        let model = try model(.says("hi"))
+        let bridge = bridge(model)
+        start(bridge, at: .now.addingTimeInterval(-10))
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(mailbox.read() == nil)
+        #expect(!model.isRecording)
+    }
+
+    /// While another take runs, the keyboard hears busy, and the mailbox is
+    /// left alone.
+    @Test func aStartWhileBusyAnswersBusy() async throws {
+        let model = try model(.says("hi"))
+        let bridge = bridge(model)
+        await model.start()
+        start(bridge)
+        #expect(announced.signals == [.busy])
+        #expect(mailbox.read() == nil)
+        model.cancel()
     }
 
     /// A stop with no keyboard take running does nothing.

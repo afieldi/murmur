@@ -41,6 +41,21 @@ import Testing
         #expect(mailbox.claim(take) == nil)
     }
 
+    /// The keyboard's ask is answered once, with its own id.
+    @Test func anAskIsAnsweredOnce() {
+        mailbox.ask(take, at: at)
+        #expect(mailbox.answer(within: 3, now: at.addingTimeInterval(1)) == take)
+        #expect(mailbox.answer(within: 3, now: at.addingTimeInterval(1)) == nil)
+    }
+
+    /// An ask that waited too long, sent while murmur was not running, is
+    /// dropped, and so is no ask at all.
+    @Test func aStaleAskIsDropped() {
+        mailbox.ask(take, at: at)
+        #expect(mailbox.answer(within: 3, now: at.addingTimeInterval(10)) == nil)
+        #expect(mailbox.answer(within: 3, now: at) == nil)
+    }
+
     /// The real mailbox sits in the app group, where the keyboard can read it.
     @Test func theRealMailboxIsInTheAppGroup() throws {
         let shared = try #require(Mailbox.shared)

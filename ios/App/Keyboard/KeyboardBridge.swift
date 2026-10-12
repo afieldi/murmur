@@ -1,22 +1,29 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // The app's side of the keyboard (ios/prd.json IOS-008): it hears the
 // keyboard's start, stop, and cancel, runs the take on the app's one take
-// model, and tells the keyboard how it goes through the mailbox. Only a
-// take the keyboard started goes to the mailbox, so a take made on the
-// Dictate screen never turns up in another app.
+// model under the id the keyboard asked with, and tells the keyboard how
+// it goes through the mailbox. Only a take the keyboard started goes to
+// the mailbox, so a take made on the Dictate screen never turns up in
+// another app.
 import Foundation
 import Observation
 
 @MainActor final class KeyboardBridge {
+    /// How long a keyboard's ask stays good. One that waited longer, sent
+    /// while murmur was not running, is dropped.
+    static let askLife: TimeInterval = 3
+
     private let model: TakeModel
     private let mailbox: Mailbox
-    private let announce: @MainActor () -> Void
+    private let announce: @MainActor (Signal) -> Void
     private var listener: SignalListener?
     /// The take the keyboard asked for, until it ends.
     private var take: UUID?
+    /// A cancel heard while the take was still starting.
+    private var cancelled = false
     private var startedAt = Date.distantPast
 
-    init(model: TakeModel, mailbox: Mailbox, announce: @escaping @MainActor () -> Void = { Signal.changed.post() }) {
+    init(model: TakeModel, mailbox: Mailbox, announce: @escaping @MainActor (Signal) -> Void = { $0.post() }) {
         self.model = model
         self.mailbox = mailbox
         self.announce = announce
@@ -33,21 +40,40 @@ import Observation
     func hear(_ signal: Signal) {
         switch signal {
         case .start:
-            guard take == nil, !model.isRecording, !model.isBusy else { return }
-            take = UUID()
+            guard let id = mailbox.answer(within: Self.askLife) else { return }
+            guard take == nil, !model.isRecording, !model.isBusy else {
+                announce(.busy)
+                return
+            }
+            take = id
             startedAt = .now
+            cancelled = false
             // Written here, not read from the model, whose state may still
             // be the last take's words.
             write(.listening)
-            Task { await model.start() }
+            Task { await settle(id) }
         case .stop:
-            guard take != nil else { return }
+            guard take != nil, model.isRecording else { return }
             Task { await model.stop() }
         case .cancel:
             guard take != nil else { return }
-            model.cancel()
-        case .changed:
+            if model.isRecording { model.cancel() } else { cancelled = true }
+        case .changed, .busy:
             break
+        }
+    }
+
+    /// Settles how the start went. A start that did not record ends failed
+    /// here: the model's state may not change at all (denied twice), and
+    /// following it alone would leave the take open forever.
+    private func settle(_ id: UUID) async {
+        await model.start()
+        guard take == id else { return }
+        if cancelled {
+            model.cancel()
+            write(.nothing, ends: true)
+        } else if !model.isRecording {
+            write(.failed, ends: true)
         }
     }
 
@@ -80,7 +106,7 @@ import Observation
     private func write(_ phase: MailboxEntry.Phase, words: String? = nil, ends: Bool = false) {
         guard let take else { return }
         mailbox.write(MailboxEntry(take: take, phase: phase, words: words, at: startedAt))
-        announce()
+        announce(.changed)
         if ends { self.take = nil }
     }
 }

@@ -80,6 +80,7 @@ final class PadView: UIView {
             top.leadingAnchor.constraint(greaterThanOrEqualTo: middle.leadingAnchor),
             top.trailingAnchor.constraint(lessThanOrEqualTo: middle.trailingAnchor),
             pill.heightAnchor.constraint(equalToConstant: 56),
+            insertLast.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
             pill.widthAnchor.constraint(greaterThanOrEqualToConstant: 176),
             globe.widthAnchor.constraint(equalToConstant: 48),
             delete.widthAnchor.constraint(equalToConstant: 56),

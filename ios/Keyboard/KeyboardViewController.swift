@@ -1,19 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // The murmur keyboard, a dictation pad (ios/prd.json IOS-008): tap the
-// pill to start a take and again to stop it. The keyboard only signals the
-// app (start, stop, cancel) and reads the mailbox; it never touches the
-// microphone or the network. Words land at the cursor once, or wait as
-// Insert last when you left the field before they arrived.
+// pill to start a take and again to stop it. The keyboard only asks the
+// app for a take under its own id, signals it (start, stop, cancel), and
+// reads the mailbox; it never touches the microphone or the network.
+// Words land at the cursor once, or wait as Insert last when you left the
+// field before they arrived.
 import UIKit
 
 final class KeyboardViewController: UIInputViewController {
     private let pad = PadView()
     private var listener: SignalListener?
-    /// When this keyboard asked for a take, until it ends.
-    private var startedAt: Date?
+    /// The take this keyboard asked for, until it ends.
+    private var mine: UUID?
+    /// The phase of that take, as the mailbox last said.
+    private var phase: MailboxEntry.Phase?
     /// The field the take began in.
     private var field: UUID?
-    private var listening = false
+    private var visible = false
     private var deleteRepeat: Timer?
     private var noAnswer: Timer?
 
@@ -37,19 +40,27 @@ final class KeyboardViewController: UIInputViewController {
         pad.insertLast.addTarget(self, action: #selector(tapInsertLast), for: .touchUpInside)
         pad.delete.addTarget(self, action: #selector(deleteDown), for: .touchDown)
         pad.delete.addTarget(self, action: #selector(deleteUp), for: [.touchUpInside, .touchUpOutside, .touchCancel])
-        listener = SignalListener([.changed]) { [weak self] _ in self?.refresh() }
+        listener = SignalListener([.changed, .busy]) { [weak self] signal in
+            signal == .busy ? self?.heardBusy() : self?.refresh()
+        }
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        visible = true
         pad.setFullAccess(hasFullAccess)
         refresh()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        // A take still listening when the keyboard goes away is dropped.
-        if listening { Signal.cancel.post() }
+        visible = false
+        // A take still starting or listening when the keyboard goes away is
+        // dropped; one already being transcribed comes back as Insert last.
+        if mine != nil, phase == nil || phase == .listening {
+            Signal.cancel.post()
+            end(nil)
+        }
         deleteUp()
     }
 
@@ -65,32 +76,51 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     @objc private func tapPill() {
-        if listening {
+        switch (mine, phase) {
+        case (.some, .listening?):
             Signal.stop.post()
-            return
-        }
-        startedAt = .now
-        field = textDocumentProxy.documentIdentifier
-        pad.insertLast.isHidden = true
-        pad.status.text = "Starting"
-        Signal.start.post()
-        // The app answers within a moment when it is open; when it is not,
-        // say how to start.
-        noAnswer?.invalidate()
-        noAnswer = Timer.scheduledTimer(withTimeInterval: 2, repeats: false) { [weak self] _ in
-            MainActor.assumeIsolated { self?.answerMissing() }
+            // The app moves on to working within a moment; when it does not,
+            // it is no longer there.
+            expectAnswer(within: 4, else: Pad.stoppedAnswering)
+        case (.some, _):
+            // This keyboard's take is still starting or being transcribed.
+            break
+        case (nil, _):
+            let take = UUID()
+            guard let mailbox = Mailbox.shared else { return }
+            mailbox.ask(take)
+            mine = take
+            phase = nil
+            field = textDocumentProxy.documentIdentifier
+            pad.insertLast.isHidden = true
+            pad.status.text = "Starting"
+            Signal.start.post()
+            // The app answers within a moment when it is open.
+            expectAnswer(within: 2, else: Pad.noAnswer)
         }
     }
 
-    private func answerMissing() {
-        guard startedAt != nil, !listening else { return }
-        startedAt = nil
-        pad.status.text = "Open murmur, then tap the pill again."
+    /// Ends the take with a line when the mailbox has not moved on in time.
+    private func expectAnswer(within seconds: TimeInterval, else line: String) {
+        let waitingOn = phase
+        noAnswer?.invalidate()
+        noAnswer = Timer.scheduledTimer(withTimeInterval: seconds, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.mine != nil, self.phase == waitingOn else { return }
+                Signal.cancel.post()
+                self.end(line)
+            }
+        }
+    }
+
+    private func heardBusy() {
+        guard mine != nil, phase == nil else { return }
+        noAnswer?.invalidate()
+        end(Pad.busy)
     }
 
     @objc private func tapInsertLast() {
-        guard let words = Mailbox.shared?.claim() else { return }
-        insert(words)
+        if let words = Mailbox.shared?.claim() { insert(words) }
         pad.insertLast.isHidden = true
     }
 
@@ -117,30 +147,35 @@ final class KeyboardViewController: UIInputViewController {
 
     private func setReturnTitle() {
         let title = Pad.returnTitle(textDocumentProxy.returnKeyType ?? .default)
+        guard pad.returnKey.configuration?.title != title else { return }
         var look = pad.returnKey.configuration
         look?.title = title
         pad.returnKey.configuration = look
         pad.returnKey.accessibilityLabel = title
     }
 
-    /// Reads the mailbox and does what the newest entry asks.
+    /// Reads the mailbox and does what the newest entry asks, only while
+    /// this keyboard is on screen.
     private func refresh() {
-        guard hasFullAccess, let mailbox = Mailbox.shared else { return }
+        guard visible, hasFullAccess, let mailbox = Mailbox.shared else { return }
         let entry = mailbox.read()
-        let ours = startedAt.map { start in entry.map { $0.at >= start.addingTimeInterval(-1) } ?? false } ?? false
-        listening = ours && entry?.phase == .listening
-        pad.setListening(listening)
-        if ours { noAnswer?.invalidate() }
-        switch Pad.react(to: entry, startedAt: startedAt, sameField: textDocumentProxy.documentIdentifier == field) {
+        if let entry, entry.take == mine, entry.phase != phase {
+            phase = entry.phase
+            noAnswer?.invalidate()
+            // Transcribing and polish can take a while, but not forever.
+            if phase == .working { expectAnswer(within: 90, else: Pad.stoppedAnswering) }
+        }
+        pad.setListening(mine != nil && phase == .listening)
+        switch Pad.react(to: entry, mine: mine, sameField: textDocumentProxy.documentIdentifier == field, visible: visible) {
         case .insert(let take):
             if let words = mailbox.claim(take) { insert(words) }
-            finish(nil)
+            end(nil)
         case .offerInsertLast:
             pad.insertLast.isHidden = false
-            finish(nil)
+            if entry?.take == mine { end(nil) }
         case .status(let line):
             pad.status.text = line
-            if entry?.phase == .nothing || entry?.phase == .failed { finish(line) }
+            if phase == .nothing || phase == .failed { end(line) }
         case .none:
             break
         }
@@ -150,9 +185,9 @@ final class KeyboardViewController: UIInputViewController {
         textDocumentProxy.insertText(Pad.spaced(words, after: textDocumentProxy.documentContextBeforeInput))
     }
 
-    private func finish(_ line: String?) {
-        startedAt = nil
-        listening = false
+    private func end(_ line: String?) {
+        mine = nil
+        phase = nil
         pad.setListening(false)
         pad.status.text = line
     }
