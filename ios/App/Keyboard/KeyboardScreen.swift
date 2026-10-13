@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // The Keyboard screen (ios/prd.json IOS-008): how to add the murmur
-// keyboard and turn on Full Access, why it needs it, and a box to try it
-// in. A stand-in until first run (IOS-011) walks you through it.
+// keyboard and turn on Full Access, why it needs it, a box to try it in,
+// and the pill's look (IOS-010). A stand-in until first run (IOS-011)
+// walks you through it.
 import SwiftUI
 import UIKit
 
 struct KeyboardScreen: View {
     @State private var tryIt = ""
+    @State private var look = PillLook.read()
 
     var body: some View {
         Form {
@@ -34,6 +36,23 @@ struct KeyboardScreen: View {
             .listRowBackground(Tokens.panel)
 
             Section {
+                HStack(spacing: 12) {
+                    ForEach(PillStyle.allCases, id: \.self) { style in
+                        LookTile(style: style, chosen: look.style == style) {
+                            look = PillLook(style: style)
+                            look.write()
+                        }
+                    }
+                }
+                .padding(.vertical, 6)
+            } header: {
+                SectionTitle("The pill")
+            } footer: {
+                Text(KeyboardCopy.lookFooter).foregroundStyle(Tokens.textDim)
+            }
+            .listRowBackground(Tokens.panel)
+
+            Section {
                 TextField(KeyboardCopy.tryPrompt, text: $tryIt, axis: .vertical)
                     .lineLimit(3...8)
             } header: {
@@ -52,6 +71,36 @@ struct KeyboardScreen: View {
     }
 }
 
+/// One look for the pill, live: the style follows a voice, as it will
+/// follow yours.
+struct LookTile: View {
+    let style: PillStyle
+    let chosen: Bool
+    let choose: () -> Void
+
+    var body: some View {
+        Button(action: choose) {
+            VStack(spacing: 8) {
+                PillCanvas(style: style, stage: .recording, level: DemoVoice.level)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .frame(height: 44)
+                    .background(Capsule().fill(Tokens.panelLift))
+                Text(KeyboardCopy.name(style))
+                    .font(.subheadline.weight(chosen ? .semibold : .regular))
+                    .foregroundStyle(chosen ? Tokens.brand : Tokens.text)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(RoundedRectangle(cornerRadius: 14).stroke(chosen ? Tokens.brand : Tokens.panelEdge, lineWidth: chosen ? 1.5 : 1))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(KeyboardCopy.name(style))
+        .accessibilityAddTraits(chosen ? .isSelected : [])
+    }
+}
+
 /// The Keyboard screen's words.
 enum KeyboardCopy {
     static let steps = [
@@ -65,7 +114,16 @@ enum KeyboardCopy {
 
     static let tryPrompt = "Tap here, then the pill"
 
-    static let tryFooter = "Tap the pill, speak, and tap it again. Your words land where the cursor is. Keep murmur open for now; starting from other apps comes next."
+    static let tryFooter = "Tap the pill, speak, and tap it again. Your words land where the cursor is."
+
+    static let lookFooter = "How the pill looks in the keyboard and when murmur opens to record."
+
+    static func name(_ style: PillStyle) -> String {
+        switch style {
+        case .bars: "Bars"
+        case .speckle: "Speckle"
+        }
+    }
 }
 
 #if DEBUG

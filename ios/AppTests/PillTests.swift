@@ -163,4 +163,9 @@ import UIKit
         #expect(read.level == 0.42 && read.count == 7)
         #expect(try Data(contentsOf: try #require(file.url)).count == 8)
     }
+
+    @Test func theAppFollowsTheTake() {
+        let states: [TakeModel.State] = [.idle, .recording(since: .now), .transcribing, .words("hi"), .heardNothing(sent: true), .micOff]
+        #expect(states.map(PillStage.init) == [.idle, .recording, .processing, .inserted, .noSpeech, .error])
+    }
 }

@@ -7,9 +7,13 @@ import Testing
     /// sentence starts.
     @Test func theStepsReadPlainly() {
         #expect(KeyboardCopy.steps.count == 4)
-        for line in KeyboardCopy.steps + [KeyboardCopy.fullAccess, KeyboardCopy.tryPrompt, KeyboardCopy.tryFooter] {
+        for line in KeyboardCopy.steps + [KeyboardCopy.fullAccess, KeyboardCopy.tryPrompt, KeyboardCopy.tryFooter, KeyboardCopy.lookFooter] {
             #expect(!line.contains("Murmur"))
         }
         #expect(KeyboardCopy.fullAccess.contains("never connects to the internet"))
+    }
+
+    @Test func theLooksAreNamedPlainly() {
+        #expect(PillStyle.allCases.map(KeyboardCopy.name) == ["Bars", "Speckle"])
     }
 }

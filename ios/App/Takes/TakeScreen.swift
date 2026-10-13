@@ -33,6 +33,7 @@ struct TakeScreen: View {
         .tint(Tokens.brand)
         .navigationTitle("Dictate")
         .navigationBarTitleDisplayMode(.inline)
+        .sensoryFeedback(.impact(weight: .light), trigger: model.isRecording)
         .onDisappear { model.cancel() }
     }
 }

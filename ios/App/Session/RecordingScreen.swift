@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Where the keyboard's first tap lands (ios/prd.json IOS-009): murmur,
-// already recording, with the live waveform large and a guide along the
+// already recording, with the pill large (IOS-010) and a guide along the
 // bottom edge showing the swipe right that takes you back to your app.
 // Everything you say from the moment it opens counts. The screen closes
 // itself when the take ends; until the take is recording it says Starting
@@ -11,6 +11,7 @@ struct RecordingScreen: View {
     let model: TakeModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var look = PillLook.read()
 
     var body: some View {
         VStack(spacing: 24) {
@@ -22,8 +23,9 @@ struct RecordingScreen: View {
                     .frame(minHeight: 44)
                 Spacer()
             } else {
-                LiveWave(model: model)
-                    .frame(height: 160)
+                PillCanvas(style: look.style, stage: model.isRecording ? .recording : .idle, level: { model.level })
+                    .frame(maxWidth: 320)
+                    .frame(height: 120)
                     .accessibilityHidden(true)
                 HStack(spacing: 10) {
                     Circle().fill(model.isRecording ? Tokens.amber : Tokens.textDim).frame(width: 10, height: 10)
@@ -56,35 +58,9 @@ struct RecordingScreen: View {
         .padding(.bottom, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Tokens.ink)
+        .sensoryFeedback(.impact(weight: .light), trigger: model.isRecording)
         .onChange(of: model.isRecording) { was, now in
             if was, !now { dismiss() }
-        }
-    }
-}
-
-/// The take's loudness over the last moments, as bars that scroll from
-/// right to left: live amber while recording, dry and dim otherwise.
-struct LiveWave: View {
-    let model: TakeModel
-    @State private var levels = [Float](repeating: 0, count: 48)
-
-    var body: some View {
-        let color = model.isRecording ? Tokens.amber : Tokens.textDim
-        Canvas { context, size in
-            let gap: CGFloat = 4
-            let width = (size.width - gap * CGFloat(levels.count - 1)) / CGFloat(levels.count)
-            for (index, level) in levels.enumerated() {
-                let height = max(width, CGFloat(level) * size.height)
-                let bar = CGRect(x: CGFloat(index) * (width + gap), y: (size.height - height) / 2, width: width, height: height)
-                context.fill(Path(roundedRect: bar, cornerRadius: width / 2), with: .color(color))
-            }
-        }
-        .task {
-            while !Task.isCancelled {
-                levels.removeFirst()
-                levels.append(model.isRecording ? model.level : 0)
-                try? await Task.sleep(for: .milliseconds(33))
-            }
         }
     }
 }
