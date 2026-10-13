@@ -42,6 +42,7 @@ enum SmokeRunner {
             ("mailbox", checkMailbox),
             ("session", checkSession),
             ("pill", checkPill),
+            ("firstRun", checkFirstRun),
             ("sharedJson", { try checkSharedJson(expected: request.sharedCount) })
         ]
         var results: [String: Bool] = [:]
@@ -278,6 +279,33 @@ enum SmokeRunner {
         guard let read = levels.read(), read.level == 0.5, read.count == 3 else { throw SmokeFailure("the level file read back \(String(describing: levels.read()))") }
         let blank = PillShots.shots.filter { (PillShots.image($0.frame).pngData()?.count ?? 0) < 1_000 }.map(\.name)
         guard blank.isEmpty else { throw SmokeFailure("these stages drew nothing: \(blank)") }
+    }
+
+    /// First run walks its steps with the microphone allowed and refused
+    /// (IOS-011): allowed, every step checks itself done in turn; refused,
+    /// the microphone says so and waits on Home while the rest go on.
+    static func checkFirstRun() throws {
+        if let failure = onMain({ await firstRunFailure() }) { throw SmokeFailure(failure) }
+    }
+
+    @MainActor private static func firstRunFailure() async -> String? {
+        for allowed in [true, false] {
+            guard let defaults = UserDefaults(suiteName: "murmur.smoke.\(UUID().uuidString)") else { return "no scratch defaults" }
+            let report = Cell<KeyboardReport?>(nil)
+            let key = Cell(false)
+            let setup = Setup(microphone: ScriptedAccess(answer: allowed), report: { report.value }, hasKey: { key.value }, defaults: defaults)
+            guard setup.next == .microphone else { return "first run did not start with the microphone" }
+            await setup.allowMicrophone()
+            guard setup.status(.microphone) == (allowed ? .done : .denied) else { return "the microphone read \(setup.status(.microphone)) when allowed was \(allowed)" }
+            setup.keyboardAdded()
+            report.value = KeyboardReport(fullAccess: true, at: .now)
+            key.value = true
+            setup.refresh()
+            setup.practiced()
+            let left: [Setup.Step] = allowed ? [] : [.microphone]
+            guard setup.remaining == left else { return "left \(setup.remaining) when allowed was \(allowed)" }
+        }
+        return nil
     }
 
     /// Runs main-actor work to the end from the smoke's synchronous start
