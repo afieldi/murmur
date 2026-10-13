@@ -5,7 +5,9 @@
 // after the length you picked, counted from your last take, when you end
 // it here or from the keyboard, or when a call, Siri, or another app takes
 // the microphone. Nothing it hears between takes is kept, written, or
-// sent: the warm microphone drops it as it arrives.
+// sent: the warm microphone drops it as it arrives. While it runs, its
+// Live Activity says so on the Lock Screen and in the Dynamic Island
+// (IOS-016).
 import AVFoundation
 import Foundation
 import Observation
@@ -34,13 +36,16 @@ import Observation
     /// A length in seconds; only the smoke and the tests shorten it.
     @ObservationIgnored private let seconds: @MainActor (Length) -> TimeInterval
     @ObservationIgnored private let announce: @MainActor (Signal) -> Void
+    /// Shows the session's Live Activity, or ends it with nil (IOS-016).
+    @ObservationIgnored private let present: @MainActor (SessionActivity.ContentState?) -> Void
     @ObservationIgnored private var timer: Task<Void, Never>?
     @ObservationIgnored private var listener: SignalListener?
     @ObservationIgnored private var interruptions: (any NSObjectProtocol)?
 
     init(
         microphone: any WarmMicrophone, model: TakeModel, defaults: UserDefaults = .standard, stateFile: URL? = SessionState.file,
-        seconds: @escaping @MainActor (Length) -> TimeInterval = { $0.seconds }, announce: @escaping @MainActor (Signal) -> Void = { $0.post() }
+        seconds: @escaping @MainActor (Length) -> TimeInterval = { $0.seconds }, announce: @escaping @MainActor (Signal) -> Void = { $0.post() },
+        present: @escaping @MainActor (SessionActivity.ContentState?) -> Void = { _ in }
     ) {
         self.microphone = microphone
         self.model = model
@@ -48,6 +53,7 @@ import Observation
         self.stateFile = stateFile
         self.seconds = seconds
         self.announce = announce
+        self.present = present
         length = Length(rawValue: defaults.integer(forKey: Self.lengthKey)) ?? .fifteen
     }
 
@@ -144,14 +150,19 @@ import Observation
         end()
     }
 
-    /// Each take that ends counts the length again from its end.
+    /// Each take that ends counts the length again from its end, and the
+    /// Live Activity follows Ready and Recording.
     private func follow() {
         withObservationTracking {
             _ = model.state
         } onChange: { [weak self] in
             Task { @MainActor in
                 guard let self else { return }
-                if self.isOn, !self.model.isRecording, !self.model.isBusy { self.extend() }
+                if self.isOn, !self.model.isRecording, !self.model.isBusy {
+                    self.extend()
+                } else {
+                    self.show()
+                }
                 self.follow()
             }
         }
@@ -160,6 +171,12 @@ import Observation
     private func publish() {
         SessionState(until: until).write(to: stateFile)
         announce(.changed)
+        show()
+    }
+
+    /// What the Live Activity shows: nothing while off.
+    private func show() {
+        present(until.map { SessionActivity.ContentState(recording: model.isRecording, until: $0) })
     }
 }
 
@@ -171,7 +188,7 @@ extension Session {
     static func live() -> Session? {
         if let shared { return shared }
         guard let model = TakeModel.live() else { return nil }
-        let session = Session(microphone: DeviceMicrophone.shared, model: model)
+        let session = Session(microphone: DeviceMicrophone.shared, model: model, present: { LiveSession.shared.show($0) })
         session.listen()
         shared = session
         return session

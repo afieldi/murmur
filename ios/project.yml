@@ -33,6 +33,7 @@ targets:
     sources:
       - path: App
       - path: Shared
+      - path: Live
       - path: Generated/Tokens.swift
       - path: Generated/Assets.xcassets
       - path: Generated/shared
