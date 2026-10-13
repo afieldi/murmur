@@ -196,7 +196,22 @@ import UIKit
         #expect(art.words?.size == CGSize(width: 320, height: JourneyArt.wordsHeight))
         #expect(art.tallies?.size == CGSize(width: 320, height: JourneyArt.talliesHeight))
         #expect(art.stamps.count == rules.achievements.achievements.count)
-        #expect(art.painted == 2)
+        // Each painting lands, and fades in, on its own.
+        #expect(art.painted == 4 + rules.achievements.achievements.count)
+    }
+
+    /// A repaint that fails keeps the paintings already there.
+    @Test func aFailedRepaintKeepsThePaintings() async throws {
+        let (report, rules) = try report([1300, 1300])
+        let painter = JourneyPainter()
+        let art = JourneyArt(painter: painter)
+        await art.paint(report, rules: rules, earned: [], gateWidth: 320, scale: 2)
+        let belt = try #require(art.belt)
+        _ = try await painter.web.evaluateJavaScript("window.murmurJourney = undefined; 1")
+        await art.paint(report, rules: rules, earned: [], gateWidth: 320, scale: 2)
+        #expect(art.belt === belt)
+        #expect(art.road != nil && art.words != nil && art.tallies != nil)
+        #expect(art.stamps.count == rules.achievements.achievements.count)
     }
 
     /// Before the row has a width the gates wait; the rest still paints.
@@ -208,32 +223,115 @@ import UIKit
         #expect(art.words == nil && art.tallies == nil)
     }
 
-    /// The tape drops in frames that land on the finished belt.
-    @Test func theTapeDropsInFrames() async throws {
-        let (report, rules) = try report([1300, 1300])
-        let painter = JourneyPainter()
-        let art = JourneyArt(painter: painter)
-        await art.paintTape(report.rank, scale: 2)
-        #expect(art.tape.count == JourneyArt.tapeFrames)
-        await art.paint(report, rules: rules, earned: [], gateWidth: 320, scale: 2)
-        let first = try #require(art.tape.first)
-        let last = try #require(art.tape.last)
-        let belt = try #require(art.belt)
-        #expect(PaintingDifference(last, belt).same)
-        #expect(!PaintingDifference(first, belt).same)
-    }
-
     /// With no page, nothing is painted and nothing waits: the Journey keeps
     /// its plain drawing.
     @Test func withoutThePageNothingIsPainted() async throws {
         let (report, rules) = try report([1300])
-        let art = JourneyArt(painter: JourneyPainter(page: nil))
+        let painter = JourneyPainter(page: nil)
+        let art = JourneyArt(painter: painter)
+        let drop = TapeDrop(painter: painter)
+        let stripe = try #require(rules.ranks.ranks.first { $0.id == "white-1" })
         let clock = ContinuousClock()
-        let took = try await clock.measure {
+        let took = await clock.measure {
             await art.paint(report, rules: rules, earned: [], gateWidth: 320, scale: 2)
-            await art.paintTape(try #require(rules.ranks.ranks.first { $0.id == "white-1" }), scale: 2)
+            drop.expect(stripe)
+            await drop.prepare(scale: 2)
         }
-        #expect(art.belt == nil && art.road == nil && art.stamps.isEmpty && art.tape.isEmpty)
+        #expect(art.belt == nil && art.road == nil && art.stamps.isEmpty)
+        // With no frames the stripe is simply on the belt: nothing waits.
+        #expect(drop.frame == nil && !drop.waiting)
         #expect(took < .seconds(2))
+    }
+}
+
+/// A new stripe's tape dropping onto the belt (IOS-018).
+@MainActor @Suite(.serialized) struct TapeDropTests {
+    func stripe(_ id: String) throws -> RankSpec {
+        try #require(BundledRules.journey().ranks.ranks.first { $0.id == id })
+    }
+
+    /// The frames are painted first, the first holding the belt without its
+    /// new tape; they play once, over desktop's half second, and land.
+    @Test func theTapeDropsOnce() async throws {
+        let painter = JourneyPainter()
+        let drop = TapeDrop(painter: painter)
+        drop.expect(try stripe("white-1"))
+        #expect(drop.waiting && drop.frame == nil)
+        await drop.prepare(scale: 2)
+        #expect(!drop.waiting)
+        let first = try #require(drop.frame)
+        let size = JourneyArt.beltSize
+        let finished = try await painter.picture(.belt(belt: "white", stripes: 1, width: size.width, height: size.height, drop: nil), scale: 2).image
+        #expect(!PaintingDifference(first, finished).same)
+        let clock = ContinuousClock()
+        var played = false
+        let took = await clock.measure { played = await drop.play(reduceMotion: false) }
+        #expect(played && took >= .seconds(0.4))
+        #expect(drop.frame == nil)
+        #expect(await drop.play(reduceMotion: false) == false)
+    }
+
+    /// Asked to play before its frames are painted (the ceremony closed
+    /// early), it keeps the stripe waiting and plays once they are.
+    @Test func playingEarlyKeepsTheStripeWaiting() async throws {
+        let drop = TapeDrop(painter: JourneyPainter())
+        drop.expect(try stripe("white-1"))
+        #expect(await drop.play(reduceMotion: false) == false)
+        #expect(drop.waiting)
+        await drop.prepare(scale: 2)
+        #expect(await drop.play(reduceMotion: false))
+        #expect(drop.frame == nil)
+    }
+
+    /// Cancelled while dropping (the screen's task restarted), the tape
+    /// lands at once instead of racing through its frames.
+    @Test func aCancelledDropLandsAtOnce() async throws {
+        let drop = TapeDrop(painter: JourneyPainter())
+        drop.expect(try stripe("white-1"))
+        await drop.prepare(scale: 2)
+        let playing = Task { await drop.play(reduceMotion: false) }
+        try await Task.sleep(for: .milliseconds(80))
+        playing.cancel()
+        #expect(await playing.value)
+        #expect(drop.frame == nil)
+        #expect(await drop.play(reduceMotion: false) == false)
+    }
+
+    /// A play that is cancelled before it starts leaves the stripe for the
+    /// next one.
+    @Test func aCancelledStartLeavesTheStripe() async throws {
+        let drop = TapeDrop(painter: JourneyPainter())
+        drop.expect(try stripe("white-1"))
+        await drop.prepare(scale: 2)
+        let cancelled = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return await drop.play(reduceMotion: false)
+        }
+        #expect(await cancelled.value == false)
+        #expect(await drop.play(reduceMotion: false))
+    }
+
+    /// A newer stripe replaces the last one's frames.
+    @Test func aNewerStripeReplacesTheLast() async throws {
+        let drop = TapeDrop(painter: JourneyPainter())
+        drop.expect(try stripe("white-1"))
+        await drop.prepare(scale: 2)
+        let one = try #require(drop.frame)
+        drop.expect(try stripe("white-2"))
+        #expect(drop.waiting && drop.frame == nil)
+        await drop.prepare(scale: 2)
+        let two = try #require(drop.frame)
+        #expect(!PaintingDifference(one, two).same)
+    }
+
+    /// With Reduce Motion the tape is simply on: nothing plays.
+    @Test func reduceMotionLandsAtOnce() async throws {
+        let drop = TapeDrop(painter: JourneyPainter())
+        drop.expect(try stripe("white-1"))
+        await drop.prepare(scale: 2)
+        let clock = ContinuousClock()
+        let took = await clock.measure { _ = await drop.play(reduceMotion: true) }
+        #expect(took < .seconds(0.1))
+        #expect(drop.frame == nil)
     }
 }

@@ -16,11 +16,10 @@ struct JourneyScreen: View {
     @Environment(\.displayScale) private var scale
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var art = JourneyArt()
+    @State private var tape = TapeDrop()
     @State private var gateWidth: Double = 0
     @State private var ceremony: CeremonyRank?
     @State private var decidedIndex: Int?
-    @State private var pendingTape: RankSpec?
-    @State private var tapeFrame: Int?
 
     var body: some View {
         let report = Journey.report(history.entries, rules: rules)
@@ -93,30 +92,35 @@ struct JourneyScreen: View {
         .navigationTitle(JourneyCopy.title)
         .navigationBarTitleDisplayMode(.inline)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.35), value: art.painted)
-        .task(id: PaintKey(standing: Journey.standing(report), earned: earned, gateWidth: gateWidth, scale: scale)) {
+        // What to celebrate depends only on how high practice stands, never
+        // on the layout, so a width arriving can never restart it.
+        .task(id: report.practice.index) {
             decide(report)
-            if let tape = pendingTape, art.tape.isEmpty, !reduceMotion {
-                await art.paintTape(tape, scale: scale)
-                tapeFrame = art.tape.isEmpty ? nil : 0
-            }
+            await tape.prepare(scale: scale)
+            if ceremony == nil { await tape.play(reduceMotion: reduceMotion) }
+        }
+        .task(id: PaintKey(standing: Journey.standing(report), earned: earned, gateWidth: gateWidth, scale: scale)) {
             await art.paint(report, rules: rules, earned: earned, gateWidth: gateWidth, scale: scale)
-            if ceremony == nil { await playTape() }
+        }
+        // Once the ceremony closes, the new stripe's tape drops (it waits if
+        // its frames are still painting, and plays when they land).
+        .task(id: ceremony == nil) {
+            if ceremony == nil { await tape.play(reduceMotion: reduceMotion) }
         }
         .fullScreenCover(item: $ceremony) { shown in
             CeremonyView(rank: shown.rank) { withoutAnimation { ceremony = nil } }
                 .presentationBackground(.clear)
         }
-        .onChange(of: ceremony == nil) { _, closed in
-            if closed { Task { await playTape() } }
-        }
     }
 
-    /// The belt, painted, or mid tape drop; plain until the painting lands.
+    /// The belt, painted, or mid tape drop; plain until the painting lands,
+    /// and while a new stripe's frames are painting, so the finished belt
+    /// never shows before its tape drops.
     @ViewBuilder private func hero(_ report: ProgressReport) -> some View {
         let size = JourneyArt.beltSize
-        if let frame = tapeFrame, art.tape.indices.contains(frame) {
-            Image(uiImage: art.tape[frame]).resizable().frame(width: size.width, height: size.height)
-        } else if let belt = art.belt {
+        if let frame = tape.frame {
+            Image(uiImage: frame).resizable().frame(width: size.width, height: size.height)
+        } else if !tape.waiting, let belt = art.belt {
             Image(uiImage: belt).resizable().frame(width: size.width, height: size.height)
         } else {
             BeltSwatch(rank: report.rank, rules: rules)
@@ -138,23 +142,9 @@ struct JourneyScreen: View {
         guard decidedIndex.map({ report.practice.index > $0 }) ?? true else { return }
         decidedIndex = report.practice.index
         let celebration = Journey.celebrate(report, rules: rules, memory: memory, now: .now)
-        pendingTape = celebration.tape
+        // With Reduce Motion the new stripe is simply on the belt.
+        if let stripe = celebration.tape, !reduceMotion { tape.expect(stripe) }
         if let belt = celebration.ceremony { withoutAnimation { ceremony = CeremonyRank(rank: belt) } }
-    }
-
-    /// The new stripe's tape slaps on, once the ceremony (if any) is over.
-    private func playTape() async {
-        guard pendingTape != nil else { return }
-        pendingTape = nil
-        guard !reduceMotion, !art.tape.isEmpty else {
-            tapeFrame = nil
-            return
-        }
-        for frame in art.tape.indices {
-            tapeFrame = frame
-            try? await Task.sleep(for: .seconds(JourneyArt.tapeDuration / Double(art.tape.count)))
-        }
-        tapeFrame = nil
     }
 
     private func withoutAnimation(_ change: () -> Void) {
@@ -208,14 +198,21 @@ private struct RoadStrip: View {
                                 .frame(width: 200)
                                 // Near either end it stays on the road, as desktop's does.
                                 .offset(x: min(max(you - 100, 0), 1300), y: 28)
-                            Color.clear.frame(width: 1, height: 1).offset(x: you).id("you")
+                            // The scroll target sits at your spot by layout; an
+                            // offset would only move its drawing.
+                            HStack(spacing: 0) {
+                                Color.clear.frame(width: max(0, you - 0.5), height: 1)
+                                Color.clear.frame(width: 1, height: 1).id("you")
+                            }
                         }
                     }
                 }
                 .frame(width: 1500, height: 120, alignment: .topLeading)
             }
             .dynamicTypeSize(...DynamicTypeSize.xxLarge)
-            .onChange(of: picture?.you) { _, _ in proxy.scrollTo("you", anchor: .center) }
+            .onChange(of: picture?.you, initial: true) { _, you in
+                if you != nil { proxy.scrollTo("you", anchor: .center) }
+            }
         }
         .frame(height: 120)
         .accessibilityElement(children: .ignore)

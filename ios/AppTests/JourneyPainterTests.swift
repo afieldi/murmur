@@ -63,6 +63,50 @@ struct PaintingDifference {
         }
     }
 
+    /// A page that loads but never says ready fails once its time is up,
+    /// and from then on fails at once, until the page starts over.
+    @Test func aSilentPageFailsInTimeThenAtOnce() async throws {
+        let url = FileManager.default.temporaryDirectory.appending(path: "journey-silent-\(UUID().uuidString).html")
+        try "<!doctype html><title>silent</title>".write(to: url, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let painter = JourneyPainter(page: url)
+        let clock = ContinuousClock()
+        let first = await clock.measure {
+            await #expect(throws: JourneyPainter.Failure.notReady) { try await painter.waitUntilReady(seconds: 0.5) }
+        }
+        #expect(first >= .seconds(0.45))
+        let again = await clock.measure {
+            await #expect(throws: JourneyPainter.Failure.notReady) { try await painter.waitUntilReady(seconds: 30) }
+        }
+        #expect(again < .seconds(0.2))
+    }
+
+    /// A second ceremony on the same page, at a new size, stops the first
+    /// one's strokes, so the old size never paints over the new. The web
+    /// view is on screen, as the ceremony's is, so its animation frames run.
+    @Test func aNewCeremonyStopsTheLastOne() async throws {
+        let painter = JourneyPainter()
+        let window = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first?.windows.first)
+        painter.web.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        window.addSubview(painter.web)
+        defer { painter.web.removeFromSuperview() }
+        let size = CGSize(width: 320, height: 700)
+        func ink() async throws -> Int {
+            let sum = try await painter.web.evaluateJavaScript(
+                "(() => { const c = document.getElementById('base'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) n += d[i]; return n })()"
+            )
+            return (sum as? Int) ?? -1
+        }
+        try await painter.ceremony(rank: "blue", size: size, reduced: true)
+        let once = try await ink()
+        #expect(once > 0)
+        try await painter.ceremony(rank: "blue", size: CGSize(width: 390, height: 844), reduced: false)
+        try await painter.ceremony(rank: "blue", size: size, reduced: true)
+        try await Task.sleep(for: .seconds(1.5))
+        let after = try await ink()
+        #expect(abs(after - once) <= once / 1000, "the finished painting went from \(once) to \(after)")
+    }
+
     /// A picture comes back as an image of the size asked for, at the
     /// screen's scale, and the same request paints the same picture.
     @Test func aBeltIsPaintedAtItsSize() async throws {
@@ -119,16 +163,33 @@ struct PaintingDifference {
         }
     }
 
-    /// The page can fetch nothing: its content policy refuses it, even a
-    /// file beside it in the bundle.
+    /// The page the app ships carries its content policy.
+    @Test func thePageCarriesItsContentPolicy() throws {
+        let page = try String(contentsOf: try #require(JourneyPage.url), encoding: .utf8)
+        #expect(page.contains(#"<meta http-equiv="Content-Security-Policy" content="default-src 'none';"#))
+    }
+
+    /// The page can fetch nothing: its content policy refuses the request
+    /// before it leaves, even one that asks for no answer, and even a file
+    /// beside it in the bundle.
     @Test func thePageCanFetchNothing() async throws {
         let painter = JourneyPainter()
         try await painter.waitUntilReady()
         for target in ["https://example.com", "journey.html"] {
             let answer = try await painter.web.callAsyncJavaScript(
-                "try { await fetch(target); return 'fetched' } catch { return 'refused' }", arguments: ["target": target], contentWorld: .page
+                """
+                const refused = []
+                const listen = (event) => refused.push(event.violatedDirective)
+                document.addEventListener('securitypolicyviolation', listen)
+                let fetched = 'fetched'
+                try { await fetch(target, { mode: 'no-cors' }) } catch { fetched = 'refused' }
+                await new Promise((done) => setTimeout(done, 100))
+                document.removeEventListener('securitypolicyviolation', listen)
+                return fetched + (refused.length > 0 ? ' by the policy' : '')
+                """,
+                arguments: ["target": target], contentWorld: .page
             )
-            #expect(answer as? String == "refused")
+            #expect(answer as? String == "refused by the policy", "\(target)")
         }
     }
 
@@ -138,7 +199,7 @@ struct PaintingDifference {
         let painter = JourneyPainter()
         try await painter.waitUntilReady()
         let page = painter.web.url
-        for target in ["https://example.com", "journey.html"] {
+        for target in ["https://example.com", "about:blank", "journey.html"] {
             _ = try? await painter.web.evaluateJavaScript("location.href = '\(target)'; 1")
             try await Task.sleep(for: .milliseconds(400))
             #expect(painter.web.url == page)

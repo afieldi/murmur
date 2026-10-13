@@ -140,9 +140,16 @@ function surface(id: string, width: number, height: number): Surface | null {
   return { canvas: el, ctx, dpr }
 }
 
+/** Stops the ceremony's strokes still going, as desktop's ceremony does
+ *  before it paints again. */
+let stopCeremony = (): void => undefined
+
 /** The ceremony on the page's own canvases: animated, or the finished
- *  painting with Reduce Motion. */
+ *  painting with Reduce Motion or at a new size. A new call stops the
+ *  last one's strokes first, so an old size never paints over the new. */
 export function ceremony(req: { rank: string; width: number; height: number; reduced: boolean }): boolean {
+  stopCeremony()
+  stopCeremony = () => undefined
   const at = rank(req.rank)
   const { width, height } = req
   const base = surface('base', width, height)
@@ -150,7 +157,7 @@ export function ceremony(req: { rank: string; width: number; height: number; red
   if (!at || !base || !fx) return false
   const items = ceremonyScene(at, width, height, journeyColors(BELT_HEX))
   if (req.reduced) paintScene(base.ctx, items)
-  else animateScene(base, fx, items)
+  else stopCeremony = animateScene(base, fx, items)
   return true
 }
 

@@ -119,7 +119,11 @@ struct JourneyPicture {
         if ready { return }
         if gaveUp { throw Failure.notReady }
         let deadline = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(seconds))
+            do {
+                try await Task.sleep(for: .seconds(seconds))
+            } catch {
+                return
+            }
             guard let self, !self.ready else { return }
             self.gaveUp = true
             for continuation in self.waiting { continuation.resume() }

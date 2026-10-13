@@ -51,8 +51,6 @@ function need(tool, hint) {
   if (!findOnPath(tool)) throw new Error(`${tool} is not installed. ${hint}`)
 }
 
-/** Writes everything the project needs and is never committed, then the
- *  project itself. Returns how many shared rule files were bundled. */
 /** The Journey's painter page (IOS-018): desktop's brush engine and
  *  Journey painter, bundled by Vite into one script and set into the page
  *  with the tokens, so the app's web view loads one file and nothing else. */
@@ -74,6 +72,8 @@ async function buildJourneyPage() {
   writeFileSync(join(generated, 'web', 'journey.html'), page)
 }
 
+/** Writes everything the project needs and is never committed, then the
+ *  project itself. Returns how many shared rule files were bundled. */
 async function generateAll() {
   need('xcodegen', 'Install it with: brew install xcodegen')
   mkdirSync(generated, { recursive: true })

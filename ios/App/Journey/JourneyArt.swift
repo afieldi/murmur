@@ -22,9 +22,7 @@ import UIKit
     private(set) var words: UIImage?
     private(set) var tallies: UIImage?
     private(set) var stamps: [String: UIImage] = [:]
-    /// The newest stripe's tape slapping on, first frame to last.
-    private(set) var tape: [UIImage] = []
-    /// How many paintings have landed: each one fades in.
+    /// How many paintings have landed: each one fades in as it does.
     private(set) var painted = 0
 
     @ObservationIgnored private let painter: JourneyPainter
@@ -34,33 +32,103 @@ import UIKit
     }
 
     /// Paints everything for this report. The gates take the row's width.
+    /// A picture that fails keeps the one already there.
     func paint(_ report: ProgressReport, rules: JourneyRules, earned: Set<String>, gateWidth: Double, scale: CGFloat) async {
         let standing = Journey.standing(report)
         let size = Self.beltSize
-        belt = try? await painter.picture(.belt(belt: report.rank.belt, stripes: report.rank.stripes, width: size.width, height: size.height, drop: nil), scale: scale).image
-        road = try? await painter.picture(.road(standing), scale: scale)
-        if report.practice.next != nil, gateWidth > 0 {
-            words = try? await painter.picture(.words(standing, width: gateWidth, height: Self.wordsHeight), scale: scale).image
-            tallies = try? await painter.picture(.tallies(standing, width: gateWidth, height: Self.talliesHeight), scale: scale).image
+        if let image = await image(.belt(belt: report.rank.belt, stripes: report.rank.stripes, width: size.width, height: size.height, drop: nil), scale) {
+            belt = image
         }
-        painted += 1
+        if let picture = try? await painter.picture(.road(standing), scale: scale) {
+            road = picture
+            painted += 1
+        }
+        if report.practice.next != nil, gateWidth > 0 {
+            if let image = await image(.words(standing, width: gateWidth, height: Self.wordsHeight), scale) { words = image }
+            if let image = await image(.tallies(standing, width: gateWidth, height: Self.talliesHeight), scale) { tallies = image }
+        }
         for (index, spec) in rules.achievements.achievements.enumerated() {
             let got = earned.contains(spec.id)
             let artwork = JourneyArtwork.stamp(id: spec.id, got: got, seed: Journey.stampSeed(index), size: Self.stampSize)
-            if let image = try? await painter.picture(artwork, scale: scale).image { stamps[spec.id] = image }
+            if let image = await image(artwork, scale) { stamps[spec.id] = image }
         }
-        painted += 1
     }
 
-    /// The frames of the newest stripe's tape slapping onto this belt.
-    func paintTape(_ rank: RankSpec, scale: CGFloat) async {
-        let size = Self.beltSize
-        var frames: [UIImage] = []
-        for frame in 0..<Self.tapeFrames {
-            let k = Double(frame) / Double(Self.tapeFrames - 1)
-            guard let image = try? await painter.picture(.belt(belt: rank.belt, stripes: rank.stripes, width: size.width, height: size.height, drop: k), scale: scale).image else { return }
-            frames.append(image)
+    /// One picture's image, counted as landed when it arrives.
+    private func image(_ artwork: JourneyArtwork, _ scale: CGFloat) async -> UIImage? {
+        guard let image = try? await painter.picture(artwork, scale: scale).image else { return nil }
+        painted += 1
+        return image
+    }
+}
+
+/// A new stripe's tape dropping onto the belt (IOS-018), as desktop slaps
+/// it on: the frames are painted first, the first one holding the belt
+/// without its new tape, then they play once over desktop's 520 ms, after
+/// the ceremony if there is one. A play cancelled midway lands at once.
+@MainActor @Observable final class TapeDrop {
+    /// The frame on show: the first while the drop waits to play, then each
+    /// in turn; nil once the tape has landed.
+    private(set) var frame: UIImage?
+    /// The stripe whose tape is expected.
+    private(set) var pending: RankSpec?
+
+    @ObservationIgnored private var frames: [UIImage] = []
+    @ObservationIgnored private let painter: JourneyPainter
+
+    init(painter: JourneyPainter = .shared) {
+        self.painter = painter
+    }
+
+    /// A stripe is waiting for its frames.
+    var waiting: Bool { pending != nil && frames.isEmpty }
+
+    /// Expects this stripe's tape; a different stripe replaces the last.
+    func expect(_ stripe: RankSpec) {
+        guard pending?.id != stripe.id else { return }
+        pending = stripe
+        frames = []
+        frame = nil
+    }
+
+    /// Paints the expected stripe's frames and holds the first. If the page
+    /// cannot paint them, the stripe is simply on the belt.
+    func prepare(scale: CGFloat) async {
+        guard let stripe = pending, frames.isEmpty else { return }
+        let size = JourneyArt.beltSize
+        var painted: [UIImage] = []
+        for index in 0..<JourneyArt.tapeFrames {
+            let k = Double(index) / Double(JourneyArt.tapeFrames - 1)
+            let artwork = JourneyArtwork.belt(belt: stripe.belt, stripes: stripe.stripes, width: size.width, height: size.height, drop: k)
+            guard let image = try? await painter.picture(artwork, scale: scale).image else {
+                if pending?.id == stripe.id { pending = nil }
+                return
+            }
+            painted.append(image)
         }
-        tape = frames
+        // A newer stripe replaced this one while it was painting.
+        guard pending?.id == stripe.id else { return }
+        frames = painted
+        frame = painted.first
+    }
+
+    /// Plays the tape once, if its frames are ready and the caller is not
+    /// cancelled. Returns whether it played.
+    @discardableResult func play(reduceMotion: Bool) async -> Bool {
+        guard pending != nil, !frames.isEmpty, !Task.isCancelled else { return false }
+        let frames = self.frames
+        pending = nil
+        self.frames = []
+        defer { frame = nil }
+        guard !reduceMotion else { return true }
+        for image in frames {
+            frame = image
+            do {
+                try await Task.sleep(for: .seconds(JourneyArt.tapeDuration / Double(frames.count)))
+            } catch {
+                return true
+            }
+        }
+        return true
     }
 }

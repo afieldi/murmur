@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // The promotion ceremony (ios/prd.json IOS-018), as desktop holds it: one
 // big stroke in the new belt's color, splatter, and the rank set large.
-// The painting runs in the painter page on screen; the rank, its title,
-// and what earned it are native text over it. A tap, or VoiceOver's
-// escape, continues; without VoiceOver it also closes on its own after
-// desktop's 4.6 seconds. Reduce Motion shows the finished painting at once.
+// The painting runs in the painter page on screen (the Journey's own,
+// already started); the rank, its title, and what earned it are native
+// text over it. A tap anywhere, or VoiceOver's escape, continues; without
+// VoiceOver it also closes on its own desktop's 4.6 seconds after the
+// painting starts. Reduce Motion shows the finished painting at once.
 import MurmurCore
 import SwiftUI
 import WebKit
@@ -22,23 +23,34 @@ struct CeremonyView: View {
     static let textDelay = 0.48
 
     let rank: RankSpec
+    let painter: JourneyPainter
+    let duration: Double
     let close: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
-    @State private var painter: JourneyPainter?
     @State private var painted = false
+    /// The painting has started (or could not): the clock runs from here.
+    @State private var started = false
     @State private var shown = false
     @ScaledMetric(relativeTo: .largeTitle) private var rankSize = 48
+
+    init(rank: RankSpec, painter: JourneyPainter = .shared, duration: Double = CeremonyView.duration, close: @escaping () -> Void) {
+        self.rank = rank
+        self.painter = painter
+        self.duration = duration
+        self.close = close
+    }
 
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .top) {
-                if let painter {
-                    Stage(painter: painter)
-                        .ignoresSafeArea()
-                        .accessibilityHidden(true)
-                }
+                // The page needs no touches: a tap anywhere reaches the
+                // ceremony's own close.
+                Stage(painter: painter)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
                 VStack(spacing: 14) {
                     Text(rank.label)
                         .font(.system(size: rankSize, weight: .heavy).width(.condensed))
@@ -68,32 +80,49 @@ struct CeremonyView: View {
             .accessibilityAddTraits(.isButton)
             .accessibilityAction(.escape, close)
             .accessibilityAction(named: JourneyCopy.continueHint, close)
-            .task(id: geometry.size) {
-                await paint(geometry.size)
+            // The page fills the whole screen, so it paints at that size.
+            .task(id: Self.screen(geometry)) {
+                await paint(Self.screen(geometry))
             }
         }
         .background(Tokens.ink.opacity(0.95))
         .task {
             if reduceMotion {
                 shown = true
-            } else {
-                try? await Task.sleep(for: .seconds(Self.textDelay))
-                withAnimation(.easeOut(duration: 0.4)) { shown = true }
+                return
             }
-            guard !voiceOver else { return }
-            try? await Task.sleep(for: .seconds(Self.duration - (reduceMotion ? 0 : Self.textDelay)))
+            do {
+                try await Task.sleep(for: .seconds(Self.textDelay))
+            } catch {
+                return
+            }
+            withAnimation(.easeOut(duration: 0.4)) { shown = true }
+        }
+        .task(id: started) {
+            guard started, !voiceOver else { return }
+            do {
+                try await Task.sleep(for: .seconds(duration))
+            } catch {
+                return
+            }
             close()
         }
     }
 
+    /// The whole screen: the safe area and the insets around it.
+    static func screen(_ geometry: GeometryProxy) -> CGSize {
+        let insets = geometry.safeAreaInsets
+        return CGSize(width: geometry.size.width + insets.leading + insets.trailing, height: geometry.size.height + insets.top + insets.bottom)
+    }
+
     /// Paints once the size is known: the stroke goes on the first time,
-    /// and a new size repaints the finished picture, as desktop does.
+    /// and a new size repaints the finished picture, as desktop does. The
+    /// clock starts once the painting has (or once it could not).
     private func paint(_ size: CGSize) async {
         guard size.width > 0, size.height > 0 else { return }
-        let painter = painter ?? JourneyPainter()
-        self.painter = painter
         let finished = reduceMotion || painted
         painted = true
         try? await painter.ceremony(rank: rank.id, size: size, reduced: finished)
+        started = true
     }
 }
