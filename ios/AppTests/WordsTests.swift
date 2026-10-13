@@ -77,3 +77,24 @@ import Testing
         #expect(finished.contains("LaBroi lives at 1 Main Street, Springfield"))
     }
 }
+
+@Suite struct WordsCopyTests {
+    /// Each empty list says what it is for, with one example.
+    @Test func eachEmptyListGivesOneExample() {
+        for line in [WordsCopy.wordsEmpty, WordsCopy.expansionsEmpty] {
+            #expect(line.components(separatedBy: "For example").count == 2)
+        }
+        #expect(WordsCopy.deleteQuestion("LaBroi") == "Delete LaBroi?")
+    }
+
+    @Test func everyLineFollowsTheWritingRules() {
+        let lines = [
+            WordsCopy.wordsEmpty, WordsCopy.expansionsEmpty, WordsCopy.wordFooter, WordsCopy.expansionFooter, WordsCopy.noMatch,
+            WordsCopy.search, WordsCopy.heard("x")
+        ]
+        for line in lines {
+            #expect(!line.contains("Murmur"))
+            #expect(!line.contains("\u{2014}") && !line.contains(" - ") && !line.contains("--"))
+        }
+    }
+}
