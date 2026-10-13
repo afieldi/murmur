@@ -219,3 +219,11 @@ The first time, open murmur once and allow the microphone: a control has no scre
 While a session runs, murmur shows a Live Activity on the Lock Screen and in the Dynamic Island: the pill, Ready or Recording, the time left in the session, and End. iOS redraws it only now and then, so the pill there stands still and never moves with your voice; the keyboard's pill is the one that listens. End there ends the session at once. If you turn off Live Activities for murmur, a session you start in murmur or from the keyboard still runs as usual; only Start murmur needs them.
 
 If murmur closes while a session runs (you swipe it away, or iOS stops it), the session ends and the orange dot goes out. The Live Activity can stay a while; once its time runs out it says Ended. Tap End or open murmur to clear it.
+
+## How do belts work on iPhone?
+
+The same way as on the Mac: the same ladder of belts and stripes (white, blue, purple, brown, and black, each with four stripes, then the black belt degrees and the coral belts), with the same two gates for each. A belt needs both enough words dictated and enough different days you dictated on, so one long day never skips a belt. The table of what every belt and stripe takes is in the Journey guide, under What are the exact requirements for each belt and stripe?
+
+On iPhone, the Journey row on Home shows your belt. Tap it to see your stripes, the words and the days you still need for the next belt, your level (one more for every hundred thousand words), and the day you earned each belt.
+
+Your iPhone counts only the takes it keeps in its own history. Deleting takes there lowers your count, as clearing history does on the Mac. For now your iPhone and your Mac each keep their own belt; one Journey across your devices comes with the murmur account.
