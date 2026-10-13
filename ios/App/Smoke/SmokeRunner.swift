@@ -44,6 +44,7 @@ enum SmokeRunner {
             ("pill", checkPill),
             ("firstRun", checkFirstRun),
             ("history", checkHistory),
+            ("dictionary", checkDictionary),
             ("sharedJson", { try checkSharedJson(expected: request.sharedCount) })
         ]
         var results: [String: Bool] = [:]
@@ -339,6 +340,28 @@ enum SmokeRunner {
         guard protection == .completeUntilFirstUserAuthentication else { throw SmokeFailure("history has protection \(String(describing: protection))") }
         try store.clear()
         guard store.list().isEmpty else { throw SmokeFailure("Clear all left takes") }
+    }
+
+    /// The dictionary and expansions (IOS-013): an entry added to each list
+    /// is kept, a take's text runs through both, and the dictionary rides
+    /// along to transcription as a spelling hint.
+    static func checkDictionary() throws {
+        if let failure = onMain({ await dictionaryFailure() }) { throw SmokeFailure(failure) }
+    }
+
+    @MainActor private static func dictionaryFailure() async -> String? {
+        guard let defaults = UserDefaults(suiteName: "murmur.smoke.\(UUID().uuidString)"), let rules = try? BundledRules.takeRules() else { return "no scratch defaults or rules" }
+        let words = WordsModel(store: CleanupStore(defaults: defaults))
+        guard words.saveWord(DictionaryEntry(from: "la broy", to: "LaBroi")),
+              words.saveExpansion(ExpansionEntry(trigger: "my address", text: "1 Main Street, Springfield"))
+        else { return "an entry would not save" }
+        var settings = CleanupStore(defaults: defaults).load()
+        guard settings.dictionary.count == 1, settings.expansions.count == 1 else { return "the entries were not kept" }
+        settings.polish = false
+        let finished = await Cleanup.finish("la broy lives at my address", settings: settings, rules: rules.cleanup, connection: nil, send: { _ in throw URLError(.notConnectedToInternet) })
+        guard finished.contains("LaBroi lives at 1 Main Street, Springfield") else { return "the take came out as \(finished)" }
+        guard transcriptionHint(settings.dictionary) == "LaBroi." else { return "the spelling hint was \(String(describing: transcriptionHint(settings.dictionary)))" }
+        return nil
     }
 
     /// Runs main-actor work to the end from the smoke's synchronous start
