@@ -54,7 +54,7 @@ import UIKit
     }
 
     @Test func thePadsOwnLinesReadPlainly() {
-        for line in [Pad.noAnswer, Pad.busy, Pad.stoppedAnswering, Pad.opening, Pad.openRefused] {
+        for line in [Pad.noAnswer, Pad.busy, Pad.stoppedAnswering, Pad.opening, Pad.openRefused, Pad.idleHint] {
             #expect(!line.contains("Murmur"))
         }
         #expect(Pad.openRefused == "Open murmur to start")

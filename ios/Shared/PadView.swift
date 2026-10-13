@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // The dictation pad's keys (ios/prd.json IOS-008): the pill in the middle,
+// drawn by the one pill module (IOS-010),
 // with globe, space, delete, and return around it, and Insert last when a
 // take landed after you left its field. Kept in Shared so the app can
 // preview it; only the keyboard wires it to a text field.
@@ -7,6 +8,8 @@ import UIKit
 
 final class PadView: UIView {
     let pill = UIButton(type: .system)
+    /// The waveform inside the pill.
+    let wave = PillView()
     let status = UILabel()
     let insertLast = UIButton(type: .system)
     let globe = UIButton(type: .system)
@@ -23,10 +26,11 @@ final class PadView: UIView {
 
         var pillLook = UIButton.Configuration.filled()
         pillLook.cornerStyle = .capsule
-        pillLook.imagePadding = 8
-        pillLook.contentInsets = NSDirectionalEdgeInsets(top: 14, leading: 28, bottom: 14, trailing: 28)
+        pillLook.baseBackgroundColor = UIColor(Tokens.panelLift)
         pill.configuration = pillLook
-        setListening(false)
+        wave.translatesAutoresizingMaskIntoConstraints = false
+        pill.addSubview(wave)
+        setStage(.idle)
 
         for label in [status, fullAccess] {
             label.font = .preferredFont(forTextStyle: .footnote)
@@ -80,6 +84,10 @@ final class PadView: UIView {
             top.leadingAnchor.constraint(greaterThanOrEqualTo: middle.leadingAnchor),
             top.trailingAnchor.constraint(lessThanOrEqualTo: middle.trailingAnchor),
             pill.heightAnchor.constraint(equalToConstant: 56),
+            wave.leadingAnchor.constraint(equalTo: pill.leadingAnchor, constant: 28),
+            wave.trailingAnchor.constraint(equalTo: pill.trailingAnchor, constant: -28),
+            wave.topAnchor.constraint(equalTo: pill.topAnchor, constant: 14),
+            wave.bottomAnchor.constraint(equalTo: pill.bottomAnchor, constant: -14),
             insertLast.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
             pill.widthAnchor.constraint(greaterThanOrEqualToConstant: 176),
             globe.widthAnchor.constraint(equalToConstant: 48),
@@ -100,15 +108,12 @@ final class PadView: UIView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("PadView is built in code") }
 
-    /// The pill: gold to start, live amber while listening.
-    func setListening(_ listening: Bool) {
-        var look = pill.configuration ?? .filled()
-        look.title = listening ? "Stop" : "Tap to talk"
-        look.image = UIImage(systemName: listening ? "stop.fill" : "mic.fill")
-        look.baseBackgroundColor = UIColor(listening ? Tokens.amber : Tokens.panelLift)
-        look.baseForegroundColor = UIColor(listening ? Tokens.ink : Tokens.brand)
-        pill.configuration = look
-        pill.accessibilityLabel = listening ? "Stop dictation" : "Start dictation"
+    /// The pill in a stage: the waveform draws it, and VoiceOver reads it as
+    /// a button with the stage's name.
+    func setStage(_ stage: PillStage) {
+        wave.show(stage)
+        pill.accessibilityLabel = Pill.label(stage)
+        pill.accessibilityHint = stage == .recording ? "Double tap to stop." : nil
     }
 
     /// Without Full Access the pill cannot work, so it gives way to the

@@ -25,6 +25,8 @@ enum Pad {
     /// While iOS opens murmur for the first take of a session (IOS-009), and
     /// when iOS will not.
     static let opening = "Opening murmur"
+    /// Under the pill at rest (IOS-010): the pill itself carries no words.
+    static let idleHint = "Tap the pill to talk"
     static let openRefused = "Open murmur to start"
 
     /// mine is the take this keyboard asked for, nil when it is not waiting

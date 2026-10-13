@@ -7,7 +7,9 @@
 // for a take under its own id, signals it (start, stop, cancel, end), and
 // reads the mailbox; it never touches the microphone or the network.
 // Words land at the cursor once, or wait as Insert last when you left the
-// field before they arrived.
+// field before they arrived. The pill is drawn from the take's stage and
+// the loudness the app writes to the app group (IOS-010), with a light tap
+// when a take starts and when it stops.
 import UIKit
 
 final class KeyboardViewController: UIInputViewController {
@@ -23,6 +25,9 @@ final class KeyboardViewController: UIInputViewController {
     private var visible = false
     private var deleteRepeat: Timer?
     private var noAnswer: Timer?
+    /// Brings the pill back to rest after it shows how a take ended.
+    private var rest: Timer?
+    private let haptic = UIImpactFeedbackGenerator(style: .light)
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -44,6 +49,9 @@ final class KeyboardViewController: UIInputViewController {
         pad.insertLast.addTarget(self, action: #selector(tapInsertLast), for: .touchUpInside)
         pad.delete.addTarget(self, action: #selector(deleteDown), for: .touchDown)
         pad.delete.addTarget(self, action: #selector(deleteUp), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+        pad.pill.addTarget(self, action: #selector(pillDown), for: .touchDown)
+        pad.wave.level = { LevelFile.shared.read()?.level ?? 0 }
+        pad.status.text = Pad.idleHint
         listener = SignalListener([.changed, .busy]) { [weak self] signal in
             signal == .busy ? self?.heardBusy() : self?.refresh()
         }
@@ -53,6 +61,7 @@ final class KeyboardViewController: UIInputViewController {
         super.viewWillAppear(animated)
         visible = true
         pad.setFullAccess(hasFullAccess)
+        pad.wave.style = PillLook.read().style
         waiting = Pad.Waiting.load(from: memory)
         // A take that opened murmur is taken over by the keyboard you come
         // back to, and lands in its field.
@@ -91,9 +100,14 @@ final class KeyboardViewController: UIInputViewController {
         setReturnTitle()
     }
 
+    @objc private func pillDown() {
+        haptic.prepare()
+    }
+
     @objc private func tapPill() {
         switch (waiting, phase) {
         case (.some, .listening?):
+            haptic.impactOccurred()
             Signal.stop.post()
             // The app moves on to working within a moment; when it does not,
             // it is no longer there.
@@ -104,6 +118,8 @@ final class KeyboardViewController: UIInputViewController {
         case (nil, _):
             let take = UUID()
             guard let mailbox = Mailbox.shared else { return }
+            haptic.impactOccurred()
+            rest?.invalidate()
             mailbox.ask(take)
             pad.insertLast.isHidden = true
             phase = nil
@@ -223,18 +239,19 @@ final class KeyboardViewController: UIInputViewController {
             // Transcribing and polish can take a while, but not forever.
             if phase == .working { expectAnswer(within: 90, else: Pad.stoppedAnswering) }
         }
-        pad.setListening(waiting != nil && phase == .listening)
+        if waiting != nil { pad.setStage(PillStage(phase)) }
         let sameField = waiting?.sameField(as: textDocumentProxy.documentIdentifier) ?? false
         switch Pad.react(to: entry, mine: waiting?.take, sameField: sameField, visible: visible) {
         case .insert(let take):
             if let words = mailbox.claim(take) { insert(words) }
-            end(nil)
+            end(nil, showing: .inserted)
         case .offerInsertLast:
             pad.insertLast.isHidden = false
             if entry?.take == waiting?.take { end(nil) }
         case .status(let line):
             pad.status.text = line
-            if phase == .nothing || phase == .failed { end(line) }
+            if phase == .nothing { end(line, showing: .noSpeech) }
+            if phase == .failed { end(line, showing: .error) }
         case .none:
             break
         }
@@ -244,11 +261,20 @@ final class KeyboardViewController: UIInputViewController {
         textDocumentProxy.insertText(Pad.spaced(words, after: textDocumentProxy.documentContextBeforeInput))
     }
 
-    private func end(_ line: String?) {
+    /// Ends the take: the pill shows how it ended for a moment, then rests.
+    private func end(_ line: String?, showing stage: PillStage = .idle) {
         waiting = nil
         phase = nil
         noAnswer?.invalidate()
-        pad.setListening(false)
-        pad.status.text = line
+        pad.setStage(stage)
+        pad.status.text = line ?? Pad.idleHint
+        rest?.invalidate()
+        guard stage != .idle else { return }
+        rest = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.waiting == nil else { return }
+                self.pad.setStage(.idle)
+            }
+        }
     }
 }
