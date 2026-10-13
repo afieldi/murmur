@@ -137,20 +137,20 @@ A take started from the keyboard that nobody stops ends at 10 minutes, and murmu
 
 Some, because the microphone stays on while a session runs. murmur does no work on the sound between takes: it is dropped as it arrives, and nothing is sent until you tap the pill. A session ends by itself after the length you pick, and End session stops it at once. If you dictate in short bursts, pick 5 minutes.
 
-## What if the pill says Open murmur to start?
+## What if the keyboard says Open murmur to start?
 
 That means iOS did not let the keyboard open murmur. Check that Allow Full Access is on for murmur in Settings, then General, Keyboard, Keyboards. If it is, open murmur yourself, tap Session, and tap Start session. Then go back to your app and tap the pill: it starts a take right there while the session runs.
 
 ## How do I change how the pill looks on iPhone?
 
-In murmur, tap Keyboard, then pick Bars or Speckle under The pill. Each tile is the real pill moving to a made-up voice; your microphone is never used for the tiles. The look you pick is outlined in gold, and the keyboard and the screen murmur opens to use it from your next take.
+In murmur, tap Keyboard, then pick Bars or Speckle under The pill. Each tile is the real pill moving to a made-up voice; your microphone is never used for the tiles. The look you pick is outlined in gold. The screen murmur opens to uses it from your next take, and the keyboard the next time it appears.
 
 - **Bars** is the classic equalizer.
 - **Speckle** is a dust field that drifts when quiet and vibrates with your speech.
 
 ## What does the pill show on iPhone?
 
-The pill shows where your take is, in the keyboard and on the screen murmur opens to:
+The pill in the keyboard shows where your take is. The screen murmur opens to shows the same pill while it records.
 
 - **At rest**, it is small, grey, and still. It never shows amber at rest, even while a session keeps the microphone ready.
 - **Recording**, it is wet amber at your voice's level, cooling toward gold as each moment ages.

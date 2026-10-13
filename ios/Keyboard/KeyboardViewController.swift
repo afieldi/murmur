@@ -120,6 +120,8 @@ final class KeyboardViewController: UIInputViewController {
             guard let mailbox = Mailbox.shared else { return }
             haptic.impactOccurred()
             rest?.invalidate()
+            // The last take's ending gives way to the new take at once.
+            pad.setStage(.idle)
             mailbox.ask(take)
             pad.insertLast.isHidden = true
             phase = nil
@@ -239,7 +241,12 @@ final class KeyboardViewController: UIInputViewController {
             // Transcribing and polish can take a while, but not forever.
             if phase == .working { expectAnswer(within: 90, else: Pad.stoppedAnswering) }
         }
-        if waiting != nil { pad.setStage(PillStage(phase)) }
+        if let stage = Pad.stage(waiting: waiting != nil, phase: phase, ending: rest?.isValid == true) {
+            // A keyboard that comes back with no take rests its pill, and the
+            // old stage's line goes with it.
+            if stage == .idle, waiting == nil, pad.wave.stage != .idle { pad.status.text = Pad.idleHint }
+            pad.setStage(stage)
+        }
         let sameField = waiting?.sameField(as: textDocumentProxy.documentIdentifier) ?? false
         switch Pad.react(to: entry, mine: waiting?.take, sameField: sameField, visible: visible) {
         case .insert(let take):

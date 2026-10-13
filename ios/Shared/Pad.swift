@@ -64,6 +64,15 @@ enum Pad {
         return " " + words
     }
 
+    /// The pill's stage after a refresh: the take's own while one is waited
+    /// on; nil (leave it) while how the last take ended still shows; rest
+    /// otherwise, so a keyboard that comes back with no take never keeps an
+    /// old stage, least of all Recording.
+    static func stage(waiting: Bool, phase: MailboxEntry.Phase?, ending: Bool) -> PillStage? {
+        if waiting { return PillStage(phase) }
+        return ending ? nil : .idle
+    }
+
     /// The take this keyboard is waiting on, kept in the keyboard's own
     /// defaults: opening murmur closes the keyboard, and the one you swipe
     /// back to is a new one that has to know the take is its own.

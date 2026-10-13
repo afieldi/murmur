@@ -85,6 +85,17 @@ import UIKit
         #expect(!inPlace.sameField(as: UUID()))
     }
 
+    /// The pill shows the take it waits on; how the last take ended while
+    /// that still shows; and rest otherwise, so a keyboard that comes back
+    /// with no take never keeps an old stage, least of all Recording.
+    @Test func thePillRestsWhenNoTakeIsWaiting() {
+        #expect(Pad.stage(waiting: true, phase: .listening, ending: false) == .recording)
+        #expect(Pad.stage(waiting: true, phase: nil, ending: true) == .idle)
+        #expect(Pad.stage(waiting: false, phase: .listening, ending: false) == .idle)
+        #expect(Pad.stage(waiting: false, phase: nil, ending: false) == .idle)
+        #expect(Pad.stage(waiting: false, phase: nil, ending: true) == nil)
+    }
+
     /// Leaving the keyboard drops a take still starting or listening,
     /// except on the trip to murmur an opened take is for; once a keyboard
     /// you came back to has taken it over, leaving drops it too.
