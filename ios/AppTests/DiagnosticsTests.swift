@@ -129,3 +129,26 @@ import Testing
         }
     }
 }
+
+@Suite struct DiagnosticsFileTests {
+    let at = Date(timeIntervalSince1970: 1_790_000_000)
+
+    /// A report is one text file, named by its day, replacing the last.
+    @Test func theReportIsOneFileNamedByItsDay() throws {
+        let folder = FileManager.default.temporaryDirectory.appending(path: "report-\(UUID().uuidString)", directoryHint: .isDirectory)
+        _ = DiagnosticsFile.write("old", now: at.addingTimeInterval(-86_400 * 3), in: folder)
+        let file = try #require(DiagnosticsFile.write("murmur diagnostics report\n", now: at, in: folder))
+        #expect(file.lastPathComponent == "murmur-diagnostics-2026-09-21.txt")
+        #expect(try String(contentsOf: file, encoding: .utf8) == "murmur diagnostics report\n")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path) == [file.lastPathComponent])
+    }
+}
+
+@Suite struct DiagnosticsCopyTests {
+    @Test func everyLineFollowsTheWritingRules() {
+        for line in [DiagnosticsCopy.what, DiagnosticsCopy.never, DiagnosticsCopy.footer, DiagnosticsCopy.noCatalog] {
+            #expect(!line.contains("Murmur"))
+            #expect(!line.contains("\u{2014}") && !line.contains(" - ") && !line.contains("--"))
+        }
+    }
+}

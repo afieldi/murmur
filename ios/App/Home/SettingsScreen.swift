@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Settings (ios/prd.json IOS-012): Provider and keys, Cleanup, Dictionary
 // and expansions (IOS-013), the session's length, the keyboard and the
-// pill's look, and About. Diagnostics (IOS-014) joins when it ships.
+// pill's look, Diagnostics (IOS-014), and About.
 import SwiftUI
 
 struct SettingsScreen: View {
@@ -13,6 +13,7 @@ struct SettingsScreen: View {
                 NavigationLink("Dictionary and expansions") { WordsRoute() }
                 NavigationLink("Session") { SessionRoute() }
                 NavigationLink("Keyboard") { KeyboardScreen() }
+                NavigationLink("Diagnostics") { DiagnosticsRoute() }
                 NavigationLink("About") { AboutScreen() }
             }
             .listRowBackground(Tokens.panel)
