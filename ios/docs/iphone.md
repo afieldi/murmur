@@ -243,3 +243,17 @@ When you earn a new belt, the Journey holds the ceremony the next time you open 
 With Reduce Motion on (Settings, Accessibility, Motion), every painting appears finished at once, with no strokes drawing on. Every word on the Journey is ordinary text, so it follows your text size, and VoiceOver reads your belt, where you stand on the road, each gate, and each achievement.
 
 The paintings are made on your iPhone by a small page inside murmur that can load nothing else and reach nothing on the internet.
+
+## How does the painting a day work on iPhone?
+
+The same way as on the Mac, painted by the same code. Each day gets one ink painting, and every take you dictate that day adds its next stroke. Tap the painting row on Home to open today's painting; the newest stroke paints itself in.
+
+- **Its subject** is new each day, picked from fourteen (a moon over water, bamboo, a plum branch, mountains, a pine on a cliff, an orchid, a chrysanthemum, a lotus pond, a waterfall, a willow by the water, a boat on the river, a breaking wave, a maple branch, and snowfall), never the same as the day before or after.
+- **Its size** is about the number of takes on a typical day for you, from 6 to 36 strokes. Once it has that many it is finished, and takes after that keep adding small marks.
+- **Its seal** stamps on when it finishes, in the color of the belt you held when the day's first take landed.
+- **Its light** comes with the seal: a dawn sun, a pale day sun, a setting sun, or a crescent moon and stars, from the hours you dictated in.
+- **Its detail** grows with your belt: washes from blue, splatter from purple, a second motif from brown, the heaviest from black. Levels add a bird or two.
+
+Earlier days wait under it in a strip; tap one to open it large. Save card saves a portrait card of the day (1080 by 1350) with its name, how far it got, and who painted it. Save the week, there once two of the last seven days have paintings, saves the seven days as one long scroll. Both open the share sheet, where Save Image puts them in Photos; murmur only adds to your photos and never looks at your library.
+
+Your iPhone keeps its own paintings, made from the takes it keeps, and they stay when you delete takes. Its seed is its own too, so the same takes on your iPhone and your Mac paint different subjects until one murmur account joins them. With Reduce Motion on (Settings, Accessibility, Motion), the painting appears finished at once.

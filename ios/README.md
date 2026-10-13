@@ -22,7 +22,7 @@ Releasing to TestFlight needs murmur's App Store Connect API key and Apple Distr
 
 The tests and the smoke run on murmur's own simulator, named murmur smoke, created the first time and shut down afterward. Other simulators are left alone.
 
-Nothing generated is committed: `ios/Generated`, `ios/build`, and `ios/murmur.xcodeproj` are rebuilt from `ios/project.yml`, `src/renderer/tokens.css`, the icon scripts, `shared/`, and the Journey's painter page (`ios/Web`, bundled with desktop's brush engine). Change those, never the generated files.
+Nothing generated is committed: `ios/Generated`, `ios/build`, and `ios/murmur.xcodeproj` are rebuilt from `ios/project.yml`, `src/renderer/tokens.css`, the icon scripts, `shared/`, and the Journey's painter page (`ios/Web`, bundled with desktop's brush engine and the cards' display face, which is fetched at install and never committed). Change those, never the generated files.
 
 ## How is it laid out?
 
