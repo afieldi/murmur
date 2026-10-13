@@ -46,6 +46,7 @@ enum SmokeRunner {
             ("history", checkHistory),
             ("dictionary", checkDictionary),
             ("diagnostics", checkDiagnostics),
+            ("sessionIntents", checkSessionIntents),
             ("sharedJson", { try checkSharedJson(expected: request.sharedCount) })
         ]
         var results: [String: Bool] = [:]
@@ -410,6 +411,48 @@ enum SmokeRunner {
         for text in [report, logged] where text.localizedCaseInsensitiveContains("smokeberry") || text.localizedCaseInsensitiveContains("smoke berry") || text.contains(canaryKey) {
             return "a canary reached the log or the report"
         }
+        return nil
+    }
+
+    /// Starting without opening murmur (IOS-016): the Start murmur intent,
+    /// as Control Center and the Action Button run it, starts a session with
+    /// the microphone warm and its Live Activity up; the End intent, as the
+    /// Live Activity's End runs it, ends both.
+    static func checkSessionIntents() throws {
+        if let failure = onMain({ await sessionIntentsFailure() }) { throw SmokeFailure(failure) }
+    }
+
+    @MainActor private static func sessionIntentsFailure() async -> String? {
+        guard let microphone = FedMicrophone(rate: Double(Wav.targetSampleRate)), let key = APIKey(StubProtocol.key),
+              let defaults = UserDefaults(suiteName: "murmur.smoke.\(UUID().uuidString)"),
+              let catalog = try? BundledRules.catalog(), let rules = try? BundledRules.takeRules()
+        else { return "the stand-ins did not build" }
+        let scratch = FileManager.default.temporaryDirectory.appending(path: "smoke-intents-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        try? FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        let connections = ConnectionStore(defaults: defaults)
+        let ring = MemoryKeyRing()
+        try? ring.save(key, for: connections.load(catalog: catalog).transcription.baseUrl)
+        let model = TakeModel(
+            microphone: microphone, store: WaitingStore(directory: scratch.appending(path: "takes", directoryHint: .isDirectory)),
+            rules: rules, catalog: catalog, connections: connections, cleanup: CleanupStore(defaults: defaults), ring: ring,
+            send: { request in (Data(#"{"text":"smoke intent words"}"#.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!) },
+            copy: { _ in }
+        )
+        let session = Session(
+            microphone: microphone, model: model, defaults: defaults, stateFile: scratch.appending(path: "session.json"),
+            announce: { _ in }, present: { LiveSession.shared.show($0) }
+        )
+        session.listen()
+        let before = SessionControl.source
+        defer { SessionControl.source = before }
+        SessionControl.source = { session }
+        guard (try? await StartSessionIntent().perform()) != nil, session.isOn, microphone.isWarm else { return "Start murmur did not start a warm session" }
+        await LiveSession.shared.settle()
+        guard LiveSession.shared.isShowing else { return "Start murmur showed no Live Activity" }
+        guard (try? await EndSessionIntent().perform()) != nil, !session.isOn, !microphone.isWarm else { return "End did not end the session" }
+        await LiveSession.shared.settle()
+        guard !LiveSession.shared.isShowing else { return "the Live Activity outlived the session" }
         return nil
     }
 
