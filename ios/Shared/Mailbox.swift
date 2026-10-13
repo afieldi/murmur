@@ -70,6 +70,21 @@ struct Mailbox: Sendable {
         return words
     }
 
+    /// Drops words still waiting to be typed (Insert last) when you delete
+    /// them in murmur (IOS-012): the ones given, or any with nil. A take
+    /// still running is left alone.
+    func forget(_ words: Set<String>?) {
+        coordinate(file, writing: true) { url in
+            guard let data = try? Data(contentsOf: url),
+                  var entry = try? JSONDecoder().decode(MailboxEntry.self, from: data),
+                  entry.phase == .ready, let waiting = entry.words,
+                  words?.contains(waiting) ?? true
+            else { return }
+            entry.words = nil
+            try? JSONEncoder().encode(entry).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        }
+    }
+
     /// The keyboard asks for a take with its own id, just before it signals
     /// start.
     func ask(_ take: UUID, at: Date = .now) {

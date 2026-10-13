@@ -142,6 +142,14 @@ struct TakeRules: Sendable {
         }
     }
 
+    /// Takes words you deleted in murmur off the Dictate screen (IOS-012):
+    /// the ones given, or any with nil.
+    func forget(_ words: Set<String>?) {
+        guard case .words(let shown) = state else { return }
+        if let words, !words.contains(where: { shown.contains($0) }) { return }
+        state = .idle
+    }
+
     /// Leaving the screen mid-take drops the take: nothing is kept or sent.
     func cancel() {
         guard isRecording else { return }

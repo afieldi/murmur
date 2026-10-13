@@ -221,6 +221,19 @@ final class FakeProvider: Sendable {
         #expect(sink.kept.first?.at == spoken)
     }
 
+    /// Deleting a take in murmur takes its words off the Dictate screen too.
+    @Test func forgottenWordsLeaveTheScreen() async {
+        let model = model(.says("Private words."))
+        await take(model)
+        model.forget(["Other words."])
+        #expect(model.state == .words("Private words."))
+        model.forget(["Private words."])
+        #expect(model.state == .idle)
+        await take(model)
+        model.forget(nil)
+        #expect(model.state == .idle)
+    }
+
     @Test func aRetryDeliversTheWordsThenDeletesTheAudio() async throws {
         let provider = FakeProvider([(503, "{}")])
         let model = model(provider)

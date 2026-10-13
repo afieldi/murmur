@@ -42,6 +42,24 @@ import Testing
     }
 
     /// The keyboard's ask is answered once, with its own id.
+    /// Words you deleted in murmur are never offered as Insert last: only
+    /// the matching words go, or all with Clear all, and a take still
+    /// running is left alone.
+    @Test func forgottenWordsAreNeverOffered() {
+        mailbox.write(MailboxEntry(take: take, phase: .ready, words: "Secret words.", at: at))
+        mailbox.forget(["Other words."])
+        #expect(mailbox.read()?.words == "Secret words.")
+        mailbox.forget(["Secret words."])
+        #expect(mailbox.read()?.words == nil)
+        #expect(mailbox.claim() == nil)
+        mailbox.write(MailboxEntry(take: take, phase: .ready, words: "More words.", at: at))
+        mailbox.forget(nil)
+        #expect(mailbox.claim() == nil)
+        mailbox.write(MailboxEntry(take: take, phase: .listening, words: nil, at: at))
+        mailbox.forget(nil)
+        #expect(mailbox.read()?.phase == .listening)
+    }
+
     @Test func anAskIsAnsweredOnce() {
         mailbox.ask(take, at: at)
         #expect(mailbox.answer(within: 3, now: at.addingTimeInterval(1)) == take)

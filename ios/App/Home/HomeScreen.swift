@@ -14,8 +14,6 @@ struct HomeScreen: View {
     let setup: Setup
     let resume: (Setup.Step) -> Void
     @State private var copied: UUID?
-    @State private var deleting: HistoryEntry?
-    @State private var askingDelete = false
     @State private var askingClear = false
 
     var body: some View {
@@ -44,11 +42,9 @@ struct HomeScreen: View {
                     ForEach(history.entries) { entry in
                         TakeRow(entry: entry, copied: copied == entry.id) {
                             copy(entry)
+                        } delete: {
+                            history.delete(entry.id)
                         }
-                        .swipeActions(edge: .trailing) {
-                            Button(HomeCopy.delete, role: .destructive) { ask(entry) }
-                        }
-                        .accessibilityAction(named: HomeCopy.delete) { ask(entry) }
                     }
                 }
             } header: {
@@ -61,6 +57,9 @@ struct HomeScreen: View {
                             .foregroundStyle(Tokens.brand)
                             .textCase(nil)
                             .frame(minHeight: 44)
+                            .confirmationDialog(HomeCopy.clearTitle(history.entries.count), isPresented: $askingClear, titleVisibility: .visible) {
+                                Button(HomeCopy.clearAction(history.entries.count), role: .destructive) { history.clear() }
+                            }
                     }
                 }
             }
@@ -69,12 +68,6 @@ struct HomeScreen: View {
         .scrollContentBackground(.hidden)
         .background(Tokens.ink)
         .foregroundStyle(Tokens.text)
-        .confirmationDialog(HomeCopy.deleteOne, isPresented: $askingDelete, titleVisibility: .visible, presenting: deleting) { entry in
-            Button(HomeCopy.deleteOneAction, role: .destructive) { history.delete(entry.id) }
-        }
-        .confirmationDialog(HomeCopy.clearTitle(history.entries.count), isPresented: $askingClear, titleVisibility: .visible) {
-            Button(HomeCopy.clearAction(history.entries.count), role: .destructive) { history.clear() }
-        }
     }
 
     private func copy(_ entry: HistoryEntry) {
@@ -86,10 +79,6 @@ struct HomeScreen: View {
         }
     }
 
-    private func ask(_ entry: HistoryEntry) {
-        deleting = entry
-        askingDelete = true
-    }
 }
 
 /// Whether a session is running, and the one action that changes it.
@@ -120,11 +109,15 @@ struct SessionCard: View {
     }
 }
 
-/// One take: its words, when, and how long. Tapping copies the words.
+/// One take: its words, when, and how long. Tapping copies the words; a
+/// swipe or VoiceOver's Delete asks first, from the row, so the question
+/// points at the take it is about.
 struct TakeRow: View {
     let entry: HistoryEntry
     let copied: Bool
     let copy: () -> Void
+    let delete: () -> Void
+    @State private var asking = false
 
     var body: some View {
         Button(action: copy) {
@@ -152,6 +145,15 @@ struct TakeRow: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityHint(HomeCopy.copyHint)
+        .swipeActions(edge: .trailing) {
+            Button(HomeCopy.delete, role: .destructive) { asking = true }
+        }
+        .accessibilityAction(named: HomeCopy.delete) { asking = true }
+        .confirmationDialog(HomeCopy.deleteOne, isPresented: $asking, titleVisibility: .visible) {
+            Button(HomeCopy.deleteOneAction, role: .destructive) { delete() }
+        } message: {
+            Text(HomeCopy.preview(entry.words))
+        }
     }
 }
 
@@ -217,7 +219,12 @@ enum HomeCopy {
     static let deleteOneAction = "Delete take"
     static let copied = "Copied"
     static let copyHint = "Double tap to copy the words."
-    static let empty = "Your takes land here. Tap the pill in any app, or tap Dictate."
+    static let empty = "Your takes land here. Tap the pill in any app, or tap the microphone above."
+
+    /// The start of a take's words, for the question that asks to delete it.
+    static func preview(_ words: String) -> String {
+        words.count <= 80 ? words : String(words.prefix(80)).trimmingCharacters(in: .whitespaces) + "..."
+    }
 
     static func waiting(_ count: Int) -> String {
         count == 1 ? "1 take waiting to retry" : "\(count) takes waiting to retry"

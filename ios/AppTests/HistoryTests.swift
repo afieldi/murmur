@@ -69,6 +69,27 @@ import Testing
 @MainActor @Suite struct HistoryModelTests {
     let store = HistoryStore(file: FileManager.default.temporaryDirectory.appending(path: "history-model-\(UUID().uuidString).jsonl"))
 
+    /// What deleting asked to be forgotten elsewhere.
+    @MainActor final class Forgotten {
+        var calls: [Set<String>?] = []
+    }
+
+    /// Deleting a take forgets its words everywhere else they wait (the
+    /// Dictate screen, the keyboard's Insert last); Clear all forgets them all.
+    @Test func deletingForgetsTheWordsEverywhere() {
+        let forgotten = Forgotten()
+        let history = History(store: store) { forgotten.calls.append($0) }
+        let first = HistoryEntry(at: .now, durationMs: 1_000, words: "One.")
+        let second = HistoryEntry(at: .now, durationMs: 1_000, words: "Two.")
+        history.add(first)
+        history.add(second)
+        history.delete(second.id)
+        #expect(forgotten.calls == [["Two."]])
+        history.clear()
+        #expect(forgotten.calls.count == 2)
+        #expect(forgotten.calls.last == .some(nil))
+    }
+
     @Test func theModelKeepsTheScreenCurrent() {
         let history = History(store: store)
         let first = HistoryEntry(at: .now, durationMs: 1_000, words: "One.")
@@ -102,6 +123,15 @@ import Testing
         #expect(HomeCopy.clearAction(1) == "Delete 1 take")
         #expect(HomeCopy.waiting(1) == "1 take waiting to retry")
         #expect(HomeCopy.waiting(3) == "3 takes waiting to retry")
+    }
+
+    /// The question that deletes a take shows which take: its words, cut
+    /// short when long.
+    @Test func theDeleteQuestionShowsTheTake() {
+        #expect(HomeCopy.preview("Pick up oat milk.") == "Pick up oat milk.")
+        let long = String(repeating: "word ", count: 30)
+        #expect(HomeCopy.preview(long).count <= 83)
+        #expect(HomeCopy.preview(long).hasSuffix("..."))
     }
 
     /// Today's takes show the time; older ones the date too.

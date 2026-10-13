@@ -90,9 +90,13 @@ struct HistoryStore: Sendable {
 @Observable @MainActor final class History {
     private(set) var entries: [HistoryEntry]
     @ObservationIgnored private let store: HistoryStore
+    /// Forgets deleted words wherever else they wait: the given words, or
+    /// all with nil.
+    @ObservationIgnored private let forget: @MainActor (Set<String>?) -> Void
 
-    init(store: HistoryStore) {
+    init(store: HistoryStore, forget: @escaping @MainActor (Set<String>?) -> Void = { _ in }) {
         self.store = store
+        self.forget = forget
         entries = store.list()
     }
 
@@ -104,23 +108,30 @@ struct HistoryStore: Sendable {
     }
 
     func delete(_ id: UUID) {
+        let words = entries.first { $0.id == id }?.words
         try? store.remove(id)
         entries = store.list()
+        if let words { forget([words]) }
     }
 
     func clear() {
         try? store.clear()
         entries = []
+        forget(nil)
     }
 }
 
 extension History {
     private static var shared: History?
 
-    /// The app's one history.
+    /// The app's one history. Deleting also forgets the words on the
+    /// Dictate screen and any the keyboard still holds as Insert last.
     static func live() -> History {
         if let shared { return shared }
-        let history = History(store: .standard)
+        let history = History(store: .standard) { words in
+            TakeModel.live()?.forget(words)
+            Mailbox.shared?.forget(words)
+        }
         shared = history
         return history
     }

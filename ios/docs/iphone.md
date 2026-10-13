@@ -4,7 +4,7 @@ murmur for iPhone is being built on the feature/ios branch and is not on the App
 
 ## How do I add my API key on iPhone?
 
-Open murmur, tap Provider and key, paste your key under Transcription, and tap Save key. Then tap Test connection; it should say Works.
+Open murmur, tap the gear at the top right, then Provider and key, paste your key under Transcription, and tap Save key. Then tap Test connection; it should say Works.
 
 1. Under Transcription, pick a provider. Groq is first and is the default. Custom takes any OpenAI-compatible address that starts with https://.
 2. Tap Get a Groq key (the link names your provider) to open its key page. Make a key there and copy it.
@@ -56,7 +56,7 @@ If murmur cannot use the microphone at all, it says so instead, with a button th
 
 ## What do the cleanup settings do on iPhone?
 
-Open murmur and tap Cleanup. Each setting says what it does under it. They work as on Mac and Windows, where Full always polishes and numbers stay as your provider wrote them.
+Open murmur, tap the gear at the top right, then Cleanup. Each setting says what it does under it. They work as on Mac and Windows, where Full always polishes and numbers stay as your provider wrote them.
 
 - Cleanup level. Off gives your words exactly as heard. Light removes fillers like um, and fixes capitals and spacing. Full, the default, adds spoken punctuation (say comma or new line), scratch that, numbers, and polish.
 - Polish, at Full. Your cleanup model tidies the formatted words. On by default.
@@ -91,7 +91,7 @@ Add it once in Settings, turn on Full Access, then pick it with the globe key.
 1. Open Settings, then General, then Keyboard, then Keyboards.
 2. Tap Add New Keyboard, and pick murmur.
 3. Tap murmur in the list, and turn on Allow Full Access.
-4. In any text field, hold the globe key and pick murmur. The Keyboard screen in murmur has a box to try it in.
+4. In any text field, hold the globe key and pick murmur. In murmur, the gear at the top right, then Keyboard, has a box to try it in.
 
 The keyboard is a dictation pad: the pill to talk, and globe, space, delete, and return. Tap the pill, speak, and tap it again; your words land where the cursor is. Typing letters stays with your other keyboards. In password and phone number fields, iOS always shows its own keyboard instead.
 
@@ -101,7 +101,7 @@ The first tap opens murmur, which starts a listening session; after that, taps s
 
 Full Access lets the keyboard and the murmur app share a small drawer. The keyboard leaves a note saying start or stop, and the app leaves your words for the keyboard to type. Without Full Access, iOS walls the keyboard off from the app, so the pill cannot work; the keyboard says so and shows the steps to turn it on.
 
-The keyboard itself never connects to the internet. A test checks that every time murmur is built. Only the app talks to your provider, and only your newest take's words pass through the drawer, cleared as soon as they are typed.
+The keyboard itself never connects to the internet. A test checks that every time murmur is built. Only the app talks to your provider, and only your newest take's words pass through the drawer, cleared as soon as they are typed or when you delete that take in murmur.
 
 ## What is Insert last?
 
@@ -127,7 +127,7 @@ Between takes murmur keeps nothing: the sound is dropped as it arrives, never sa
 
 ## How long does murmur keep listening?
 
-15 minutes after your last take, unless you change it. In murmur, open Session and pick 5 minutes, 15 minutes, or 1 hour. The time counts from the end of your last take, so a session lasts as long as you keep dictating.
+15 minutes after your last take, unless you change it. In murmur, tap the gear at the top right, then Session, and pick 5 minutes, 15 minutes, or 1 hour. The time counts from the end of your last take, so a session lasts as long as you keep dictating.
 
 To end it sooner, tap End session in murmur, or press and hold the pill in the keyboard and tap End session. A phone call, Siri, or another app taking the microphone ends it too. A take in progress when a session ends still goes through, as if you had tapped stop.
 
@@ -139,11 +139,11 @@ Some, because the microphone stays on while a session runs. murmur does no work 
 
 ## What if the keyboard says Open murmur to start?
 
-That means iOS did not let the keyboard open murmur. Check that Allow Full Access is on for murmur in Settings, then General, Keyboard, Keyboards. If it is, open murmur yourself, tap Session, and tap Start session. Then go back to your app and tap the pill: it starts a take right there while the session runs.
+That means iOS did not let the keyboard open murmur. Check that Allow Full Access is on for murmur in Settings, then General, Keyboard, Keyboards. If it is, open murmur yourself and tap Start session at the top of the home screen. Then go back to your app and tap the pill: it starts a take right there while the session runs.
 
 ## How do I change how the pill looks on iPhone?
 
-In murmur, tap Keyboard, then pick Bars or Speckle under The pill. Each tile is the real pill moving to a made-up voice; your microphone is never used for the tiles. The look you pick is outlined in gold. The screen murmur opens to uses it from your next take, and the keyboard the next time it appears.
+In murmur, tap the gear at the top right, then Keyboard, and pick Bars or Speckle under The pill. Each tile is the real pill moving to a made-up voice; your microphone is never used for the tiles. The look you pick is outlined in gold. The screen murmur opens to uses it from your next take, and the keyboard the next time it appears.
 
 - **Bars** is the classic equalizer.
 - **Speckle** is a dust field that drifts when quiet and vibrates with your speech.
@@ -175,7 +175,7 @@ In other apps, when no session is running, your first tap opens murmur. Swipe ri
 
 ## Where is my history kept on iPhone?
 
-Only on your iPhone, in murmur's own storage. Your history is left out of iCloud backups and never goes to your provider or anyone else. The murmur keyboard never sees it: only your newest take's words pass through the drawer the keyboard shares, and they are cleared as soon as they are typed.
+Only on your iPhone, in murmur's own storage. Your history is left out of iCloud backups and never goes to your provider or anyone else. The murmur keyboard never sees it: only your newest take's words pass through the drawer the keyboard shares, cleared as soon as they are typed or when you delete that take. Because your history is left out of backups, it does not move to a new iPhone.
 
 murmur's home screen shows your takes, newest first, with their words, when you spoke them, and how long they ran. Tap a take to copy its words.
 
