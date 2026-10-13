@@ -168,4 +168,12 @@ import UIKit
         let states: [TakeModel.State] = [.idle, .recording(since: .now), .transcribing, .words("hi"), .heardNothing(sent: true), .micOff]
         #expect(states.map(PillStage.init) == [.idle, .recording, .processing, .inserted, .noSpeech, .error])
     }
+
+    /// The capture script draws every stage of both styles.
+    @Test func theShotsCoverEveryStage() {
+        let covered = Set(PillShots.shots.map { "\($0.frame.style) \($0.frame.stage)" })
+        #expect(covered.count == PillStyle.allCases.count * 6)
+        #expect(Set(PillShots.shots.map(\.name)).count == PillShots.shots.count)
+        #expect(PillShots.image(PillShots.shots[0].frame).size == CGSize(width: 236, height: 56))
+    }
 }

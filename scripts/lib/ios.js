@@ -74,4 +74,14 @@ function parseSmokeLine(output) {
   return line ? JSON.parse(line.slice('SMOKE_RESULT '.length)) : null
 }
 
-module.exports = { SMOKE_SIMULATOR, SIM_SIGNING, compareVersions, pickSmokeSimulator, findOnPath, copySharedJson, parseSmokeLine }
+/** The folder the app saved its pill shots in (IOS-010), or null when it
+ *  never said. */
+function parsePillShotsLine(output) {
+  const line = output
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .find((l) => l.startsWith('PILL_SHOTS '))
+  return line ? line.slice('PILL_SHOTS '.length) : null
+}
+
+module.exports = { SMOKE_SIMULATOR, SIM_SIGNING, compareVersions, pickSmokeSimulator, findOnPath, copySharedJson, parseSmokeLine, parsePillShotsLine }

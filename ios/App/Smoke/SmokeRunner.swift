@@ -41,6 +41,7 @@ enum SmokeRunner {
             ("polish", checkPolish),
             ("mailbox", checkMailbox),
             ("session", checkSession),
+            ("pill", checkPill),
             ("sharedJson", { try checkSharedJson(expected: request.sharedCount) })
         ]
         var results: [String: Bool] = [:]
@@ -265,6 +266,18 @@ enum SmokeRunner {
             guard audio.isEmpty else { return "audio exists in \(place.lastPathComponent): \(audio)" }
         }
         return nil
+    }
+
+    /// The pill draws every stage of both styles (IOS-010), and the level
+    /// file the keyboard reads round trips in the app group.
+    static func checkPill() throws {
+        guard let container = AppGroup.containerURL else { throw SmokeFailure("no container for \(AppGroup.identifier)") }
+        let levels = LevelFile(url: container.appending(path: "smoke-level-\(UUID().uuidString)"))
+        defer { levels.url.map { try? FileManager.default.removeItem(at: $0) } }
+        levels.write(0.5, count: 3)
+        guard let read = levels.read(), read.level == 0.5, read.count == 3 else { throw SmokeFailure("the level file read back \(String(describing: levels.read()))") }
+        let blank = PillShots.shots.filter { (PillShots.image($0.frame).pngData()?.count ?? 0) < 1_000 }.map(\.name)
+        guard blank.isEmpty else { throw SmokeFailure("these stages drew nothing: \(blank)") }
     }
 
     /// Runs main-actor work to the end from the smoke's synchronous start

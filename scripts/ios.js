@@ -4,15 +4,16 @@
 //   node scripts/ios.js generate   colors, icon, shared rules, Xcode project
 //   node scripts/ios.js test       MurmurCore on the Mac, then the app's tests on murmur's own simulator
 //   node scripts/ios.js smoke      boots the app headless and relays its SMOKE_RESULT
+//   node scripts/ios.js pill-shots every stage of the pill, both styles, as images in ios/build/pill-shots
 //   node scripts/ios.js register   one device build that registers the bundle ids and app group
 // Only the ios: commands need Xcode; npm install and the desktop gates never do.
 const { execFileSync, spawnSync } = require('node:child_process')
-const { mkdirSync, readFileSync, writeFileSync } = require('node:fs')
+const { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } = require('node:fs')
 const { join } = require('node:path')
 const { loadBrush } = require('./lib/enso')
 const { iosIconSet } = require('./lib/ios-icon')
 const { colorSetJson, parseRootTokens, toSwift } = require('./lib/ios-tokens')
-const { SIM_SIGNING, copySharedJson, findOnPath, parseSmokeLine, pickSmokeSimulator } = require('./lib/ios')
+const { SIM_SIGNING, copySharedJson, findOnPath, parsePillShotsLine, parseSmokeLine, pickSmokeSimulator } = require('./lib/ios')
 
 const root = join(__dirname, '..')
 const iosDir = join(root, 'ios')
@@ -125,6 +126,38 @@ async function smoke() {
   }
 }
 
+/** Every stage of the pill, both styles, as images (IOS-010), like
+ *  desktop's ink shots: the app draws them in the simulator, and they land
+ *  in ios/build/pill-shots. */
+async function pillShots() {
+  await generateAll()
+  const udid = simulator()
+  try {
+    run('xcodebuild', ['build', ...onSimulator(udid)])
+    const app = join(derived, 'Build', 'Products', 'Debug-iphonesimulator', 'murmur.app')
+    const bundleId = plistValue(app, 'CFBundleIdentifier')
+    run('xcrun', ['simctl', 'install', udid, app])
+    spawnSync('xcrun', ['simctl', 'terminate', udid, bundleId], { stdio: 'ignore' })
+    const launched = spawnSync('xcrun', ['simctl', 'launch', '--console', udid, bundleId, '--pill-shots'], { encoding: 'utf8', timeout: 120_000 })
+    const output = `${launched.stdout ?? ''}${launched.stderr ?? ''}`
+    const folder = parsePillShotsLine(output)
+    if (!folder) {
+      console.error('the app never said where its pill shots are. output follows:')
+      console.error(output.slice(-2000))
+      return 1
+    }
+    const out = join(iosDir, 'build', 'pill-shots')
+    rmSync(out, { recursive: true, force: true })
+    mkdirSync(out, { recursive: true })
+    const names = readdirSync(folder).filter((name) => name.endsWith('.png'))
+    for (const name of names) copyFileSync(join(folder, name), join(out, name))
+    console.log(`ios: ${names.length} pill shots in ${out}`)
+    return names.length > 0 ? 0 : 1
+  } finally {
+    shutdown(udid)
+  }
+}
+
 /** One device build with automatic provisioning: registers both bundle
  *  ids and the app group under the project's team (Eze Media LLC in
  *  murmur's own builds), then proves the profiles
@@ -156,6 +189,7 @@ const COMMANDS = {
   },
   test,
   smoke,
+  'pill-shots': pillShots,
   register
 }
 

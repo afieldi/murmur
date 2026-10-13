@@ -3,7 +3,7 @@ import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { compareVersions, copySharedJson, findOnPath, parseSmokeLine, pickSmokeSimulator } from './ios'
+import { compareVersions, copySharedJson, findOnPath, parsePillShotsLine, parseSmokeLine, pickSmokeSimulator } from './ios'
 
 const iphone17 = { name: 'iPhone 17', identifier: 'com.apple.CoreSimulator.SimDeviceType.iPhone-17', productFamily: 'iPhone' }
 const iphone18 = { name: 'iPhone 18 Pro', identifier: 'com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro', productFamily: 'iPhone' }
@@ -108,5 +108,16 @@ describe('the smoke line', () => {
 
   it('returns null when the app never printed it', () => {
     expect(parseSmokeLine('crashed\n')).toBeNull()
+  })
+})
+
+describe('the pill shots line', () => {
+  it('finds where the app saved its pill shots', () => {
+    expect(parsePillShotsLine('drawing\r\nPILL_SHOTS /Users/x/Library/tmp/pill-shots\r\n')).toBe('/Users/x/Library/tmp/pill-shots')
+  })
+
+  it('returns null when the app failed or never said', () => {
+    expect(parsePillShotsLine('PILL_SHOTS_FAILED disk full\n')).toBeNull()
+    expect(parsePillShotsLine('crashed\n')).toBeNull()
   })
 })

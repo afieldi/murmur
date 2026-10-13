@@ -9,6 +9,9 @@ struct MurmurApp: App {
         if let request = SmokeRequest(arguments: ProcessInfo.processInfo.arguments) {
             SmokeRunner.runAndExit(request)
         }
+        if ProcessInfo.processInfo.arguments.contains("--pill-shots") {
+            PillShots.runAndExit()
+        }
     }
 
     var body: some Scene {
