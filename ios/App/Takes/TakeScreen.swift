@@ -260,7 +260,7 @@ extension TakeModel {
         guard let catalog = try? BundledRules.catalog(), let rules = try? BundledRules.takeRules() else { return nil }
         let session = URLSession(configuration: .ephemeral)
         let model = TakeModel(
-            microphone: DeviceMicrophone(), store: .standard, rules: rules, catalog: catalog,
+            microphone: DeviceMicrophone.shared, store: .standard, rules: rules, catalog: catalog,
             connections: ConnectionStore(), cleanup: CleanupStore(), ring: KeychainKeyRing(), send: { try await session.data(for: $0) },
             copy: { UIPasteboard.general.string = $0 }
         )

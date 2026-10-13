@@ -78,6 +78,11 @@ struct TakeRules: Sendable {
         state.isRecording
     }
 
+    /// How loud the take is right now, 0 to 1, for the live waveform.
+    var level: Float {
+        microphone.level
+    }
+
     /// Transcribing or retrying: one thing at a time.
     var isBusy: Bool {
         state == .transcribing || !retrying.isEmpty
