@@ -2,7 +2,8 @@
 // Home (ios/prd.json IOS-012): the session, with Start session and End
 // session; what is left of setup; takes waiting to retry; and the newest
 // takes with their words, time, and length. Tap a take to copy it;
-// deleting one asks first, in red, and Clear all says the real count.
+// deleting one asks first, in red, and Clear all says the real count. The
+// Journey row shows the belt this iPhone's takes have earned (IOS-017).
 import MurmurCore
 import SwiftUI
 import UIKit
@@ -12,6 +13,8 @@ struct HomeScreen: View {
     let session: Session?
     let model: TakeModel?
     let setup: Setup
+    /// The belt ladder; nil only if the app's own files could not be read.
+    var journey: JourneyRules? = JourneyRules.live
     let resume: (Setup.Step) -> Void
     @State private var copied: UUID?
     @State private var askingClear = false
@@ -20,6 +23,12 @@ struct HomeScreen: View {
         List {
             if let session {
                 SessionCard(session: session)
+            }
+            if let journey {
+                Section {
+                    JourneyRow(history: history, rules: journey)
+                }
+                .listRowBackground(Tokens.panel)
             }
             if !setup.isFinished {
                 SetupChecklist(setup: setup, resume: resume)
