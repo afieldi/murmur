@@ -92,6 +92,32 @@ import Testing
         #expect(setup.next == nil)
     }
 
+    /// Moving on goes to the next step not done yet, so a step done another
+    /// way (the report proves both keyboard steps) is passed over, and the
+    /// end is the end.
+    @Test func movingOnPassesStepsAlreadyDone() async {
+        let setup = setup()
+        await setup.allowMicrophone()
+        report.value = KeyboardReport(fullAccess: true, at: .now)
+        setup.refresh()
+        #expect(setup.step(after: .microphone) == .key)
+        #expect(setup.step(after: .keyboard) == .key)
+        setup.skip(.key)
+        #expect(setup.step(after: .microphone) == .key)
+        #expect(setup.step(after: .key) == .practice)
+        setup.practiced()
+        #expect(setup.step(after: .key) == nil)
+        #expect(setup.step(after: .practice) == nil)
+    }
+
+    /// A take from the keyboard's link shows Recording over Home, over
+    /// first run, or nowhere when it is first run's own practice take.
+    @Test func recordingShowsWhereTheTakeIs() {
+        #expect(TakeOpener.cover(setupUp: false, practicing: false) == .home)
+        #expect(TakeOpener.cover(setupUp: true, practicing: false) == .overSetup)
+        #expect(TakeOpener.cover(setupUp: true, practicing: true) == .none)
+    }
+
     @Test func firstRunShowsOnce() {
         let first = setup()
         first.seen = true

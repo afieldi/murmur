@@ -114,6 +114,14 @@ import Observation
         refresh()
     }
 
+    /// The step after this one that is not done yet, skipped ones included,
+    /// or nil at the end: a step done another way is passed over.
+    func step(after step: Step) -> Step? {
+        let all = Step.allCases
+        guard let index = all.firstIndex(of: step) else { return nil }
+        return all[(index + 1)...].first { status($0) != .done }
+    }
+
     /// The step to show first: the first one not done or skipped, or the
     /// first one left.
     var next: Step? {

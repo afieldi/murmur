@@ -40,7 +40,10 @@ struct ContentView: View {
         .task {
             _ = KeyboardBridge.live()
             _ = Session.live()
-            if !setup.seen { firstRun = setup.next ?? .microphone }
+            if !setup.seen {
+                // Everything done already: nothing to walk through.
+                if let next = setup.next { firstRun = next } else { setup.seen = true }
+            }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { setup.refresh() }

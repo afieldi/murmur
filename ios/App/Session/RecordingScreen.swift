@@ -108,14 +108,33 @@ struct SwipeGuide: View {
 /// Recording screen shows until the take ends.
 @Observable @MainActor final class TakeOpener {
     static let shared = TakeOpener()
+    /// The Recording screen over Home.
     var showing = false
-    /// While first run is on screen, its practice box is where the words
-    /// land, so the take starts without covering it (IOS-011).
-    var quiet = false
+    /// The Recording screen over first run, which covers Home (IOS-011).
+    var showingOverSetup = false
+    /// First run is on screen.
+    var setupUp = false
+    /// First run's practice box is on screen with murmur in front, so a take
+    /// from it lands there, uncovered.
+    var practicing = false
+
+    enum Cover: Equatable {
+        case home, overSetup, none
+    }
+
+    /// Where the Recording screen goes for a take from the keyboard's link.
+    static func cover(setupUp: Bool, practicing: Bool) -> Cover {
+        guard setupUp else { return .home }
+        return practicing ? .none : .overSetup
+    }
 
     func open(_ url: URL) async {
         guard let id = TakeLink.take(in: url), let session = Session.live(), let bridge = KeyboardBridge.live(), bridge.opened(id) else { return }
-        showing = !quiet
+        switch Self.cover(setupUp: setupUp, practicing: practicing) {
+        case .home: showing = true
+        case .overSetup: showingOverSetup = true
+        case .none: break
+        }
         _ = await session.begin()
     }
 }

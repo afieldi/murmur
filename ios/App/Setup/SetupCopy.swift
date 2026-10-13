@@ -28,7 +28,7 @@ enum SetupCopy {
     /// to murmur's own page, the closest place iOS allows.
     static func taps(_ step: Setup.Step) -> [String] {
         switch step {
-        case .keyboard: ["Tap Open Settings.", "Tap Keyboards.", "Turn on murmur.", "Come back to murmur."]
+        case .keyboard: ["Tap Open Settings.", "Tap Keyboards, turn on murmur, then turn on Allow Full Access and tap Allow.", "Come back, tap the box below, and pick murmur with the globe key."]
         case .fullAccess: ["Tap Open Settings.", "Tap Keyboards.", "Turn on Allow Full Access, then tap Allow.", "Come back, tap the box below, and pick murmur with the globe key."]
         case .practice: ["Tap the box below.", "Hold the globe key and pick murmur.", "Tap the pill, say a sentence, and tap the pill again."]
         case .microphone, .key: []
@@ -38,7 +38,7 @@ enum SetupCopy {
     static let micDenied = "The microphone is off for murmur. Tap Open Settings, then turn on Microphone."
     static let checkBox = "Tap here, then pick murmur with the globe key"
     static let practiceBox = "Your first take lands here"
-    static let practiceDone = "Your words landed. In other apps, your first tap opens murmur, and this is the way back:"
+    static let practiceDone = "Your words landed. When no session is running, your first tap in another app opens murmur, and this is the way back:"
     static let done = "Done"
     static let skip = "Skip for now"
     static let later = "Finish later"

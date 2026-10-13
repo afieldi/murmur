@@ -281,29 +281,40 @@ enum SmokeRunner {
         guard blank.isEmpty else { throw SmokeFailure("these stages drew nothing: \(blank)") }
     }
 
-    /// First run walks its steps with the microphone allowed and refused
-    /// (IOS-011): allowed, every step checks itself done in turn; refused,
-    /// the microphone says so and waits on Home while the rest go on.
+    /// First run walks its steps with each permission granted and refused
+    /// (IOS-011): the microphone allowed or not, and Full Access on (the
+    /// keyboard reports itself) or off (it cannot, so your word adds the
+    /// keyboard). Whatever was refused says so and waits on Home while the
+    /// rest go on.
     static func checkFirstRun() throws {
         if let failure = onMain({ await firstRunFailure() }) { throw SmokeFailure(failure) }
     }
 
     @MainActor private static func firstRunFailure() async -> String? {
         for allowed in [true, false] {
-            guard let defaults = UserDefaults(suiteName: "murmur.smoke.\(UUID().uuidString)") else { return "no scratch defaults" }
-            let report = Cell<KeyboardReport?>(nil)
-            let key = Cell(false)
-            let setup = Setup(microphone: ScriptedAccess(answer: allowed), report: { report.value }, hasKey: { key.value }, defaults: defaults)
-            guard setup.next == .microphone else { return "first run did not start with the microphone" }
-            await setup.allowMicrophone()
-            guard setup.status(.microphone) == (allowed ? .done : .denied) else { return "the microphone read \(setup.status(.microphone)) when allowed was \(allowed)" }
-            setup.keyboardAdded()
-            report.value = KeyboardReport(fullAccess: true, at: .now)
-            key.value = true
-            setup.refresh()
-            setup.practiced()
-            let left: [Setup.Step] = allowed ? [] : [.microphone]
-            guard setup.remaining == left else { return "left \(setup.remaining) when allowed was \(allowed)" }
+            for fullAccess in [true, false] {
+                guard let defaults = UserDefaults(suiteName: "murmur.smoke.\(UUID().uuidString)") else { return "no scratch defaults" }
+                let report = Cell<KeyboardReport?>(nil)
+                let key = Cell(false)
+                let setup = Setup(microphone: ScriptedAccess(answer: allowed), report: { report.value }, hasKey: { key.value }, defaults: defaults)
+                let walk = "microphone \(allowed ? "allowed" : "refused"), Full Access \(fullAccess ? "on" : "off")"
+                guard setup.next == .microphone else { return "\(walk): first run did not start with the microphone" }
+                await setup.allowMicrophone()
+                guard setup.status(.microphone) == (allowed ? .done : .denied) else { return "\(walk): the microphone read \(setup.status(.microphone))" }
+                if fullAccess {
+                    report.value = KeyboardReport(fullAccess: true, at: .now)
+                    setup.refresh()
+                    guard setup.status(.keyboard) == .done, setup.status(.fullAccess) == .done else { return "\(walk): the report did not prove both keyboard steps" }
+                } else {
+                    setup.keyboardAdded()
+                    guard setup.status(.keyboard) == .done, setup.status(.fullAccess) == .todo else { return "\(walk): the keyboard steps read wrong without a report" }
+                }
+                key.value = true
+                setup.refresh()
+                setup.practiced()
+                let left = (allowed ? [] : [Setup.Step.microphone]) + (fullAccess ? [] : [Setup.Step.fullAccess])
+                guard setup.remaining == left else { return "\(walk): left \(setup.remaining)" }
+            }
         }
         return nil
     }

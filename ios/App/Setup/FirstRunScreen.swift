@@ -12,6 +12,7 @@ struct FirstRunScreen: View {
     @State private var addingKey = false
     @State private var practice = ""
     @State private var check = ""
+    @State private var opener = TakeOpener.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
@@ -44,11 +45,26 @@ struct FirstRunScreen: View {
         .background(Tokens.ink)
         .foregroundStyle(Tokens.text)
         .tint(Tokens.brand)
-        .onAppear { TakeOpener.shared.quiet = true }
-        .onDisappear { TakeOpener.shared.quiet = false }
+        .onAppear {
+            opener.setupUp = true
+            follow()
+        }
+        .onDisappear {
+            opener.setupUp = false
+            opener.practicing = false
+            dropPracticeTake()
+        }
+        .onChange(of: step) { was, _ in
+            if was == .practice { dropPracticeTake() }
+            follow()
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { setup.refresh() }
+            follow()
         }
+        // A take started in another app while first run is up shows here,
+        // since first run covers Home.
+        .fullScreenCover(isPresented: $opener.showingOverSetup) { RecordingRoute() }
         // Waiting on the keyboard's report: look again every second.
         .task(id: step) {
             guard step == .keyboard || step == .fullAccess else { return }
@@ -61,9 +77,11 @@ struct FirstRunScreen: View {
             // Done in Settings or here: move on by itself, after a moment to
             // see the check.
             guard was != .done, now == .done, step != .practice else { return }
+            // Only from the step that turned done: Next may have moved on.
+            let from = step
             Task {
                 try? await Task.sleep(for: .milliseconds(900))
-                advance()
+                if step == from { advance() }
             }
         }
         .onChange(of: practice) { _, text in
@@ -103,7 +121,8 @@ struct FirstRunScreen: View {
                     }
                 }
             }
-            if step == .fullAccess, setup.status(step) != .done {
+            // The box makes the keyboard appear, and it reports itself.
+            if step == .keyboard || step == .fullAccess, setup.status(step) != .done {
                 Box(prompt: SetupCopy.checkBox, text: $check)
             }
             if step == .practice {
@@ -158,11 +177,22 @@ struct FirstRunScreen: View {
         if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
     }
 
-    /// The next step in order, or the end.
+    /// The next step not done yet, or the end.
     private func advance() {
-        let all = Setup.Step.allCases
-        guard let index = all.firstIndex(of: step), index + 1 < all.count else { return close() }
-        step = all[index + 1]
+        guard let next = setup.step(after: step) else { return close() }
+        step = next
+    }
+
+    /// A take from the practice box lands uncovered only while the box is
+    /// on screen and murmur is in front.
+    private func follow() {
+        opener.practicing = step == .practice && scenePhase == .active
+    }
+
+    /// Leaving practice drops a practice take still starting or recording,
+    /// so a take you walked away from never runs on.
+    private func dropPracticeTake() {
+        KeyboardBridge.live()?.hear(.cancel)
     }
 
     private func close() {
