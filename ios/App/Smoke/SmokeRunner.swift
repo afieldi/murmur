@@ -43,6 +43,7 @@ enum SmokeRunner {
             ("session", checkSession),
             ("pill", checkPill),
             ("firstRun", checkFirstRun),
+            ("history", checkHistory),
             ("sharedJson", { try checkSharedJson(expected: request.sharedCount) })
         ]
         var results: [String: Bool] = [:]
@@ -317,6 +318,27 @@ enum SmokeRunner {
             }
         }
         return nil
+    }
+
+    /// History in a scratch folder (IOS-012): three takes written read back
+    /// newest first, one deletes, Clear all empties it, and the folder is
+    /// out of backups with the file writable after first unlock.
+    static func checkHistory() throws {
+        let folder = FileManager.default.temporaryDirectory.appending(path: "smoke-history-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = HistoryStore(file: folder.appending(path: "history.jsonl"))
+        let takes = ["The first smoke take.", "The second smoke take.", "The third smoke take."].enumerated().map { index, words in
+            HistoryEntry(at: Date(timeIntervalSince1970: 1_790_000_000 + Double(index) * 60), durationMs: 1_500, words: words)
+        }
+        for take in takes { try store.append(take) }
+        guard store.list() == takes.reversed() else { throw SmokeFailure("history read back \(store.list().map(\.words))") }
+        try store.remove(takes[1].id)
+        guard store.list() == [takes[2], takes[0]] else { throw SmokeFailure("deleting one left \(store.list().map(\.words))") }
+        guard try folder.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true else { throw SmokeFailure("history is in backups") }
+        let protection = try store.file.resourceValues(forKeys: [.fileProtectionKey]).fileProtection
+        guard protection == .completeUntilFirstUserAuthentication else { throw SmokeFailure("history has protection \(String(describing: protection))") }
+        try store.clear()
+        guard store.list().isEmpty else { throw SmokeFailure("Clear all left takes") }
     }
 
     /// Runs main-actor work to the end from the smoke's synchronous start
