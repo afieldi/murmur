@@ -37,6 +37,15 @@ enum BundledRules {
         return SharedData(directory: directory)
     }
 
+    /// The belt ladder and the belts' colors (IOS-017).
+    static func journey() throws -> JourneyRules {
+        let shared = try shared()
+        return JourneyRules(
+            ranks: try shared.decode(RanksFile.self, from: "ranks.json"),
+            beltColors: try shared.decode(BeltColors.self, from: "cosmetics.json").beltColors
+        )
+    }
+
     static func catalog() throws -> ProviderCatalog {
         try shared().decode(ProviderCatalog.self, from: "provider-catalog.json")
     }

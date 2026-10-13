@@ -4,6 +4,7 @@
 // keyboard shares and never in iCloud backups, so it never leaves the
 // phone. One line per take, newest last on disk and first on screen.
 import Foundation
+import MurmurCore
 import Observation
 
 struct HistoryEntry: Codable, Equatable, Identifiable, Sendable {
@@ -16,14 +17,30 @@ struct HistoryEntry: Codable, Equatable, Identifiable, Sendable {
     let wordCount: Int
     /// A take that failed first and came back on a retry (IOS-006).
     let retried: Bool
+    /// The local day it was spoken on, kept as it was then, as desktop
+    /// keeps it, so a timezone change never moves a take to another day and
+    /// a belt once earned stays earned (IOS-017). Nil on takes kept before.
+    let day: String?
 
-    init(id: UUID = UUID(), at: Date, durationMs: Int, words: String, retried: Bool = false) {
+    init(id: UUID = UUID(), at: Date, durationMs: Int, words: String, retried: Bool = false, calendar: Calendar = .current) {
         self.id = id
         self.at = at
         self.durationMs = max(0, durationMs)
         self.words = words
         wordCount = words.split(whereSeparator: \.isWhitespace).count
         self.retried = retried
+        day = Self.dayKey(at, calendar: calendar)
+    }
+
+    /// A local day as yyyy-MM-dd, the form desktop's dayKey writes.
+    static func dayKey(_ date: Date, calendar: Calendar = .current) -> String {
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
+
+    /// The take as the belt math sees it.
+    var rankEvent: RankEvent {
+        RankEvent(at: Int64((at.timeIntervalSince1970 * 1000).rounded()), words: wordCount, day: day ?? Self.dayKey(at))
     }
 }
 
