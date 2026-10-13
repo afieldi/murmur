@@ -172,3 +172,13 @@ Open murmur once; it walks you through four steps and a practice take. Each step
 5. **Try your first take.** Tap the box, pick murmur with the globe key, tap the pill, say a sentence, and tap the pill again. Your words land in the box.
 
 In other apps, when no session is running, your first tap opens murmur. Swipe right along the bottom edge to go back, and keep talking.
+
+## Where is my history kept on iPhone?
+
+Only on your iPhone, in murmur's own storage. Your history is left out of iCloud backups and never goes to your provider or anyone else. The murmur keyboard never sees it: only your newest take's words pass through the drawer the keyboard shares, and they are cleared as soon as they are typed.
+
+murmur's home screen shows your takes, newest first, with their words, when you spoke them, and how long they ran. Tap a take to copy its words.
+
+## How do I delete my history on iPhone?
+
+On murmur's home screen, swipe left on a take and tap Delete, then Delete take. To delete everything, tap Clear all above your takes; murmur asks first and says how many takes will go. Deleting murmur from your iPhone deletes your history too.
