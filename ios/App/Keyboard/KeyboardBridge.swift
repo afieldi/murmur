@@ -4,7 +4,8 @@
 // model under the id the keyboard asked with, and tells the keyboard how
 // it goes through the mailbox. Only a take the keyboard started goes to
 // the mailbox, so a take made on the Dictate screen never turns up in
-// another app.
+// another app. While a keyboard take records, its loudness goes to the
+// level file for the keyboard's pill (IOS-010).
 import Foundation
 import Observation
 
@@ -23,6 +24,7 @@ import Observation
     private let mailbox: Mailbox
     private let announce: @MainActor (Signal) -> Void
     private let limit: TimeInterval
+    private let levels: LevelFile
     private var listener: SignalListener?
     /// The take the keyboard asked for, until it ends.
     private var take: UUID?
@@ -30,10 +32,14 @@ import Observation
     private var cancelled = false
     private var startedAt = Date.distantPast
 
-    init(model: TakeModel, mailbox: Mailbox, limit: TimeInterval = KeyboardBridge.takeLimit, announce: @escaping @MainActor (Signal) -> Void = { $0.post() }) {
+    init(
+        model: TakeModel, mailbox: Mailbox, limit: TimeInterval = KeyboardBridge.takeLimit, levels: LevelFile = .shared,
+        announce: @escaping @MainActor (Signal) -> Void = { $0.post() }
+    ) {
         self.model = model
         self.mailbox = mailbox
         self.limit = limit
+        self.levels = levels
         self.announce = announce
     }
 
@@ -108,7 +114,20 @@ import Observation
             write(.failed, ends: true)
         } else {
             Task { await limit(id) }
+            Task { await stream(id) }
         }
+    }
+
+    /// Writes the take's loudness for the keyboard's pill about 30 times a
+    /// second while it records, then silence.
+    private func stream(_ id: UUID) async {
+        var count: UInt32 = 0
+        while take == id, model.isRecording {
+            count &+= 1
+            levels.write(model.level, count: count)
+            try? await Task.sleep(for: .milliseconds(33))
+        }
+        levels.write(0, count: count &+ 1)
     }
 
     /// Ends a take still recording at the limit, dropping what it heard.

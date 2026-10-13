@@ -297,6 +297,32 @@ import Testing
         #expect(KeyboardBridge.takeLimit == 600)
     }
 
+    /// While a keyboard take records, its loudness reaches the level file
+    /// for the keyboard's pill, then silence once it stops.
+    @Test func aKeyboardTakeStreamsItsLevels() async throws {
+        let levels = LevelFile(url: FileManager.default.temporaryDirectory.appending(path: "level-\(UUID().uuidString)"))
+        microphone.level = 0.6
+        let model = try model(.says("Loud."))
+        let bridge = KeyboardBridge(model: model, mailbox: mailbox, levels: levels) { [announced] signal in
+            announced.signals.append(signal)
+        }
+        bridge.listen()
+        start(bridge)
+        try await waitUntilRecording(model)
+        for _ in 0..<100 where (levels.read()?.count ?? 0) < 3 {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let live = try #require(levels.read())
+        #expect(live.count >= 3)
+        #expect(live.level == 0.6)
+        bridge.hear(.stop)
+        _ = try await waitFor(.ready)
+        for _ in 0..<50 where levels.read()?.level != 0 {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(levels.read()?.level == 0)
+    }
+
     /// A stop with no keyboard take running does nothing.
     @Test func aStrayStopIsIgnored() async throws {
         let model = try model(.says("hi"))
