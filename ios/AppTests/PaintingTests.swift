@@ -161,3 +161,70 @@ func pageHasDisplayFace() -> Bool {
         #expect(abs(try await ink() - rest) <= rest / 50)
     }
 }
+
+/// What the painting screens remember and say (IOS-019).
+@Suite struct PaintingWordsTests {
+    func seen() -> (PaintingSeen, UserDefaults, String) {
+        let name = "painting-seen-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name) ?? .standard
+        return (PaintingSeen(defaults: defaults), defaults, name)
+    }
+
+    /// The newest stroke paints in only when it is new since the last look;
+    /// the strokes done when last seen today say whether it just finished.
+    @Test func theNewestStrokePaintsInOnce() {
+        let (seen, defaults, name) = seen()
+        defer { defaults.removePersistentDomain(forName: name) }
+        #expect(seen.look(day: "2026-10-13", done: 3) == (true, 0))
+        seen.remember(day: "2026-10-13", done: 3)
+        #expect(seen.look(day: "2026-10-13", done: 3) == (false, 3))
+        #expect(seen.look(day: "2026-10-13", done: 4) == (true, 3))
+        #expect(seen.look(day: "2026-10-14", done: 1) == (true, 0))
+    }
+
+    @Test func theLinesAreDesktops() {
+        var record = PaintingRecord(subject: .lotus, seed: 1, target: 6, tier: 0, level: 1, rank: "white", hour: 20, words: [10, 20, 30])
+        #expect(PaintingCopy.line(record, longestMs: nil) == "Every take adds the next stroke. 3 more to finish it.")
+        record.words = Array(repeating: 10, count: 8)
+        #expect(PaintingCopy.line(record, longestMs: 125_000) == "8 takes, 80 words. The longest ran 2:05. Every take from here adds to it.")
+        record.words = Array(repeating: 1, count: 6 + Paintings.maxExtra)
+        #expect(!PaintingCopy.line(record, longestMs: nil).hasSuffix("adds to it."))
+        #expect(PaintingCopy.stripCaption(record) == "lotus pond")
+        record.words = [1, 1]
+        #expect(PaintingCopy.stripCaption(record) == "2 of 6")
+    }
+
+    /// The strip names the last week's days by weekday, older ones by date.
+    @Test func theStripNamesItsDays() {
+        #expect(PaintingCopy.stripDay("2026-10-12", today: "2026-10-13") == "Mon")
+        #expect(PaintingCopy.stripDay("2026-10-07", today: "2026-10-13") == "Wed")
+        #expect(PaintingCopy.stripDay("2026-10-06", today: "2026-10-13") == "Oct 6")
+        #expect(PaintingCopy.cardName("2026-10-13") == "murmur-day-2026-10-13.png")
+        #expect(PaintingCopy.weekName("2026-10-13") == "murmur-week-2026-10-13.png")
+    }
+
+    @Test func everyLineFollowsTheWritingRules() {
+        for line in [PaintingCopy.title, PaintingCopy.past, PaintingCopy.saveCard, PaintingCopy.saveWeek, PaintingCopy.firstTake, PaintingCopy.kept, PaintingCopy.fromHere, PaintingCopy.toFinish(2)] {
+            #expect(!line.contains("Murmur"))
+            #expect(!line.contains("\u{2014}") && !line.contains(" - ") && !line.contains("--"))
+        }
+    }
+}
+
+/// The share sheet's pictures (IOS-019).
+@MainActor @Suite(.serialized) struct PaintingShareTests {
+    func book() throws -> PaintingBook {
+        let ladder = try BundledRules.journey().ranks.ranks
+        return Paintings.sync([:], events: try paintingTakes([(0, 7), (1, 3), (3, 6)]).map(\.paintingEvent), install: 4242, ladder: ladder)
+    }
+
+    /// The share sheet's picture is the card, painted when it is asked for.
+    @Test func theShareIsTheCard() async throws {
+        let book = try book()
+        let last = try #require(book.keys.sorted().last)
+        let record = try #require(book[last])
+        let share = PaintingShare(name: PaintingCopy.cardName(last), artwork: .card(day: last, record: record, longestMs: nil))
+        let data = try await share.png()
+        #expect(UIImage(data: data)?.size == CGSize(width: 1080, height: 1350))
+    }
+}

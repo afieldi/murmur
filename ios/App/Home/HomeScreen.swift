@@ -3,7 +3,8 @@
 // session; what is left of setup; takes waiting to retry; and the newest
 // takes with their words, time, and length. Tap a take to copy it;
 // deleting one asks first, in red, and Clear all says the real count. The
-// Journey row shows the belt this iPhone's takes have earned (IOS-017).
+// Journey row shows the belt this iPhone's takes have earned (IOS-017),
+// and the painting row today's painting (IOS-019).
 import MurmurCore
 import SwiftUI
 import UIKit
@@ -15,6 +16,8 @@ struct HomeScreen: View {
     let setup: Setup
     /// The belt ladder; nil only if the app's own files could not be read.
     var journey: JourneyRules? = JourneyRules.live
+    /// The painting book; nil only if the app's own files could not be read.
+    var paintings: PaintingStore? = PaintingStore.live()
     let resume: (Setup.Step) -> Void
     @State private var copied: UUID?
     @State private var askingClear = false
@@ -38,9 +41,14 @@ struct HomeScreen: View {
                 }
                 .listRowBackground(Tokens.panel)
             }
-            if let journey {
+            if journey != nil || paintings != nil {
                 Section {
-                    JourneyRow(history: history, rules: journey)
+                    if let paintings {
+                        PaintingRow(store: paintings, history: history)
+                    }
+                    if let journey {
+                        JourneyRow(history: history, rules: journey)
+                    }
                 }
                 .listRowBackground(Tokens.panel)
             }

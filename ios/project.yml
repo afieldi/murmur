@@ -68,6 +68,7 @@ targets:
           - CFBundleURLName: $(MURMUR_BUNDLE_ID)
             CFBundleURLSchemes: [$(MURMUR_BUNDLE_ID)]
         NSMicrophoneUsageDescription: murmur listens only while you dictate and sends what you say to the provider you chose.
+        NSPhotoLibraryAddUsageDescription: murmur adds the painting cards you choose to save to your photos, and never looks at your library.
         # The session's Live Activity (IOS-016).
         NSSupportsLiveActivities: true
         UIBackgroundModes: [audio]
