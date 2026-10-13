@@ -24,12 +24,6 @@ struct HomeScreen: View {
             if let session {
                 SessionCard(session: session)
             }
-            if let journey {
-                Section {
-                    JourneyRow(history: history, rules: journey)
-                }
-                .listRowBackground(Tokens.panel)
-            }
             if !setup.isFinished {
                 SetupChecklist(setup: setup, resume: resume)
             }
@@ -41,6 +35,12 @@ struct HomeScreen: View {
                         Label(HomeCopy.waiting(model.waiting.count), systemImage: "arrow.clockwise")
                             .foregroundStyle(Tokens.brand)
                     }
+                }
+                .listRowBackground(Tokens.panel)
+            }
+            if let journey {
+                Section {
+                    JourneyRow(history: history, rules: journey)
                 }
                 .listRowBackground(Tokens.panel)
             }

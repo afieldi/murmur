@@ -83,31 +83,51 @@ private struct Gate: View {
     }
 }
 
-/// A belt drawn plainly: its color, and at the tip a dark bar (red on a
-/// black belt) with one white mark per stripe.
+/// Where a belt's rank bar and tape go, as desktop's painter lays them out
+/// (journeyPaint.ts): the bar from 70 to 86 percent of the belt's length,
+/// none on coral or red belts (or no belt), and up to four tapes, six
+/// degrees on a black belt, spaced to fit inside the bar. All in fractions
+/// of the length.
+struct BeltLayout: Equatable {
+    static let barStart = 0.7
+    static let barEnd = 0.86
+
+    let bar: ClosedRange<Double>?
+    let tapes: [Double]
+    let tapeWidth: Double
+
+    static func of(belt: String, stripes: Int) -> BeltLayout {
+        guard belt != "none", belt != "red", !belt.hasPrefix("coral") else { return BeltLayout(bar: nil, tapes: [], tapeWidth: 0) }
+        let cap = belt == "black" ? 6 : 4
+        let space = (barEnd - barStart) / Double(cap + 1)
+        let tapes = (0..<min(max(stripes, 0), cap)).map { barStart + space * Double($0 + 1) }
+        return BeltLayout(bar: barStart...barEnd, tapes: tapes, tapeWidth: space * 0.5)
+    }
+}
+
+/// A belt drawn plainly, as desktop lays it out: the fabric, the rank bar
+/// (red on a black belt, none on coral or red belts), and a strip of cream
+/// tape per stripe.
 struct BeltSwatch: View {
     let rank: RankSpec
     let rules: JourneyRules
 
     var body: some View {
-        GeometryReader { box in
-            let tip = box.size.width * 0.3
-            HStack(spacing: 0) {
-                Rectangle().fill(rules.color(rank.belt))
-                ZStack {
-                    Rectangle().fill(rank.belt == "black" ? rules.color("red") : Color.black)
-                    HStack(spacing: 3) {
-                        ForEach(0..<rank.stripes, id: \.self) { _ in
-                            Rectangle().fill(Color.white).frame(width: 3)
-                        }
-                    }
-                    .padding(.vertical, 2)
+        let layout = BeltLayout.of(belt: rank.belt, stripes: rank.stripes)
+        Canvas { context, size in
+            let w = size.width
+            context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(rules.fabric(rank.belt)))
+            if let bar = layout.bar {
+                let rect = CGRect(x: w * bar.lowerBound, y: 0, width: w * (bar.upperBound - bar.lowerBound), height: size.height)
+                context.fill(Path(rect), with: .color(rank.belt == "black" ? rules.color("red") : Tokens.ink))
+                for tape in layout.tapes {
+                    let width = max(1, w * layout.tapeWidth)
+                    context.fill(Path(CGRect(x: w * tape - width / 2, y: size.height * 0.15, width: width, height: size.height * 0.7)), with: .color(Tokens.text))
                 }
-                .frame(width: rank.belt == "none" ? 0 : tip)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 3))
-            .overlay(RoundedRectangle(cornerRadius: 3).stroke(Tokens.panelEdge))
         }
+        .clipShape(RoundedRectangle(cornerRadius: 3))
+        .overlay(RoundedRectangle(cornerRadius: 3).stroke(Tokens.panelEdge))
         .accessibilityHidden(true)
     }
 }
@@ -124,7 +144,7 @@ struct JourneyRow: View {
         } label: {
             HStack(spacing: 12) {
                 BeltSwatch(rank: report.rank, rules: rules)
-                    .frame(width: 56, height: 10)
+                    .frame(width: 72, height: 10)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(JourneyCopy.title)
                     Text(report.rank.label)
@@ -136,3 +156,49 @@ struct JourneyRow: View {
         }
     }
 }
+
+#if DEBUG
+/// A history in a scratch file with this many words a day, one take a day.
+@MainActor private func previewHistory(_ name: String, words: [Int]) -> History {
+    let store = HistoryStore(file: FileManager.default.temporaryDirectory.appending(path: "journey-preview-\(name).jsonl"))
+    try? store.clear()
+    let start = Date.now.addingTimeInterval(-Double(words.count) * 86_400)
+    for (day, count) in words.enumerated() {
+        try? store.append(HistoryEntry(at: start.addingTimeInterval(Double(day) * 86_400), durationMs: 60_000, words: Array(repeating: "word", count: count).joined(separator: " ")))
+    }
+    return History(store: store)
+}
+
+#Preview("No belt") {
+    NavigationStack {
+        if let rules = JourneyRules.live { JourneyScreen(history: previewHistory("none", words: []), rules: rules) }
+    }
+    .preferredColorScheme(.dark)
+}
+
+#Preview("White, two stripes") {
+    NavigationStack {
+        if let rules = JourneyRules.live { JourneyScreen(history: previewHistory("white2", words: [180, 900, 1500, 600, 2100, 1300, 800]), rules: rules) }
+    }
+    .preferredColorScheme(.dark)
+}
+
+#Preview("Belts on the Home row") {
+    if let rules = JourneyRules.live {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(["white-4", "blue-2", "brown-4", "black", "black-6", "coral-7", "red-9"], id: \.self) { id in
+                if let rank = rules.ranks.ranks.first(where: { $0.id == id }) {
+                    HStack {
+                        BeltSwatch(rank: rank, rules: rules).frame(width: 72, height: 10)
+                        Text(rank.label).font(.footnote)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Tokens.panel)
+        .foregroundStyle(Tokens.text)
+        .preferredColorScheme(.dark)
+    }
+}
+#endif

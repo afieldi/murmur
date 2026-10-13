@@ -222,8 +222,8 @@ If murmur closes while a session runs (you swipe it away, or iOS stops it), the 
 
 ## How do belts work on iPhone?
 
-The same way as on the Mac: the same ladder of belts and stripes (white, blue, purple, brown, and black, each with four stripes, then the black belt degrees and the coral belts), with the same two gates for each. A belt needs both enough words dictated and enough different days you dictated on, so one long day never skips a belt. The table of what every belt and stripe takes is in the Journey guide, under What are the exact requirements for each belt and stripe?
+The same way as on the Mac: the same ladder of belts and stripes (white, blue, purple, brown, and black, each with four stripes, then the black belt degrees, the coral belts, and the red belt), with the same two gates for each. A belt needs both enough words dictated and enough different days you dictated on, so one long day never skips a belt. What every belt and stripe takes is in the [Journey guide](../../docs/journey.md), under What are the exact requirements for each belt and stripe?
 
-On iPhone, the Journey row on Home shows your belt. Tap it to see your stripes, the words and the days you still need for the next belt, your level (one more for every hundred thousand words), and the day you earned each belt.
+On iPhone, the Journey row on Home shows your belt. Tap it to see your stripes, your words and your days against what the next belt needs, your level (one more for every hundred thousand words), and the day you earned each belt.
 
 Your iPhone counts only the takes it keeps in its own history. Deleting takes there lowers your count, as clearing history does on the Mac. For now your iPhone and your Mac each keep their own belt; one Journey across your devices comes with the murmur account.

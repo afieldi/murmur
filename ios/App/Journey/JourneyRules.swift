@@ -18,14 +18,27 @@ struct JourneyRules: Sendable {
     func color(_ belt: String) -> Color {
         (beltColors[belt] ?? beltColors["none"]).map { Color(hex: $0) } ?? Tokens.textDim
     }
+
+    /// A belt's color as fabric on night studio's dark ground, as desktop's
+    /// beltOnInk paints it: white as rice paper, the black belt lifted
+    /// toward grey so it never vanishes, coral as coral.
+    func fabric(_ belt: String) -> Color {
+        switch belt {
+        case "white": Tokens.rice
+        case "black": color("black").mix(with: Tokens.textDim, by: 0.45)
+        case let coral where coral.hasPrefix("coral"): color("coral-black")
+        default: color(belt)
+        }
+    }
 }
 
 struct BeltColors: Decodable {
     let beltColors: [String: String]
 }
 
-extension Color {
-    /// A color from #rrggbb.
+private extension Color {
+    /// A color from the shared data's #rrggbb; private to this file, so
+    /// every other color still comes from the tokens.
     init(hex: String) {
         let digits = UInt32(hex.trimmingCharacters(in: CharacterSet(charactersIn: "#")), radix: 16) ?? 0
         let red = Double((digits >> 16) & 0xFF) / 255

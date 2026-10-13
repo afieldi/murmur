@@ -42,7 +42,7 @@ enum JourneyCopy {
     /// What earns the first belt, while there are no promotions yet.
     static func firstBelt(_ next: RankSpec?) -> String {
         guard let next, let words = next.words else { return "Your takes earn belts here." }
-        return "Dictate \(words.formatted()) words to earn the \(next.label)."
+        return "Your first \(words.formatted()) words earn the \(next.label)."
     }
 
     static func promoted(_ at: Date) -> String {

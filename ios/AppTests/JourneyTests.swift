@@ -17,13 +17,15 @@ import Testing
     /// A take keeps the local day it was spoken on, so moving to another
     /// timezone later never moves it to another day.
     @Test func aTakeKeepsTheDayItWasSpokenOn() throws {
-        // 2026-09-21 14:13 UTC is still the 21st in Los Angeles, already the
-        // 22nd in Tokyo.
-        let tokyo = HistoryEntry(at: at.addingTimeInterval(11 * 3600), durationMs: 1000, words: "one two", calendar: try calendar("Asia/Tokyo"))
+        // 2026-09-21 16:13 UTC is already 01:13 on the 22nd in Tokyo, and still
+        // the 21st in UTC and in the Americas, so the stored day differs from
+        // the one this test machine would derive, wherever it runs.
+        let tokyo = HistoryEntry(at: at.addingTimeInterval(2 * 3600), durationMs: 1000, words: "one two", calendar: try calendar("Asia/Tokyo"))
         #expect(tokyo.day == "2026-09-22")
+        #expect(HistoryEntry.dayKey(tokyo.at, calendar: try calendar("UTC")) == "2026-09-21")
         #expect(tokyo.rankEvent.day == "2026-09-22")
         #expect(tokyo.rankEvent.words == 2)
-        #expect(tokyo.rankEvent.at == 1_790_039_600_000)
+        #expect(tokyo.rankEvent.at == 1_790_007_200_000)
         let encoded = try JSONEncoder().encode(tokyo)
         #expect(try JSONDecoder().decode(HistoryEntry.self, from: encoded).day == "2026-09-22")
     }
@@ -36,6 +38,19 @@ import Testing
         #expect(entry.day == nil)
         #expect(entry.rankEvent.day == HistoryEntry.dayKey(entry.at))
         #expect(entry.rankEvent.words == 3)
+    }
+
+    /// A day is always written as desktop writes it, in the Gregorian
+    /// calendar, whatever calendar the phone is set to; only the phone's
+    /// time zone counts.
+    @Test func aDayIsAlwaysWrittenTheGregorianWay() throws {
+        for identifier: Calendar.Identifier in [.buddhist, .japanese, .islamicUmmAlQura, .persian] {
+            var other = Calendar(identifier: identifier)
+            other.timeZone = try #require(TimeZone(identifier: "Asia/Bangkok"))
+            // 14:13 UTC is 21:13 in Bangkok, still the 21st.
+            #expect(HistoryEntry.dayKey(at, calendar: other) == "2026-09-21", "\(identifier)")
+            #expect(HistoryEntry(at: at, durationMs: 1000, words: "one", calendar: other).day == "2026-09-21")
+        }
     }
 
     @Test func theLadderAndTheBeltColorsLoad() throws {
@@ -89,6 +104,27 @@ import Testing
             #expect(!line.contains("Murmur"))
             #expect(!line.contains("\u{2014}") && !line.contains(" - ") && !line.contains("--"))
         }
-        #expect(JourneyCopy.firstBelt(rules.ranks.ranks[1]) == "Dictate 100 words to earn the white belt.")
+        #expect(JourneyCopy.firstBelt(rules.ranks.ranks[1]) == "Your first 100 words earn the white belt.")
+    }
+}
+/// The belt as desktop's painter lays it out: the rank bar from 70 to 86
+/// percent of its length, none on coral or red belts, and up to four tapes,
+/// six on a black belt, spaced to fit inside the bar.
+@Suite struct BeltLayoutTests {
+    @Test func tapesStayInsideTheBar() throws {
+        for (belt, stripes, shown) in [("white", 4, 4), ("blue", 2, 2), ("black", 6, 6), ("black", 9, 6), ("purple", 7, 4)] {
+            let layout = BeltLayout.of(belt: belt, stripes: stripes)
+            let bar = try #require(layout.bar)
+            #expect(layout.tapes.count == shown, "\(belt) \(stripes)")
+            for tape in layout.tapes {
+                #expect(tape - layout.tapeWidth / 2 > bar.lowerBound && tape + layout.tapeWidth / 2 < bar.upperBound, "\(belt) \(stripes)")
+            }
+        }
+    }
+
+    @Test func coralRedAndNoBeltHaveNoBar() {
+        for (belt, stripes) in [("coral-black", 7), ("coral-white", 8), ("red", 9), ("none", 0)] {
+            #expect(BeltLayout.of(belt: belt, stripes: stripes) == BeltLayout(bar: nil, tapes: [], tapeWidth: 0))
+        }
     }
 }
