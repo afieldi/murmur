@@ -49,6 +49,17 @@ import Testing
         #expect(text.contains("name=\"response_format\"\r\n\r\njson\r\n"))
         #expect(text.hasSuffix("--b--\r\n"))
         #expect(body.range(of: wav) != nil)
+        #expect(!text.contains("name=\"prompt\""))
+    }
+
+    /// The dictionary's spellings ride along as a prompt (IOS-013); an empty
+    /// one sends none.
+    @Test func theSpellingHintRidesAlongAsAPrompt() throws {
+        let hinted = try #require(Transcription.request(wav: wav, baseUrl: groq, model: "m", key: key, prompt: "LaBroi, Eze Media.", boundary: "b"))
+        let text = String(decoding: try #require(hinted.httpBody), as: UTF8.self)
+        #expect(text.contains("name=\"prompt\"\r\n\r\nLaBroi, Eze Media.\r\n"))
+        let blank = try #require(Transcription.request(wav: wav, baseUrl: groq, model: "m", key: key, prompt: "  ", boundary: "b"))
+        #expect(!String(decoding: try #require(blank.httpBody), as: UTF8.self).contains("name=\"prompt\""))
     }
 
     @Test func anAddressTheIPhoneCannotCallSendsNothing() async {
