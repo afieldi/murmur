@@ -141,3 +141,23 @@ Some, because the microphone stays on while a session runs. murmur does no work 
 
 That means iOS did not let the keyboard open murmur. Check that Allow Full Access is on for murmur in Settings, then General, Keyboard, Keyboards. If it is, open murmur yourself, tap Session, and tap Start session. Then go back to your app and tap the pill: it starts a take right there while the session runs.
 
+## How do I change how the pill looks on iPhone?
+
+In murmur, tap Keyboard, then pick Bars or Speckle under The pill. Each tile is the real pill moving to a made-up voice; your microphone is never used for the tiles. The look you pick is outlined in gold, and the keyboard and the screen murmur opens to use it from your next take.
+
+- **Bars** is the classic equalizer.
+- **Speckle** is a dust field that drifts when quiet and vibrates with your speech.
+
+## What does the pill show on iPhone?
+
+The pill shows where your take is, in the keyboard and on the screen murmur opens to:
+
+- **At rest**, it is small, grey, and still. It never shows amber at rest, even while a session keeps the microphone ready.
+- **Recording**, it is wet amber at your voice's level, cooling toward gold as each moment ages.
+- **Working**, the paint dries to gold with one sheen, and a softer sheen every 2 seconds if it takes a while, so a long wait never looks frozen.
+- **Words added**, it sinks flat.
+- **Heard nothing**, it is a dry grey scrape.
+- **Failed**, it is plain red. Open murmur to see why and retry.
+
+Your iPhone gives a light tap when a take starts and when it stops. With Reduce Motion on (Settings, then Accessibility, then Motion), each stage is a still picture. VoiceOver reads the pill as a button with its stage: Start dictation, Recording, Working, Words added, Heard nothing, or Failed, retry in murmur.
+
