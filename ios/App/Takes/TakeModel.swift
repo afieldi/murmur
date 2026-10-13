@@ -219,11 +219,15 @@ struct TakeRules: Sendable {
         let settings = connections.load(catalog: catalog)
         let baseUrl = settings.transcription.baseUrl
         guard let key = (try? ring.key(for: baseUrl)) ?? nil else { return .failure(.noKey) }
-        switch await Transcription.run(wav: wav, baseUrl: baseUrl, model: settings.transcription.sttModel, key: key, send: send) {
+        // The dictionary's spellings go to transcription as a hint, and to
+        // polish (IOS-013).
+        let cleanupSettings = cleanup.load()
+        let hint = transcriptionHint(cleanupSettings.dictionary)
+        switch await Transcription.run(wav: wav, baseUrl: baseUrl, model: settings.transcription.sttModel, key: key, prompt: hint, send: send) {
         case .words(let text):
             guard let heard = TakeAudio.heard(text, list: rules.hallucinations) else { return .success(nil) }
             let connection = settings.polishConnection { [ring] in (try? ring.key(for: $0)) ?? nil }
-            let finished = await Cleanup.finish(heard, settings: cleanup.load(), rules: rules.cleanup, connection: connection, send: send)
+            let finished = await Cleanup.finish(heard, settings: cleanupSettings, rules: rules.cleanup, connection: connection, send: send)
             return .success(finished.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : finished)
         case .failed(let kind, let detail):
             return .failure(TakeFailure(kind: kind.rawValue, detail: detail))

@@ -149,6 +149,20 @@ final class FakeProvider: Sendable {
         #expect(model.waiting.isEmpty)
     }
 
+    /// The dictionary's spellings go to transcription as a hint (IOS-013);
+    /// without a dictionary, no hint goes.
+    @Test func theDictionaryHintsTheSpellings() async throws {
+        let provider = FakeProvider.says("LaBroi called.")
+        let model = model(provider)
+        await take(model)
+        #expect(!String(decoding: try #require(provider.requests.last?.httpBody), as: UTF8.self).contains("name=\"prompt\""))
+        var settings = CleanupStore(defaults: defaults).load()
+        settings.dictionary = [DictionaryEntry(from: "la broy", to: "LaBroi")]
+        CleanupStore(defaults: defaults).save(settings)
+        await take(model)
+        #expect(String(decoding: try #require(provider.requests.last?.httpBody), as: UTF8.self).contains("name=\"prompt\"\r\n\r\nLaBroi.\r\n"))
+    }
+
     @Test func silenceIsNeverSent() async {
         microphone.samples = ScriptedMicrophone.silence
         let provider = FakeProvider.says("Thank you.")
