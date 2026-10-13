@@ -48,6 +48,8 @@ enum SmokeRunner {
             ("diagnostics", checkDiagnostics),
             ("sessionIntents", checkSessionIntents),
             ("journey", checkJourney),
+            ("achievements", checkAchievements),
+            ("journeyPage", checkJourneyPage),
             ("sharedJson", { try checkSharedJson(expected: request.sharedCount) })
         ]
         var results: [String: Bool] = [:]
@@ -488,6 +490,56 @@ enum SmokeRunner {
         }
     }
 
+    /// Achievements (IOS-018): histories from shared/achievement-vectors.json
+    /// go through the history store and back, then the achievements, and
+    /// earn what desktop's achievements earned, when they earned it.
+    static func checkAchievements() throws {
+        guard let rules = try? BundledRules.journey(),
+              let directory = Bundle.main.url(forResource: "shared", withExtension: nil),
+              let vectors = try? SharedData(directory: directory).decode(SmokeAchievementVectors.self, from: "achievement-vectors.json")
+        else { throw SmokeFailure("the achievements or their vectors did not load") }
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC") ?? .gmt
+        let wanted = ["seven days in a row", "a five minute take is a marathon", "a week away and back is a comeback"]
+        let cases = vectors.cases.filter { wanted.contains($0.name) }
+        guard cases.count == wanted.count else { throw SmokeFailure("the achievement vectors lack a case the smoke runs") }
+        for vector in cases {
+            let file = FileManager.default.temporaryDirectory.appending(path: "smoke-achievements-\(UUID().uuidString).jsonl")
+            defer { try? FileManager.default.removeItem(at: file) }
+            let store = HistoryStore(file: file)
+            for event in vector.events {
+                let words = Array(repeating: "word", count: event.words).joined(separator: " ")
+                try store.append(HistoryEntry(at: Date(timeIntervalSince1970: TimeInterval(event.at) / 1000), durationMs: event.durationMs, words: words, calendar: utc))
+            }
+            let earned = Journey.earned(store.list(), rules: rules)
+            guard earned.map(\.id) == vector.expect.map(\.id), earned.map(\.at) == vector.expect.map(\.at)
+            else { throw SmokeFailure("\(vector.name): the iPhone earned \(earned.map(\.id)), desktop \(vector.expect.map(\.id))") }
+        }
+    }
+
+    /// The painted Journey (IOS-018): the painter page in the app bundle
+    /// loads in its web view, says it is ready, and paints a stamp and the
+    /// road.
+    static func checkJourneyPage() throws {
+        if let failure = onMain({ await journeyPageFailure() }) { throw SmokeFailure(failure) }
+    }
+
+    @MainActor private static func journeyPageFailure() async -> String? {
+        let painter = JourneyPainter()
+        do {
+            try await painter.waitUntilReady(seconds: 30)
+        } catch {
+            return "the painter page never said it was ready"
+        }
+        guard let stamp = try? await painter.picture(.stamp(id: "first-words", got: true, seed: Journey.stampSeed(0), size: 76), scale: 2),
+              stamp.image.size == CGSize(width: 76, height: 76)
+        else { return "the page painted no stamp" }
+        let standing = JourneyStanding(rank: "white", next: "white-1", words: 300, days: 1)
+        guard let road = try? await painter.picture(.road(standing), scale: 1), road.groups.first?.name == "white", road.you != nil
+        else { return "the page painted no road" }
+        return nil
+    }
+
     /// Runs main-actor work to the end from the smoke's synchronous start
     /// on the main thread, turning the run loop so the work gets to run.
     private static func onMain<T: Sendable>(_ work: @escaping @MainActor () async -> T) -> T {
@@ -558,6 +610,28 @@ private struct SmokeRankVectors: Decodable {
     }
 
     struct Step: Decodable {
+        let id: String
+        let at: Int64
+    }
+
+    let cases: [Case]
+}
+
+/// The parts of shared/achievement-vectors.json the smoke reads.
+private struct SmokeAchievementVectors: Decodable {
+    struct Case: Decodable {
+        let name: String
+        let events: [Event]
+        let expect: [Earned]
+    }
+
+    struct Event: Decodable {
+        let at: Int64
+        let words: Int
+        let durationMs: Int
+    }
+
+    struct Earned: Decodable {
         let id: String
         let at: Int64
     }
