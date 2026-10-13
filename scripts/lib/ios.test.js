@@ -9,7 +9,9 @@ import {
   compareVersions,
   copySharedJson,
   exportOptionsPlist,
+  fillJourneyPage,
   findOnPath,
+  journeyScript,
   parsePillShotsLine,
   parseSmokeLine,
   keyFileProblem,
@@ -209,5 +211,26 @@ describe('the release (IOS-015)', () => {
     expect(keyFileProblem('/Users/me/.appstoreconnect/private_keys/AuthKey_KEYID12345.p8', 'KEYID12345')).toBeNull()
     expect(keyFileProblem('/Users/me/keys/murmur.p8', 'KEYID12345')).toContain('AuthKey_KEYID12345.p8')
     expect(keyFileProblem('', 'KEYID12345')).toContain('APPLE_API_KEY')
+  })
+})
+
+describe('the Journey page (IOS-018)', () => {
+  const template = '<style>/*TOKENS*/</style><script>/*SCRIPT*/</script>'
+
+  it('takes the one script Vite built', () => {
+    expect(journeyScript([{ output: [{ type: 'asset', source: 'x' }, { type: 'chunk', code: 'var a=1' }] }])).toBe('var a=1')
+    expect(journeyScript({ output: [{ type: 'chunk', code: 'var b=2' }] })).toBe('var b=2')
+    expect(() => journeyScript([{ output: [] }])).toThrow(/no script/)
+  })
+
+  it('sets the tokens and the script into the page, as written', () => {
+    const page = fillJourneyPage(template, ':root { --ink: #0f0e11; }', 'a.replace(/x/, "$&")')
+    expect(page).toBe('<style>:root { --ink: #0f0e11; }</style><script>a.replace(/x/, "$&")</script>')
+  })
+
+  it('refuses a script that could close its own tag, and a page without its marks', () => {
+    expect(() => fillJourneyPage(template, '', 'x("</script>")')).toThrow(/closing script tag/)
+    expect(() => fillJourneyPage('<script>/*SCRIPT*/</script>', '', 'x')).toThrow(/TOKENS/)
+    expect(() => fillJourneyPage(template + '/*SCRIPT*/', '', 'x')).toThrow(/SCRIPT/)
   })
 })

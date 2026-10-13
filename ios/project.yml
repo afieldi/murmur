@@ -39,6 +39,9 @@ targets:
       - path: Generated/shared
         type: folder
         buildPhase: resources
+      - path: Generated/web
+        type: folder
+        buildPhase: resources
     dependencies:
       - target: murmurKeyboard
       - target: murmurWidgets

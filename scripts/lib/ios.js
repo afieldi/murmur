@@ -200,6 +200,24 @@ function keyFileProblem(keyPath, keyId) {
   return basename(keyPath) === want ? null : `the key file must be named ${want} for altool to find it`
 }
 
+/** The bundled script from Vite's build result: one chunk, as a string. */
+function journeyScript(result) {
+  const outputs = (Array.isArray(result) ? result : [result]).flatMap((r) => r.output ?? [])
+  const chunk = outputs.find((o) => o.type === 'chunk')
+  if (!chunk || !chunk.code) throw new Error('the Journey page built no script')
+  return chunk.code
+}
+
+/** The page with the tokens and the script set in. A script that could
+ *  close its own tag, or a page missing a mark, stops the build. */
+function fillJourneyPage(template, tokens, script) {
+  for (const mark of ['/*TOKENS*/', '/*SCRIPT*/']) {
+    if (template.split(mark).length !== 2) throw new Error(`the Journey page needs exactly one ${mark}`)
+  }
+  if (/<\/script/i.test(script)) throw new Error('the Journey script contains a closing script tag')
+  return template.replace('/*TOKENS*/', () => tokens).replace('/*SCRIPT*/', () => script)
+}
+
 module.exports = {
   SMOKE_SIMULATOR,
   SIM_SIGNING,
@@ -217,5 +235,7 @@ module.exports = {
   releaseOptions,
   releaseBlocker,
   altoolFailure,
-  keyFileProblem
+  keyFileProblem,
+  journeyScript,
+  fillJourneyPage
 }

@@ -17,6 +17,8 @@ const { colorSetJson, parseRootTokens, toSwift } = require('./lib/ios-tokens')
 const {
   SIM_SIGNING,
   altoolFailure,
+  fillJourneyPage,
+  journeyScript,
   buildNumber,
   copySharedJson,
   exportOptionsPlist,
@@ -51,6 +53,27 @@ function need(tool, hint) {
 
 /** Writes everything the project needs and is never committed, then the
  *  project itself. Returns how many shared rule files were bundled. */
+/** The Journey's painter page (IOS-018): desktop's brush engine and
+ *  Journey painter, bundled by Vite into one script and set into the page
+ *  with the tokens, so the app's web view loads one file and nothing else. */
+async function buildJourneyPage() {
+  const { build } = await import('vite')
+  const out = await build({
+    configFile: false,
+    logLevel: 'silent',
+    build: {
+      write: false,
+      minify: true,
+      lib: { entry: join(iosDir, 'Web', 'journey.ts'), formats: ['iife'], name: 'murmurJourneyPage', fileName: () => 'journey.js' }
+    }
+  })
+  const script = journeyScript(out)
+  const tokens = readFileSync(join(root, 'src', 'renderer', 'tokens.css'), 'utf8')
+  const page = fillJourneyPage(readFileSync(join(iosDir, 'Web', 'journey.html'), 'utf8'), tokens, script)
+  mkdirSync(join(generated, 'web'), { recursive: true })
+  writeFileSync(join(generated, 'web', 'journey.html'), page)
+}
+
 async function generateAll() {
   need('xcodegen', 'Install it with: brew install xcodegen')
   mkdirSync(generated, { recursive: true })
@@ -71,6 +94,7 @@ async function generateAll() {
   writeFileSync(join(launchDir, 'Contents.json'), colorSetJson(ink.rgba))
 
   const count = copySharedJson(join(root, 'shared'), join(generated, 'shared'))
+  await buildJourneyPage()
   run('xcodegen', ['generate', '--quiet'], { cwd: iosDir })
   console.log(`ios: generated the colors, the ${brush ? 'brushed' : 'clean'} icon, ${count} shared rules, and murmur.xcodeproj`)
   return count
