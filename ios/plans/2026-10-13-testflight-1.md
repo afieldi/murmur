@@ -36,7 +36,7 @@ LaBroi can overturn any of these; each says what it costs if wrong.
 2. **Signing and upload use the API key by default.** `--xcode-account` signs with Xcode's account. This mirrors `register`.
 3. **Apple validates the ipa just before the upload,** so a refusal arrives before a build number is used.
 4. **The upload waits for LaBroi's yes, every time.** It sends the build to Apple. Parently's notes ask the same.
-5. **The internal group is created by LaBroi** in App Store Connect, and the runbook says how. Creating it through the API is possible, but it is a one-time click and adds another outward action.
+5. **The internal group is murmur team,** made with the record in IOS-004; the runbook says how to add a build to it. (Corrected by the review gate: the first draft had LaBroi make a second group.)
 6. **The orientation warning stays.** "All interface orientations must be supported unless the app requires full screen" is about iPad multitasking, and murmur is iPhone only and portrait only. If wrong: one Info.plist key.
 
 ## Global Constraints

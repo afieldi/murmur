@@ -6,7 +6,7 @@
 //   node scripts/ios.js smoke      boots the app headless and relays its SMOKE_RESULT
 //   node scripts/ios.js pill-shots every stage of the pill, both styles, as images in ios/build/pill-shots
 //   node scripts/ios.js register   one device build that registers the bundle ids and app group
-//   node scripts/ios.js release    archives for the App Store, checks, and uploads to TestFlight (--no-upload stops before)
+//   node scripts/ios.js release    archives for the App Store and checks it; --upload sends it to TestFlight
 // Only the ios: commands need Xcode; npm install and the desktop gates never do.
 const { execFileSync, spawnSync } = require('node:child_process')
 const { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } = require('node:fs')
@@ -16,14 +16,18 @@ const { iosIconSet } = require('./lib/ios-icon')
 const { colorSetJson, parseRootTokens, toSwift } = require('./lib/ios-tokens')
 const {
   SIM_SIGNING,
+  altoolFailure,
   buildNumber,
   copySharedJson,
   exportOptionsPlist,
   findOnPath,
+  keyFileProblem,
   parsePillShotsLine,
   parseSmokeLine,
   pickSmokeSimulator,
   projectSetting,
+  releaseBlocker,
+  releaseOptions,
   systemFirstPath,
   uploadArgs
 } = require('./lib/ios')
@@ -196,75 +200,106 @@ async function register() {
 }
 
 /** TestFlight (IOS-015): archives murmur for the App Store with a build
- *  number from git, exports the signed ipa, checks it, has Apple validate
- *  it, and uploads it to App Store Connect, all with the App Store Connect
- *  API key from the environment (signing can use the account signed in to
- *  Xcode with --xcode-account). --no-upload stops with the ipa checked and
- *  nothing sent. */
+ *  number from git, exports the signed ipa, and checks it. Nothing is sent
+ *  unless --upload is given (only after LaBroi says yes): then Apple
+ *  validates the ipa and it is uploaded, all with the App Store Connect API
+ *  key from the environment. Signing can use the account signed in to
+ *  Xcode with --xcode-account. */
 async function release() {
+  const options = releaseOptions(process.argv.slice(3), process.env)
+  const { APPLE_API_KEY, APPLE_API_KEY_ID, APPLE_API_ISSUER } = process.env
+  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim()
+  const dirty = git('status', '--porcelain') !== ''
+  const blocker = releaseBlocker({ upload: options.upload, dirty, shallow: git('rev-parse', '--is-shallow-repository') === 'true' })
+  if (blocker) throw new Error(blocker)
+  if (options.upload) {
+    const problem = keyFileProblem(APPLE_API_KEY, APPLE_API_KEY_ID) ?? (APPLE_API_ISSUER ? null : 'set APPLE_API_ISSUER to upload')
+    if (problem) throw new Error(problem)
+  }
+  // A release never ships the clean icon in place of the brushed one.
+  if (!(await loadBrush().catch(() => null))) throw new Error('a release needs the brushed icon, which needs Node 22.13 or later')
   await generateAll()
   const yml = readFileSync(join(iosDir, 'project.yml'), 'utf8')
   const version = projectSetting(yml, 'MARKETING_VERSION')
   const team = projectSetting(yml, 'DEVELOPMENT_TEAM')
-  const build = buildNumber(execFileSync('git', ['rev-list', '--count', 'HEAD'], { cwd: root, encoding: 'utf8' }))
-  const { APPLE_API_KEY, APPLE_API_KEY_ID, APPLE_API_ISSUER } = process.env
-  const useKey = !process.argv.includes('--xcode-account') && APPLE_API_KEY && APPLE_API_KEY_ID && APPLE_API_ISSUER
+  const build = buildNumber(git('rev-list', '--count', 'HEAD'))
+  const commit = git('rev-parse', '--short=12', 'HEAD')
+  const useKey = !options.xcodeAccount && APPLE_API_KEY && APPLE_API_KEY_ID && APPLE_API_ISSUER
   const auth = useKey
     ? ['-authenticationKeyPath', APPLE_API_KEY, '-authenticationKeyID', APPLE_API_KEY_ID, '-authenticationKeyIssuerID', APPLE_API_ISSUER]
     : []
   console.log(`ios: signing with ${useKey ? 'the App Store Connect API key' : 'the account signed in to Xcode'}`)
+  if (dirty) console.log('ios: the working tree has uncommitted changes, so this dry run is not exactly a commit')
   const out = join(iosDir, 'build', 'release', `${version}-${build}`)
   rmSync(out, { recursive: true, force: true })
   mkdirSync(out, { recursive: true })
   const archive = join(out, 'murmur.xcarchive')
-  console.log(`ios: archiving murmur ${version} (${build})`)
+  console.log(`ios: archiving murmur ${version} (${build}) from commit ${commit}`)
   run('xcodebuild', [
     'archive', '-project', project, '-scheme', 'murmur', '-configuration', 'Release', '-destination', 'generic/platform=iOS',
     '-archivePath', archive, '-derivedDataPath', join(iosDir, 'build', 'ReleaseData'), '-allowProvisioningUpdates', '-quiet',
-    `CURRENT_PROJECT_VERSION=${build}`, ...auth
+    `CURRENT_PROJECT_VERSION=${build}`, `MURMUR_COMMIT=${commit}`, ...auth
   ])
-  const options = join(out, 'ExportOptions.plist')
-  writeFileSync(options, exportOptionsPlist(team))
+  const exportOptions = join(out, 'ExportOptions.plist')
+  writeFileSync(exportOptions, exportOptionsPlist(team))
   const exported = join(out, 'export')
-  run('xcodebuild', ['-exportArchive', '-archivePath', archive, '-exportPath', exported, '-exportOptionsPlist', options, '-allowProvisioningUpdates', '-quiet', ...auth], {
+  run('xcodebuild', ['-exportArchive', '-archivePath', archive, '-exportPath', exported, '-exportOptionsPlist', exportOptions, '-allowProvisioningUpdates', '-quiet', ...auth], {
     env: { ...process.env, PATH: systemFirstPath(process.env.PATH) }
   })
-  const app = join(archive, 'Products', 'Applications', 'murmur.app')
-  const checks = {
-    CFBundleShortVersionString: version,
-    CFBundleVersion: build,
-    ITSAppUsesNonExemptEncryption: 'false'
-  }
-  for (const [key, want] of Object.entries(checks)) {
-    const got = plistValue(app, key)
-    if (got !== want) throw new Error(`the archive's ${key} is ${got}, not ${want}`)
-  }
-  if (plistValue(join(app, 'PlugIns', 'murmurKeyboard.appex'), 'CFBundleVersion') !== build) {
-    throw new Error('the keyboard carries a different build number')
-  }
-  // What goes to Apple is the ipa: both bundles in it must be signed for the
-  // App Store (no test devices) with profiles that carry the app group.
+  // What goes to Apple is the ipa, so every check reads the unzipped ipa:
+  // the app and each of its extensions carry this build, are signed for the
+  // App Store (no test devices, no debugging), and are entitled to the app
+  // group.
   const ipa = join(exported, 'murmur.ipa')
   const unpacked = join(out, 'unpacked')
   run('unzip', ['-q', ipa, '-d', unpacked])
   const shipped = join(unpacked, 'Payload', 'murmur.app')
-  const group = plistValue(shipped, 'MurmurAppGroup')
-  for (const bundle of [shipped, join(shipped, 'PlugIns', 'murmurKeyboard.appex')]) {
-    const profile = execFileSync('security', ['cms', '-D', '-i', join(bundle, 'embedded.mobileprovision')], { encoding: 'utf8' })
-    if (!profile.includes(group)) throw new Error(`${bundle}: its provisioning profile lacks the app group ${group}`)
-    if (profile.includes('<key>ProvisionedDevices</key>')) throw new Error(`${bundle}: signed for test devices, not the App Store`)
+  const checks = { CFBundleShortVersionString: version, CFBundleVersion: build, ITSAppUsesNonExemptEncryption: 'false', MurmurCommit: commit }
+  for (const [key, want] of Object.entries(checks)) {
+    const got = plistValue(shipped, key)
+    if (got !== want) throw new Error(`the ipa's ${key} is ${got}, not ${want}`)
   }
-  if (process.argv.includes('--no-upload')) {
-    console.log(`ios: murmur ${version} (${build}) is checked and ready at ${ipa}; nothing was sent (--no-upload)`)
+  const group = plistValue(shipped, 'MurmurAppGroup')
+  const plugins = join(shipped, 'PlugIns')
+  const extensions = readdirSync(plugins).filter((name) => name.endsWith('.appex')).map((name) => join(plugins, name))
+  for (const bundle of [shipped, ...extensions]) {
+    if (plistValue(bundle, 'CFBundleVersion') !== build) throw new Error(`${bundle}: carries a different build number`)
+    const profile = execFileSync('security', ['cms', '-D', '-i', join(bundle, 'embedded.mobileprovision')], { encoding: 'utf8' })
+    if (profile.includes('<key>ProvisionedDevices</key>')) throw new Error(`${bundle}: signed for test devices, not the App Store`)
+    const entitlements = signedEntitlements(bundle, out)
+    if (!(entitlements['com.apple.security.application-groups'] ?? []).includes(group)) throw new Error(`${bundle}: not entitled to the app group ${group}`)
+    if (entitlements['get-task-allow'] !== false) throw new Error(`${bundle}: signed for debugging, not the App Store`)
+  }
+  console.log(`ios: murmur ${version} (${build}), commit ${commit}, with ${extensions.length} extension${extensions.length === 1 ? "" : "s"}, is checked and ready at ${ipa}`)
+  if (!options.upload) {
+    console.log('ios: nothing was sent. After LaBroi says yes: npm run ios:release -- --upload')
     return 0
   }
   // altool reads the key file from the folder it is in.
-  const env = APPLE_API_KEY ? { ...process.env, API_PRIVATE_KEYS_DIR: dirname(APPLE_API_KEY) } : process.env
+  const env = { ...process.env, API_PRIVATE_KEYS_DIR: dirname(APPLE_API_KEY) }
   const upload = uploadArgs(ipa, APPLE_API_KEY_ID, APPLE_API_ISSUER)
-  run('xcrun', ['altool', '--validate-app', ...upload.slice(2)], { env })
-  run('xcrun', upload, { env })
+  altool(['altool', '--validate-app', ...upload.slice(2)], env, 'validation')
+  altool(upload, env, 'upload')
   console.log(`ios: murmur ${version} (${build}) is uploaded; it shows in TestFlight once App Store Connect has processed it`)
   return 0
+}
+
+/** A bundle's signed entitlements as an object. */
+function signedEntitlements(bundle, scratch) {
+  const file = join(scratch, 'entitlements.plist')
+  const xml = execFileSync('codesign', ['-d', '--entitlements', '-', '--xml', bundle], { stdio: ['ignore', 'pipe', 'ignore'] })
+  writeFileSync(file, xml)
+  return JSON.parse(execFileSync('plutil', ['-convert', 'json', '-o', '-', file], { encoding: 'utf8' }))
+}
+
+/** Runs altool, shows what it said, and fails on any failure it reports,
+ *  whatever its exit code. */
+function altool(args, env, step) {
+  const result = spawnSync('xcrun', args, { env, encoding: 'utf8' })
+  const output = `${result.stdout ?? ''}${result.stderr ?? ''}`
+  process.stdout.write(output)
+  const failure = result.error?.message ?? altoolFailure(output) ?? (result.status === 0 ? null : `altool exited ${result.status}`)
+  if (failure) throw new Error(`the ${step} failed: ${failure}`)
 }
 
 const COMMANDS = {

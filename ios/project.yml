@@ -20,6 +20,8 @@ settings:
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
+    # The commit a release was built from; npm run ios:release sets it.
+    MURMUR_COMMIT: ""
     TARGETED_DEVICE_FAMILY: "1"
 packages:
   MurmurCore:
@@ -53,6 +55,7 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         LSRequiresIPhoneOS: true
         MurmurAppGroup: $(MURMUR_APP_GROUP)
+        MurmurCommit: $(MURMUR_COMMIT)
         # The keyboard opens murmur with <scheme>://take (IOS-009); the
         # bundle id keeps the scheme unique to each build.
         MurmurURLScheme: $(MURMUR_BUNDLE_ID)

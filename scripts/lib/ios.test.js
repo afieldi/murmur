@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  altoolFailure,
   buildNumber,
   compareVersions,
   copySharedJson,
@@ -11,8 +12,11 @@ import {
   findOnPath,
   parsePillShotsLine,
   parseSmokeLine,
+  keyFileProblem,
   pickSmokeSimulator,
   projectSetting,
+  releaseBlocker,
+  releaseOptions,
   systemFirstPath,
   uploadArgs
 } from './ios'
@@ -162,10 +166,48 @@ describe('the release (IOS-015)', () => {
     expect(path.split(delimiter)).toEqual(['/usr/bin', '/bin', '/usr/sbin', '/sbin', '/opt/homebrew/bin', '/Users/me/bin'])
   })
 
-  it('uploads with the key id and issuer, never the key file', () => {
+  it('uploads with the key id and issuer, never the key file, and asks for JSON', () => {
     expect(uploadArgs('/tmp/murmur.ipa', 'KEYID12345', 'issuer-uuid')).toEqual([
-      'altool', '--upload-app', '-f', '/tmp/murmur.ipa', '-t', 'ios', '--apiKey', 'KEYID12345', '--apiIssuer', 'issuer-uuid'
+      'altool', '--upload-app', '-f', '/tmp/murmur.ipa', '-t', 'ios', '--apiKey', 'KEYID12345', '--apiIssuer', 'issuer-uuid', '--output-format', 'json'
     ])
     expect(() => uploadArgs('/tmp/murmur.ipa', '', 'issuer')).toThrow('APPLE_API_KEY_ID')
+  })
+
+  it('uploads only when asked with --upload, and refuses flags it does not know', () => {
+    expect(releaseOptions([], {})).toEqual({ upload: false, xcodeAccount: false })
+    expect(releaseOptions(['--upload'], {})).toEqual({ upload: true, xcodeAccount: false })
+    expect(releaseOptions(['--xcode-account'], {})).toEqual({ upload: false, xcodeAccount: true })
+    for (const flag of ['--no-upload', '--dry-run', '--uplaod', 'upload']) {
+      expect(() => releaseOptions([flag], {})).toThrow(`unknown option ${flag}`)
+    }
+  })
+
+  it('stops when npm took a flag meant for the release (no -- before it)', () => {
+    for (const name of ['npm_config_upload', 'npm_config_no_upload', 'npm_config_xcode_account']) {
+      expect(() => releaseOptions([], { [name]: 'true' })).toThrow('npm run ios:release -- --upload')
+    }
+  })
+
+  it('uploads only a clean commit from a full clone, so the build number names what shipped', () => {
+    expect(releaseBlocker({ upload: true, dirty: false, shallow: false })).toBeNull()
+    expect(releaseBlocker({ upload: true, dirty: true, shallow: false })).toContain('uncommitted changes')
+    expect(releaseBlocker({ upload: true, dirty: false, shallow: true })).toContain('shallow clone')
+    expect(releaseBlocker({ upload: false, dirty: true, shallow: true })).toBeNull()
+  })
+
+  it('reads a failed upload from what altool says, not only its exit code', () => {
+    const failed = JSON.stringify({ 'product-errors': [{ code: -19232, message: 'The bundle version must be higher than the previously uploaded version.' }] })
+    expect(altoolFailure(`2026-10-13 altool[1:2] some log line\n${failed}\n`)).toBe('The bundle version must be higher than the previously uploaded version.')
+    expect(altoolFailure('*** Error: Unable to upload archive.')).toBe('*** Error: Unable to upload archive.')
+    expect(altoolFailure('ERROR: [ContentDelivery.Uploader] Invalid bundle')).toBe('ERROR: [ContentDelivery.Uploader] Invalid bundle')
+    expect(altoolFailure('UPLOAD FAILED with 1 error')).toBe('UPLOAD FAILED with 1 error')
+    expect(altoolFailure(JSON.stringify({ 'success-message': "No errors uploading 'murmur.ipa'", 'product-errors': [] }))).toBeNull()
+    expect(altoolFailure("No errors uploading 'murmur.ipa'")).toBeNull()
+  })
+
+  it('needs the key file named for its id, where altool looks for it', () => {
+    expect(keyFileProblem('/Users/me/.appstoreconnect/private_keys/AuthKey_KEYID12345.p8', 'KEYID12345')).toBeNull()
+    expect(keyFileProblem('/Users/me/keys/murmur.p8', 'KEYID12345')).toContain('AuthKey_KEYID12345.p8')
+    expect(keyFileProblem('', 'KEYID12345')).toContain('APPLE_API_KEY')
   })
 })

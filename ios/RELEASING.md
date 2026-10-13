@@ -5,26 +5,27 @@ How a build gets from this repo to TestFlight (ios/prd.json IOS-015). Desktop ha
 ## Version and build numbers
 
 - **Version** is `MARKETING_VERSION` in `ios/project.yml` (0.1.0 for the TestFlight builds). Bump it in its own commit when an App Store version changes.
-- **Build** is the number of commits behind the build (`git rev-list --count HEAD`). `npm run ios:release` sets it at archive time, so `CURRENT_PROJECT_VERSION` in `ios/project.yml` stays 1 and is never edited by hand. It only grows, so every new commit uploads with a new build number. App Store Connect refuses a second upload of the same build number, so a rebuild of the same commit needs a new commit first.
+- **Build** is the number of commits behind the build (`git rev-list --count HEAD`). `npm run ios:release` sets it at archive time, along with the commit itself (`MurmurCommit` in the app's Info.plist), so `CURRENT_PROJECT_VERSION` in `ios/project.yml` stays 1 and is never edited by hand.
+- App Store Connect refuses a build number it has seen, and any number lower than the newest one already uploaded for the same version. Commit counts only grow along one history, so ship from `feature/ios` or `main` with their full history. If a number is ever refused (a squash merge or a rebase dropped commits, or the same commit is uploaded twice), add a commit (`git commit --allow-empty -m "iOS: build bump"` is enough) or bump the version.
 
 ## What the Mac needs once
 
-- The App Store Connect API key in the environment: `APPLE_API_KEY` (the path to the .p8 file), `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER`. On LaBroi's Mac they live in `~/.config/apple-notary/env`, which `~/.zshenv` loads. Never print them, log them, or commit them.
+- The App Store Connect API key in the environment: `APPLE_API_KEY` (the path to the key file, which must be named `AuthKey_<key id>.p8`), `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER`. On LaBroi's Mac they live in `~/.config/apple-notary/env`, which `~/.zshenv` loads. Never print them, log them, or commit them.
 - The Apple Distribution certificate for Eze Media LLC (team 4B55ZVBVKN) in the login keychain.
-- The App Store Connect record murmur voice dictation for `com.lbwalton.murmur.ios`, which exists (IOS-004).
+- The App Store Connect record murmur voice dictation for `com.lbwalton.murmur.ios`, with its internal TestFlight group murmur team (IOS-004).
 
-Signing uses the API key with automatic provisioning: the first archive creates the App Store profiles for the app and the keyboard. `--xcode-account` signs with the account signed in to Xcode instead, which works only from a Terminal that can read the login keychain.
+Signing uses the API key with automatic provisioning: the first archive creates the App Store profiles for the app and each extension. `--xcode-account` signs with the account signed in to Xcode instead, which works only from a Terminal that can read the login keychain. Xcode writes the key's id and path into `ios/build`, so never share that folder.
 
 ## Archive, check, and upload
 
-1. **Gates.** `npm run typecheck`, `npm run test`, `npm run ios:test`, and `npm run ios:smoke` green on the commit you ship.
-2. **Dry run.** `npm run ios:release -- --no-upload` generates the project, archives murmur for the App Store, exports the signed ipa into `ios/build/release/<version>-<build>/export/`, and checks it. Nothing is sent. The checks:
-   - the version and build number in the archive;
+1. **Gates.** `npm run typecheck`, `npm run test`, `npm run ios:test`, and `npm run ios:smoke` green, on a commit with nothing uncommitted, pushed.
+2. **Dry run.** `npm run ios:release` generates the project, archives murmur for the App Store, exports the signed ipa into `ios/build/release/<version>-<build>/export/`, and checks the ipa itself. Nothing is sent. The checks:
+   - the version, the build number, and the commit;
    - export compliance set (below);
-   - the keyboard carrying the same build;
-   - both bundles in the ipa signed for the App Store, with no test devices and profiles that carry the app group.
-3. **Upload.** `npm run ios:release` does all of that, then has Apple validate the ipa, then uploads it. Ask LaBroi before every upload: it sends the build to Apple.
-4. **Processing.** App Store Connect processes the build for 5 to 30 minutes. Apple emails lbwalton@gmail.com when it is ready, or when it is not and why.
+   - the app and every extension carrying the same build;
+   - each signed for the App Store: no test devices, no debugging, entitled to the app group.
+3. **Upload, only after LaBroi says yes.** `npm run ios:release -- --upload` does all of that, then has Apple validate the ipa, then uploads it. It refuses uncommitted changes and shallow clones, so the build number always names the commit that shipped. The `--` matters: without it npm keeps the flag, and the release stops instead of guessing. A failure altool reports stops the release even when altool exits 0, as newer versions can.
+4. **Processing.** App Store Connect processes the build, usually within 5 to 30 minutes. Apple usually emails when it is ready or when it is not and why. If nothing comes, open App Store Connect, murmur voice dictation, TestFlight, and look at the build's status; only after 24 hours in Processing is it worth asking Apple.
 
 ## Export compliance
 
@@ -38,11 +39,12 @@ Paste this into the build's What to Test in App Store Connect, TestFlight, under
 
 ## Internal testing
 
-- In App Store Connect, open murmur voice dictation, then TestFlight. Once, create an internal group (murmur internal) with LaBroi in it and automatic distribution on, so every processed build reaches it.
-- On the iPhone, install TestFlight from the App Store. The invite goes to lbwalton@gmail.com, the App Store Connect account; the phone's iCloud is a different Apple ID, so open the invite email on the phone, or sign in to TestFlight as lbwalton@gmail.com.
+- The internal group is murmur team, with lbwalton@gmail.com in it (IOS-004). In App Store Connect, murmur voice dictation, TestFlight, Internal Testing, murmur team: if automatic distribution is on, each processed build joins the group by itself. If the new build is not listed under Builds, click the plus next to Builds and add it.
+- On the iPhone, install TestFlight from the App Store and open the invite email sent to lbwalton@gmail.com. The phone's everyday Apple Account is labroi@me.com, a different one, and a build never shows in TestFlight under it (learned on the old record, 2026-08-15). If TestFlight shows no murmur or says the Apple Account does not match, open TestFlight, tap the account picture at the top right, sign out, and sign in as lbwalton@gmail.com; then open the invite again.
 
 ## Before inviting anyone else
 
 - LaBroi's live checks in HANDOFF.md pass on his own iPhone first.
-- External testers need Beta App Review: fill in Test Information in App Store Connect (a feedback email, a contact, the privacy policy address, a beta description) and the app's privacy details. murmur collects nothing itself: takes go only to the provider you choose with your own key, and diagnostics are never sent by themselves.
+- External testers need Beta App Review: fill in Test Information in App Store Connect (a beta description, a feedback email, a contact, and review notes). murmur's core needs a provider key, so the review notes must say how a reviewer can test it, for example with a key on a spending limit made only for review, or the build is likely to come back as not testable.
+- murmur collects nothing itself: takes go only to the provider you choose with your own key, and diagnostics are never sent by themselves.
 - Problems found in TestFlight become fixes or stories in ios/prd.json before the next build (IOS-015).
