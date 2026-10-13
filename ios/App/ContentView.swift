@@ -2,15 +2,19 @@
 import SwiftUI
 
 /// A quiet placeholder until Home (IOS-012) replaces it: the way to a
-/// take, the keyboard, Cleanup, and the Provider screen, and nothing else.
-/// It starts the keyboard's bridge to the app's take model.
+/// take, the keyboard, the session, Cleanup, and the Provider screen, and
+/// nothing else. It starts the keyboard's bridge and the session, and shows
+/// the Recording screen when the keyboard opens murmur.
 struct ContentView: View {
+    @State private var opener = TakeOpener.shared
+
     var body: some View {
         NavigationStack {
             List {
                 Group {
                     NavigationLink("Dictate") { TakeRoute() }
                     NavigationLink("Keyboard") { KeyboardScreen() }
+                    NavigationLink("Session") { SessionRoute() }
                     NavigationLink("Cleanup") { CleanupRoute() }
                     NavigationLink("Provider and key") { ProviderRoute() }
                 }
@@ -23,7 +27,14 @@ struct ContentView: View {
         }
         .tint(Tokens.brand)
         .preferredColorScheme(.dark)
-        .task { _ = KeyboardBridge.live() }
+        .task {
+            _ = KeyboardBridge.live()
+            _ = Session.live()
+        }
+        .onOpenURL { url in
+            Task { await opener.open(url) }
+        }
+        .fullScreenCover(isPresented: $opener.showing) { RecordingRoute() }
     }
 }
 
