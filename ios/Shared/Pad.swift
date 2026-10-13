@@ -22,6 +22,10 @@ enum Pad {
     static let noAnswer = "Open murmur, then tap the pill again."
     static let busy = "murmur is busy with another take. Try again in a moment."
     static let stoppedAnswering = "murmur stopped answering. Open murmur to see why."
+    /// While iOS opens murmur for the first take of a session (IOS-009), and
+    /// when iOS will not.
+    static let opening = "Opening murmur"
+    static let openRefused = "Open murmur to start"
 
     /// mine is the take this keyboard asked for, nil when it is not waiting
     /// on one; sameField is whether the cursor is still in the field the take
@@ -56,6 +60,46 @@ enum Pad {
               let first = words.first, !",.;:!?)]}".contains(first)
         else { return words }
         return " " + words
+    }
+
+    /// The take this keyboard is waiting on, kept in the keyboard's own
+    /// defaults: opening murmur closes the keyboard, and the one you swipe
+    /// back to is a new one that has to know the take is its own.
+    struct Waiting: Codable, Equatable {
+        let take: UUID
+        /// Started by opening murmur, so the words land in the field you come
+        /// back to, and leaving the keyboard does not cancel it.
+        let opened: Bool
+        /// The field the take began in; for an opened take, the field the
+        /// keyboard came back to.
+        var field: UUID?
+        let at: Date
+
+        /// A take waited on longer than this is let go: its words, if any,
+        /// wait as Insert last.
+        static let life: TimeInterval = 10 * 60
+        static let key = "waitingTake"
+
+        static func load(from defaults: UserDefaults, now: Date = .now) -> Waiting? {
+            guard let data = defaults.data(forKey: key), let waiting = try? JSONDecoder().decode(Waiting.self, from: data),
+                  now.timeIntervalSince(waiting.at) < life
+            else { return nil }
+            return waiting
+        }
+
+        static func save(_ waiting: Waiting?, to defaults: UserDefaults) {
+            if let waiting, let data = try? JSONEncoder().encode(waiting) {
+                defaults.set(data, forKey: key)
+            } else {
+                defaults.removeObject(forKey: key)
+            }
+        }
+
+        /// Whether the cursor is in the take's field. An opened take adopts
+        /// the first field the keyboard comes back to.
+        func sameField(as current: UUID?) -> Bool {
+            field == nil || field == current
+        }
     }
 
     /// The return key's name, following the field's return key type.

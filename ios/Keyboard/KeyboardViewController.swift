@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The murmur keyboard, a dictation pad (ios/prd.json IOS-008): tap the
-// pill to start a take and again to stop it. The keyboard only asks the
-// app for a take under its own id, signals it (start, stop, cancel), and
+// The murmur keyboard, a dictation pad (ios/prd.json IOS-008, IOS-009):
+// tap the pill to start a take and again to stop it. With no session
+// running, the first tap opens murmur, which starts one already
+// listening; you swipe back and keep talking. During a session a tap
+// starts a take without leaving your app. The keyboard only asks the app
+// for a take under its own id, signals it (start, stop, cancel, end), and
 // reads the mailbox; it never touches the microphone or the network.
 // Words land at the cursor once, or wait as Insert last when you left the
 // field before they arrived.
@@ -9,13 +12,14 @@ import UIKit
 
 final class KeyboardViewController: UIInputViewController {
     private let pad = PadView()
+    private let memory = UserDefaults.standard
     private var listener: SignalListener?
-    /// The take this keyboard asked for, until it ends.
-    private var mine: UUID?
+    /// The take this keyboard is waiting on, kept across keyboards.
+    private var waiting: Pad.Waiting? {
+        didSet { Pad.Waiting.save(waiting, to: memory) }
+    }
     /// The phase of that take, as the mailbox last said.
     private var phase: MailboxEntry.Phase?
-    /// The field the take began in.
-    private var field: UUID?
     private var visible = false
     private var deleteRepeat: Timer?
     private var noAnswer: Timer?
@@ -49,18 +53,28 @@ final class KeyboardViewController: UIInputViewController {
         super.viewWillAppear(animated)
         visible = true
         pad.setFullAccess(hasFullAccess)
+        waiting = Pad.Waiting.load(from: memory)
+        // A take that opened murmur lands in the field you come back to.
+        if var opened = waiting, opened.opened, opened.field == nil {
+            opened.field = textDocumentProxy.documentIdentifier
+            waiting = opened
+        }
         refresh()
+        // Back from murmur, its take should be in the mailbox by now.
+        if waiting?.opened == true, phase == nil { expectAnswer(within: 3, else: Pad.noAnswer) }
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         visible = false
         // A take still starting or listening when the keyboard goes away is
-        // dropped; one already being transcribed comes back as Insert last.
-        if mine != nil, phase == nil || phase == .listening {
+        // dropped; one being transcribed comes back as Insert last. A take
+        // that opened murmur goes on: the keyboard left so you could go there.
+        if let waiting, !waiting.opened, phase == nil || phase == .listening {
             Signal.cancel.post()
             end(nil)
         }
+        noAnswer?.invalidate()
         deleteUp()
     }
 
@@ -76,7 +90,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     @objc private func tapPill() {
-        switch (mine, phase) {
+        switch (waiting, phase) {
         case (.some, .listening?):
             Signal.stop.post()
             // The app moves on to working within a moment; when it does not,
@@ -89,32 +103,62 @@ final class KeyboardViewController: UIInputViewController {
             let take = UUID()
             guard let mailbox = Mailbox.shared else { return }
             mailbox.ask(take)
-            mine = take
-            phase = nil
-            field = textDocumentProxy.documentIdentifier
             pad.insertLast.isHidden = true
-            pad.status.text = "Starting"
-            Signal.start.post()
-            // The app answers within a moment when it is open.
-            expectAnswer(within: 2, else: Pad.noAnswer)
+            phase = nil
+            if SessionState.read().isOn() {
+                waiting = Pad.Waiting(take: take, opened: false, field: textDocumentProxy.documentIdentifier, at: .now)
+                pad.status.text = "Starting"
+                Signal.start.post()
+                // A running session answers within a moment; when it does not,
+                // murmur was closed, so open it.
+                expectAnswer(within: 2) { [weak self] in
+                    Signal.cancel.post()
+                    self?.openMurmur(take)
+                }
+            } else {
+                openMurmur(take)
+            }
+        }
+    }
+
+    /// Opens murmur with the take's link; murmur starts the session and the
+    /// take, and you swipe back.
+    private func openMurmur(_ take: UUID) {
+        Mailbox.shared?.ask(take)
+        guard let url = TakeLink.url(for: take), let scene = view.window?.windowScene else {
+            end(Pad.openRefused)
+            return
+        }
+        waiting = Pad.Waiting(take: take, opened: true, field: nil, at: .now)
+        pad.status.text = Pad.opening
+        scene.open(url, options: nil) { [weak self] opened in
+            MainActor.assumeIsolated {
+                if !opened, self?.waiting?.take == take { self?.end(Pad.openRefused) }
+            }
         }
     }
 
     /// Ends the take with a line when the mailbox has not moved on in time.
     private func expectAnswer(within seconds: TimeInterval, else line: String) {
+        expectAnswer(within: seconds) { [weak self] in
+            Signal.cancel.post()
+            self?.end(line)
+        }
+    }
+
+    private func expectAnswer(within seconds: TimeInterval, otherwise: @escaping @MainActor () -> Void) {
         let waitingOn = phase
         noAnswer?.invalidate()
         noAnswer = Timer.scheduledTimer(withTimeInterval: seconds, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, self.mine != nil, self.phase == waitingOn else { return }
-                Signal.cancel.post()
-                self.end(line)
+                guard let self, self.visible, self.waiting != nil, self.phase == waitingOn else { return }
+                otherwise()
             }
         }
     }
 
     private func heardBusy() {
-        guard mine != nil, phase == nil else { return }
+        guard waiting != nil, phase == nil else { return }
         noAnswer?.invalidate()
         end(Pad.busy)
     }
@@ -154,25 +198,38 @@ final class KeyboardViewController: UIInputViewController {
         pad.returnKey.accessibilityLabel = title
     }
 
+    /// A long press on the pill holds End session while one runs.
+    private func setSessionMenu() {
+        guard SessionState.read().isOn() else {
+            pad.pill.menu = nil
+            return
+        }
+        pad.pill.menu = UIMenu(children: [
+            UIAction(title: "End session", image: UIImage(systemName: "stop.circle")) { _ in Signal.end.post() }
+        ])
+    }
+
     /// Reads the mailbox and does what the newest entry asks, only while
     /// this keyboard is on screen.
     private func refresh() {
         guard visible, hasFullAccess, let mailbox = Mailbox.shared else { return }
+        setSessionMenu()
         let entry = mailbox.read()
-        if let entry, entry.take == mine, entry.phase != phase {
+        if let entry, entry.take == waiting?.take, entry.phase != phase {
             phase = entry.phase
             noAnswer?.invalidate()
             // Transcribing and polish can take a while, but not forever.
             if phase == .working { expectAnswer(within: 90, else: Pad.stoppedAnswering) }
         }
-        pad.setListening(mine != nil && phase == .listening)
-        switch Pad.react(to: entry, mine: mine, sameField: textDocumentProxy.documentIdentifier == field, visible: visible) {
+        pad.setListening(waiting != nil && phase == .listening)
+        let sameField = waiting?.sameField(as: textDocumentProxy.documentIdentifier) ?? false
+        switch Pad.react(to: entry, mine: waiting?.take, sameField: sameField, visible: visible) {
         case .insert(let take):
             if let words = mailbox.claim(take) { insert(words) }
             end(nil)
         case .offerInsertLast:
             pad.insertLast.isHidden = false
-            if entry?.take == mine { end(nil) }
+            if entry?.take == waiting?.take { end(nil) }
         case .status(let line):
             pad.status.text = line
             if phase == .nothing || phase == .failed { end(line) }
@@ -186,8 +243,9 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func end(_ line: String?) {
-        mine = nil
+        waiting = nil
         phase = nil
+        noAnswer?.invalidate()
         pad.setListening(false)
         pad.status.text = line
     }

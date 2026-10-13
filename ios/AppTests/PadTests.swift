@@ -54,9 +54,35 @@ import UIKit
     }
 
     @Test func thePadsOwnLinesReadPlainly() {
-        for line in [Pad.noAnswer, Pad.busy, Pad.stoppedAnswering] {
+        for line in [Pad.noAnswer, Pad.busy, Pad.stoppedAnswering, Pad.opening, Pad.openRefused] {
             #expect(!line.contains("Murmur"))
         }
+        #expect(Pad.openRefused == "Open murmur to start")
+    }
+
+    /// The take a keyboard waits on outlives the keyboard: the one you
+    /// swipe back to from murmur knows it, until it grows too old.
+    @Test func aWaitingTakeOutlivesTheKeyboard() throws {
+        let defaults = try #require(UserDefaults(suiteName: "murmur.tests.\(UUID().uuidString)"))
+        let start = Date(timeIntervalSince1970: 1_790_000_000)
+        let waiting = Pad.Waiting(take: take, opened: true, field: nil, at: start)
+        Pad.Waiting.save(waiting, to: defaults)
+        #expect(Pad.Waiting.load(from: defaults, now: start.addingTimeInterval(60)) == waiting)
+        #expect(Pad.Waiting.load(from: defaults, now: start.addingTimeInterval(Pad.Waiting.life + 1)) == nil)
+        Pad.Waiting.save(nil, to: defaults)
+        #expect(Pad.Waiting.load(from: defaults, now: start) == nil)
+    }
+
+    /// A take that opened murmur lands in the field you come back to; one
+    /// started in place lands only in its own field.
+    @Test func anOpenedTakeLandsWhereYouComeBack() {
+        let field = UUID()
+        let opened = Pad.Waiting(take: take, opened: true, field: nil, at: .now)
+        #expect(opened.sameField(as: field))
+        #expect(opened.sameField(as: nil))
+        let inPlace = Pad.Waiting(take: take, opened: false, field: field, at: .now)
+        #expect(inPlace.sameField(as: field))
+        #expect(!inPlace.sameField(as: UUID()))
     }
 
     @Test(arguments: [
