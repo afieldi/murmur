@@ -146,9 +146,11 @@ async function smoke() {
     const bundleId = plistValue(app, 'CFBundleIdentifier')
     run('xcrun', ['simctl', 'install', udid, app])
     spawnSync('xcrun', ['simctl', 'terminate', udid, bundleId], { stdio: 'ignore' })
+    // A shared CI runner can take a while to start the painter page's web
+    // process the first time (IOS-018).
     const launched = spawnSync('xcrun', ['simctl', 'launch', '--console', udid, bundleId, '--smoke', `--shared-count=${count}`], {
       encoding: 'utf8',
-      timeout: 120_000
+      timeout: 240_000
     })
     const output = `${launched.stdout ?? ''}${launched.stderr ?? ''}`
     const result = parseSmokeLine(output)
@@ -158,8 +160,11 @@ async function smoke() {
       console.error(output.slice(-2000))
       return 1
     }
-    const why = output.split(/\r?\n/).map((l) => l.trim()).filter((l) => /^smoke [A-Za-z]+:/.test(l))
+    const lines = output.split(/\r?\n/).map((l) => l.trim())
+    const why = lines.filter((l) => /^smoke [A-Za-z]+:/.test(l))
     if (why.length > 0) console.error(why.join('\n'))
+    const times = lines.flatMap((l) => /^smoke ([A-Za-z]+) took (\d+) ms$/.exec(l)?.slice(1, 3) ?? []).reduce((all, part, i, parts) => (i % 2 === 0 ? [...all, `${part} ${parts[i + 1]}`] : all), [])
+    if (times.length > 0) console.log(`ios: smoke check times in ms: ${times.join(', ')}`)
     console.log(`SMOKE_RESULT ${JSON.stringify(result)}`)
     return result.ok ? 0 : 1
   } finally {

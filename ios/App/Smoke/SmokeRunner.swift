@@ -54,6 +54,7 @@ enum SmokeRunner {
         ]
         var results: [String: Bool] = [:]
         for check in checks {
+            let started = Date.now
             do {
                 try check.run()
                 results[check.name] = true
@@ -61,6 +62,9 @@ enum SmokeRunner {
                 results[check.name] = false
                 emit("smoke \(check.name): \(error)")
             }
+            // Each check's time, so a smoke that runs out of time shows
+            // where it went.
+            emit("smoke \(check.name) took \(Int(Date.now.timeIntervalSince(started) * 1000)) ms")
         }
         let ok = results.values.allSatisfy { $0 }
         let payload: [String: Any] = ["ok": ok, "checks": results]
