@@ -1,39 +1,42 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import SwiftUI
 
-/// A quiet placeholder until Home (IOS-012) replaces it: what is left of
-/// setup, the way to a take, the keyboard, the session, Cleanup, and the
-/// Provider screen, and nothing else. It starts the keyboard's bridge and
-/// the session, opens first run on the first launch (IOS-011), and shows
-/// the Recording screen when the keyboard opens murmur.
+/// The app's root: Home (IOS-012), with Dictate and Settings at the top.
+/// It starts the keyboard's bridge and the session, opens first run on the
+/// first launch (IOS-011), and shows the Recording screen when the keyboard
+/// opens murmur.
 struct ContentView: View {
     @State private var opener = TakeOpener.shared
     @State private var setup = Setup.live()
+    @State private var history = History.live()
     @State private var firstRun: Setup.Step?
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         NavigationStack {
-            List {
-                if !setup.isFinished {
-                    SetupChecklist(setup: setup) { firstRun = $0 }
+            HomeScreen(history: history, session: Session.live(), model: TakeModel.live(), setup: setup) { firstRun = $0 }
+                .navigationTitle("murmur")
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        NavigationLink {
+                            TakeRoute()
+                        } label: {
+                            Image(systemName: "mic")
+                                .accessibilityLabel("Dictate")
+                        }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        NavigationLink {
+                            SettingsScreen()
+                        } label: {
+                            Image(systemName: "gearshape")
+                                .accessibilityLabel("Settings")
+                        }
+                    }
                 }
-                Group {
-                    NavigationLink("Dictate") { TakeRoute() }
-                    NavigationLink("Keyboard") { KeyboardScreen() }
-                    NavigationLink("Session") { SessionRoute() }
-                    NavigationLink("Cleanup") { CleanupRoute() }
-                    NavigationLink("Provider and key") { ProviderRoute() }
+                .fullScreenCover(item: $firstRun) { step in
+                    FirstRunScreen(setup: setup, step: step)
                 }
-                .listRowBackground(Tokens.panel)
-            }
-            .scrollContentBackground(.hidden)
-            .background(Tokens.ink)
-            .foregroundStyle(Tokens.text)
-            .navigationTitle("murmur")
-            .fullScreenCover(item: $firstRun) { step in
-                FirstRunScreen(setup: setup, step: step)
-            }
         }
         .tint(Tokens.brand)
         .preferredColorScheme(.dark)

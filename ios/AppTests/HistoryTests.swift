@@ -84,3 +84,49 @@ import Testing
         #expect(History(store: store).entries.isEmpty)
     }
 }
+
+@Suite struct HomeCopyTests {
+    @Test func lengthsReadAsPeopleSayThem() {
+        #expect(HomeCopy.length(0) == "1 second")
+        #expect(HomeCopy.length(12_400) == "12 seconds")
+        #expect(HomeCopy.length(60_000) == "1 minute")
+        #expect(HomeCopy.length(65_000) == "1 minute 5 seconds")
+        #expect(HomeCopy.length(181_000) == "3 minutes 1 second")
+    }
+
+    /// Clear all says the real count, and one take reads as one.
+    @Test func clearAllSaysTheRealCount() {
+        #expect(HomeCopy.clearTitle(12) == "Delete all 12 takes?")
+        #expect(HomeCopy.clearAction(12) == "Delete 12 takes")
+        #expect(HomeCopy.clearTitle(1) == "Delete your 1 take?")
+        #expect(HomeCopy.clearAction(1) == "Delete 1 take")
+        #expect(HomeCopy.waiting(1) == "1 take waiting to retry")
+        #expect(HomeCopy.waiting(3) == "3 takes waiting to retry")
+    }
+
+    /// Today's takes show the time; older ones the date too.
+    @Test func olderTakesShowTheirDate() {
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+        #expect(HomeCopy.time(now.addingTimeInterval(-60), now: now) == now.addingTimeInterval(-60).formatted(date: .omitted, time: .shortened))
+        let lastWeek = now.addingTimeInterval(-7 * 86_400)
+        #expect(HomeCopy.time(lastWeek, now: now) == lastWeek.formatted(date: .abbreviated, time: .shortened))
+    }
+
+    @Test func everyLineFollowsTheWritingRules() {
+        let lines = [HomeCopy.empty, HomeCopy.copyHint, HomeCopy.deleteOne, AboutCopy.license, AboutCopy.noOutsideCode, AboutCopy.bundled]
+        for line in lines {
+            #expect(!line.contains("Murmur"))
+            #expect(!line.contains("\u{2014}") && !line.contains(" - ") && !line.contains("--"))
+        }
+        #expect(HomeCopy.empty.contains("Tap the pill"))
+    }
+
+    /// About names the version and build, the license, the source, and that
+    /// murmur takes no outside code.
+    @Test func aboutSaysWhatMurmurIs() {
+        #expect(AboutCopy.version(["CFBundleShortVersionString": "0.1.0", "CFBundleVersion": "7"]) == "0.1.0 (7)")
+        #expect(AboutCopy.source.absoluteString == "https://github.com/lbwalton/murmur")
+        #expect(AboutCopy.license.contains("version 3"))
+        #expect(AboutCopy.noOutsideCode.contains("does not accept outside code"))
+    }
+}

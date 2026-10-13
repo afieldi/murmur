@@ -1,0 +1,82 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Settings (ios/prd.json IOS-012): Provider and keys, Cleanup, the session's
+// length, the keyboard and the pill's look, and About. Dictionary and
+// expansions (IOS-013) and Diagnostics (IOS-014) join the list when they
+// ship.
+import SwiftUI
+
+struct SettingsScreen: View {
+    var body: some View {
+        List {
+            Group {
+                NavigationLink("Provider and key") { ProviderRoute() }
+                NavigationLink("Cleanup") { CleanupRoute() }
+                NavigationLink("Session") { SessionRoute() }
+                NavigationLink("Keyboard") { KeyboardScreen() }
+                NavigationLink("About") { AboutScreen() }
+            }
+            .listRowBackground(Tokens.panel)
+        }
+        .scrollContentBackground(.hidden)
+        .background(Tokens.ink)
+        .foregroundStyle(Tokens.text)
+        .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// The version, the license, the source, and how murmur is made.
+struct AboutScreen: View {
+    var body: some View {
+        List {
+            Section {
+                LabeledContent("Version", value: AboutCopy.version())
+            }
+            .listRowBackground(Tokens.panel)
+            Section {
+                Text(AboutCopy.license)
+                Link(AboutCopy.readSource, destination: AboutCopy.source)
+                    .buttonStyle(RowAction())
+                Link(AboutCopy.readLicense, destination: AboutCopy.gpl)
+                    .buttonStyle(RowAction())
+            } header: {
+                SectionTitle("Free software")
+            }
+            .listRowBackground(Tokens.panel)
+            Section {
+                Text(AboutCopy.noOutsideCode)
+            } header: {
+                SectionTitle("Who writes murmur")
+            }
+            .listRowBackground(Tokens.panel)
+            Section {
+                Text(AboutCopy.bundled)
+            } header: {
+                SectionTitle("Licenses")
+            }
+            .listRowBackground(Tokens.panel)
+        }
+        .scrollContentBackground(.hidden)
+        .background(Tokens.ink)
+        .foregroundStyle(Tokens.text)
+        .navigationTitle("About")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+enum AboutCopy {
+    static let license = "murmur is free software under the GNU General Public License, version 3. Read it, learn from it, and build it yourself."
+    static let readSource = "Read the source"
+    static let readLicense = "Read the license"
+    static let noOutsideCode = "murmur does not accept outside code: pull requests are closed without being merged. That keeps Eze Media LLC the sole copyright holder, which is what lets murmur ship on the App Store as well as under the GPL."
+    static let bundled = "murmur bundles no outside code. The app, the keyboard, and the code they share are murmur's own, all under the GPL, version 3."
+    static let source = URL(string: "https://github.com/lbwalton/murmur")!
+    static let gpl = URL(string: "https://www.gnu.org/licenses/gpl-3.0.html")!
+
+    /// The version and build, from the app's Info.plist.
+    static func version(_ info: [String: Any]? = Bundle.main.infoDictionary) -> String {
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(version) (\(build))"
+    }
+}
