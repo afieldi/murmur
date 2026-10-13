@@ -7,6 +7,7 @@
 // bundle, with read access to its own folder only; its content policy
 // refuses every fetch, and the web view refuses every navigation but that
 // one file's first load.
+import MurmurCore
 import UIKit
 import WebKit
 
@@ -134,16 +135,23 @@ struct JourneyPicture {
         guard ready else { throw Failure.notReady }
     }
 
-    /// One picture from the page.
-    func picture(_ request: JourneyArtwork, scale: CGFloat) async throws -> JourneyPicture {
+    /// One picture from the page, as the page painted it: PNG bytes at
+    /// `scale` pixels to the point, and the page's answer.
+    func png(_ request: JourneyArtwork, scale: CGFloat) async throws -> (data: Data, body: [String: Any]) {
         try await waitUntilReady()
         var asked = request.fields
         asked["scale"] = scale
         let answer = try await web.callAsyncJavaScript("return window.murmurJourney.picture(request)", arguments: ["request": asked], contentWorld: .page)
         guard let body = answer as? [String: Any], let png = body["png"] as? String,
-              let comma = png.firstIndex(of: ","), let data = Data(base64Encoded: String(png[png.index(after: comma)...])),
-              let image = UIImage(data: data, scale: scale)
+              let comma = png.firstIndex(of: ","), let data = Data(base64Encoded: String(png[png.index(after: comma)...]))
         else { throw Failure.badPicture }
+        return (data, body)
+    }
+
+    /// One picture from the page.
+    func picture(_ request: JourneyArtwork, scale: CGFloat) async throws -> JourneyPicture {
+        let (data, body) = try await png(request, scale: scale)
+        guard let image = UIImage(data: data, scale: scale) else { throw Failure.badPicture }
         var picture = JourneyPicture(image: image)
         if let groups = body["groups"] as? [[String: Any]] {
             picture.groups = groups.compactMap { group in
@@ -153,6 +161,20 @@ struct JourneyPicture {
         }
         picture.you = (body["you"] as? Double).map { CGFloat($0) }
         return picture
+    }
+
+    /// Today's painting on this web view's own canvases (IOS-019): the
+    /// newest stroke paints in when it is fresh, and the seal stamps in with
+    /// the stroke that finished it; at rest, or with Reduce Motion, it is
+    /// drawn finished at once.
+    func live(_ record: PaintingRecord, size: CGSize, fresh: Bool, doneBefore: Int, reduced: Bool) async throws {
+        try await waitUntilReady()
+        let request: [String: Any] = [
+            "record": record.fields, "width": size.width, "height": size.height,
+            "fresh": fresh, "doneBefore": doneBefore, "reduced": reduced
+        ]
+        let answer = try await web.callAsyncJavaScript("return window.murmurJourney.live(request)", arguments: ["request": request], contentWorld: .page)
+        guard answer as? Bool == true else { throw Failure.badPicture }
     }
 
     /// The promotion ceremony, painted on this web view's own canvases at
@@ -178,7 +200,13 @@ struct JourneyStanding: Hashable {
 }
 
 /// A picture the page paints, sized in points.
-enum JourneyArtwork: Hashable {
+enum JourneyArtwork: Hashable, Sendable {
+    /// A day's painting at rest (IOS-019).
+    case painting(PaintingRecord, width: Double, height: Double)
+    /// A day's portrait card, at desktop's 540 by 675 points.
+    case card(day: String, record: PaintingRecord, longestMs: Int?)
+    /// The week's scroll ending on `last`, at desktop's 1984 by 432 points.
+    case week(last: String, book: PaintingBook)
     /// drop runs 0 to 1 while the newest stripe's tape slaps on.
     case belt(belt: String, stripes: Int, width: Double, height: Double, drop: Double?)
     case road(JourneyStanding)
@@ -188,6 +216,12 @@ enum JourneyArtwork: Hashable {
 
     var fields: [String: Any] {
         switch self {
+        case let .painting(record, width, height):
+            return ["kind": "painting", "record": record.fields, "width": width, "height": height]
+        case let .card(day, record, longestMs):
+            return ["kind": "card", "day": day, "record": record.fields, "longestMs": longestMs.map { $0 as Any } ?? NSNull()]
+        case let .week(last, book):
+            return ["kind": "week", "last": last, "book": book.mapValues(\.fields)]
         case let .belt(belt, stripes, width, height, drop):
             var fields: [String: Any] = ["kind": "belt", "belt": belt, "stripes": stripes, "width": width, "height": height]
             if let drop { fields["drop"] = drop }
@@ -201,5 +235,15 @@ enum JourneyArtwork: Hashable {
         case let .stamp(id, got, seed, size):
             return ["kind": "stamp", "id": id, "got": got, "seed": seed, "size": size]
         }
+    }
+}
+
+extension PaintingRecord {
+    /// The record as the page reads it, desktop's PaintingRecord.
+    var fields: [String: Any] {
+        var fields: [String: Any] = ["subject": subject.rawValue, "seed": Int(seed), "target": target, "tier": tier, "level": level, "words": words]
+        if let rank { fields["rank"] = rank }
+        if let hour { fields["hour"] = hour }
+        return fields
     }
 }
