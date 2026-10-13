@@ -8,6 +8,7 @@ import {
   buildNumber,
   compareVersions,
   copySharedJson,
+  displayFaceRule,
   exportOptionsPlist,
   fillJourneyPage,
   findOnPath,
@@ -215,7 +216,7 @@ describe('the release (IOS-015)', () => {
 })
 
 describe('the Journey page (IOS-018)', () => {
-  const template = '<style>/*TOKENS*/</style><script>/*SCRIPT*/</script>'
+  const template = '<style>/*TOKENS*/\n/*FONT*/</style><script>/*SCRIPT*/</script>'
 
   it('takes the one script Vite built', () => {
     expect(journeyScript([{ output: [{ type: 'asset', source: 'x' }, { type: 'chunk', code: 'var a=1' }] }])).toBe('var a=1')
@@ -223,14 +224,24 @@ describe('the Journey page (IOS-018)', () => {
     expect(() => journeyScript([{ output: [] }])).toThrow(/no script/)
   })
 
-  it('sets the tokens and the script into the page, as written', () => {
-    const page = fillJourneyPage(template, ':root { --ink: #0f0e11; }', 'a.replace(/x/, "$&")')
-    expect(page).toBe('<style>:root { --ink: #0f0e11; }</style><script>a.replace(/x/, "$&")</script>')
+  it('sets the tokens, the font, and the script into the page, as written', () => {
+    const page = fillJourneyPage(template, ':root { --ink: #0f0e11; }', 'a.replace(/x/, "$&")', '@font-face { src: url($&) }')
+    expect(page).toBe('<style>:root { --ink: #0f0e11; }\n@font-face { src: url($&) }</style><script>a.replace(/x/, "$&")</script>')
+    expect(fillJourneyPage(template, '', 'x')).toBe('<style>\n</style><script>x</script>')
+  })
+
+  it('inlines the display face (IOS-019), so the page loads no file for it', () => {
+    const rule = displayFaceRule(Buffer.from('wOF2 face'))
+    expect(rule).toContain('font-family: "murmur display"')
+    expect(rule).toContain(`url(data:font/woff2;base64,${Buffer.from('wOF2 face').toString('base64')}) format("woff2")`)
+    expect(rule).toContain('font-weight: 800')
+    expect(rule).toContain('font-stretch: 75% 85%')
   })
 
   it('refuses a script that could close its own tag, and a page without its marks', () => {
     expect(() => fillJourneyPage(template, '', 'x("</script>")')).toThrow(/closing script tag/)
     expect(() => fillJourneyPage('<script>/*SCRIPT*/</script>', '', 'x')).toThrow(/TOKENS/)
+    expect(() => fillJourneyPage('<style>/*TOKENS*/</style><script>/*SCRIPT*/</script>', '', 'x')).toThrow(/FONT/)
     expect(() => fillJourneyPage(template + '/*SCRIPT*/', '', 'x')).toThrow(/SCRIPT/)
   })
 })

@@ -208,14 +208,22 @@ function journeyScript(result) {
   return chunk.code
 }
 
-/** The page with the tokens and the script set in. A script that could
- *  close its own tag, or a page missing a mark, stops the build. */
-function fillJourneyPage(template, tokens, script) {
-  for (const mark of ['/*TOKENS*/', '/*SCRIPT*/']) {
+/** The page with the tokens, the display face's rule (empty without it),
+ *  and the script set in. A script that could close its own tag, or a
+ *  page missing a mark, stops the build. */
+function fillJourneyPage(template, tokens, script, font = '') {
+  for (const mark of ['/*TOKENS*/', '/*FONT*/', '/*SCRIPT*/']) {
     if (template.split(mark).length !== 2) throw new Error(`the Journey page needs exactly one ${mark}`)
   }
   if (/<\/script/i.test(script)) throw new Error('the Journey script contains a closing script tag')
-  return template.replace('/*TOKENS*/', () => tokens).replace('/*SCRIPT*/', () => script)
+  return template.replace('/*TOKENS*/', () => tokens).replace('/*FONT*/', () => font).replace('/*SCRIPT*/', () => script)
+}
+
+/** The display face's @font-face rule (IOS-019), the woff2 inlined, so the
+ *  page loads no file for it: the family, the weight, and the condensed
+ *  widths desktop fetches. */
+function displayFaceRule(woff2) {
+  return `@font-face { font-family: "murmur display"; src: url(data:font/woff2;base64,${woff2.toString('base64')}) format("woff2"); font-weight: 800; font-stretch: 75% 85%; font-display: block; }`
 }
 
 module.exports = {
@@ -237,5 +245,6 @@ module.exports = {
   altoolFailure,
   keyFileProblem,
   journeyScript,
-  fillJourneyPage
+  fillJourneyPage,
+  displayFaceRule
 }

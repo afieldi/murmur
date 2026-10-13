@@ -9,14 +9,16 @@
 //   node scripts/ios.js release    archives for the App Store and checks it; --upload sends it to TestFlight
 // Only the ios: commands need Xcode; npm install and the desktop gates never do.
 const { execFileSync, spawnSync } = require('node:child_process')
-const { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } = require('node:fs')
+const { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } = require('node:fs')
 const { dirname, join } = require('node:path')
+const { DISPLAY_FACE_FILE } = require('./lib/display-face')
 const { loadBrush } = require('./lib/enso')
 const { iosIconSet } = require('./lib/ios-icon')
 const { colorSetJson, parseRootTokens, toSwift } = require('./lib/ios-tokens')
 const {
   SIM_SIGNING,
   altoolFailure,
+  displayFaceRule,
   fillJourneyPage,
   journeyScript,
   buildNumber,
@@ -53,8 +55,11 @@ function need(tool, hint) {
 
 /** The Journey's painter page (IOS-018): desktop's brush engine and
  *  Journey painter, bundled by Vite into one script and set into the page
- *  with the tokens, so the app's web view loads one file and nothing else. */
-async function buildJourneyPage() {
+ *  with the tokens, so the app's web view loads one file and nothing else.
+ *  The cards' display face (IOS-019), fetched at install like desktop's
+ *  and never committed, goes in too, its license beside it; a release
+ *  must have it. */
+async function buildJourneyPage({ requireFont = false } = {}) {
   const { build } = await import('vite')
   const out = await build({
     configFile: false,
@@ -67,14 +72,23 @@ async function buildJourneyPage() {
   })
   const script = journeyScript(out)
   const tokens = readFileSync(join(root, 'src', 'renderer', 'tokens.css'), 'utf8')
-  const page = fillJourneyPage(readFileSync(join(iosDir, 'Web', 'journey.html'), 'utf8'), tokens, script)
+  const fonts = join(root, 'src', 'renderer', 'public', 'fonts')
+  const face = join(fonts, DISPLAY_FACE_FILE)
+  const license = join(fonts, 'OFL.txt')
+  const hasFace = existsSync(face) && existsSync(license)
+  if (requireFont && !hasFace) throw new Error('the display face is missing: run node scripts/fetch-display-face.js --require')
+  const font = hasFace ? displayFaceRule(readFileSync(face)) : ''
+  const page = fillJourneyPage(readFileSync(join(iosDir, 'Web', 'journey.html'), 'utf8'), tokens, script, font)
   mkdirSync(join(generated, 'web'), { recursive: true })
   writeFileSync(join(generated, 'web', 'journey.html'), page)
+  const shipped = join(generated, 'web', 'OFL.txt')
+  if (hasFace) copyFileSync(license, shipped)
+  else rmSync(shipped, { force: true })
 }
 
 /** Writes everything the project needs and is never committed, then the
  *  project itself. Returns how many shared rule files were bundled. */
-async function generateAll() {
+async function generateAll({ requireFont = false } = {}) {
   need('xcodegen', 'Install it with: brew install xcodegen')
   mkdirSync(generated, { recursive: true })
 
@@ -94,7 +108,7 @@ async function generateAll() {
   writeFileSync(join(launchDir, 'Contents.json'), colorSetJson(ink.rgba))
 
   const count = copySharedJson(join(root, 'shared'), join(generated, 'shared'))
-  await buildJourneyPage()
+  await buildJourneyPage({ requireFont })
   run('xcodegen', ['generate', '--quiet'], { cwd: iosDir })
   console.log(`ios: generated the colors, the ${brush ? 'brushed' : 'clean'} icon, ${count} shared rules, and murmur.xcodeproj`)
   return count
@@ -247,7 +261,8 @@ async function release() {
   }
   // A release never ships the clean icon in place of the brushed one.
   if (!(await loadBrush().catch(() => null))) throw new Error('a release needs the brushed icon, which needs Node 22.13 or later')
-  await generateAll()
+  // A release carries the cards' display face, as desktop's does.
+  await generateAll({ requireFont: true })
   const yml = readFileSync(join(iosDir, 'project.yml'), 'utf8')
   const version = projectSetting(yml, 'MARKETING_VERSION')
   const team = projectSetting(yml, 'DEVELOPMENT_TEAM')
