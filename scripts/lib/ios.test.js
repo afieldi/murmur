@@ -3,7 +3,19 @@ import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { compareVersions, copySharedJson, findOnPath, parsePillShotsLine, parseSmokeLine, pickSmokeSimulator } from './ios'
+import {
+  buildNumber,
+  compareVersions,
+  copySharedJson,
+  exportOptionsPlist,
+  findOnPath,
+  parsePillShotsLine,
+  parseSmokeLine,
+  pickSmokeSimulator,
+  projectSetting,
+  systemFirstPath,
+  uploadArgs
+} from './ios'
 
 const iphone17 = { name: 'iPhone 17', identifier: 'com.apple.CoreSimulator.SimDeviceType.iPhone-17', productFamily: 'iPhone' }
 const iphone18 = { name: 'iPhone 18 Pro', identifier: 'com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro', productFamily: 'iPhone' }
@@ -119,5 +131,41 @@ describe('the pill shots line', () => {
   it('returns null when the app failed or never said', () => {
     expect(parsePillShotsLine('PILL_SHOTS_FAILED disk full\n')).toBeNull()
     expect(parsePillShotsLine('crashed\n')).toBeNull()
+  })
+})
+
+describe('the release (IOS-015)', () => {
+  const yml = ['settings:', '  base:', '    DEVELOPMENT_TEAM: 4B55ZVBVKN', '    MARKETING_VERSION: "0.1.0"', '    CURRENT_PROJECT_VERSION: "1"', ''].join('\n')
+
+  it('reads the version and team from project.yml', () => {
+    expect(projectSetting(yml, 'MARKETING_VERSION')).toBe('0.1.0')
+    expect(projectSetting(yml, 'DEVELOPMENT_TEAM')).toBe('4B55ZVBVKN')
+    expect(() => projectSetting(yml, 'MISSING')).toThrow('project.yml has no MISSING')
+  })
+
+  it('numbers a build by its commit count, and nothing else', () => {
+    expect(buildNumber('412\n')).toBe('412')
+    for (const bad of ['', '0', '-3', '12a', '1.5']) expect(() => buildNumber(bad)).toThrow('not a commit count')
+  })
+
+  it('exports for App Store Connect, signed by the team, with the build number kept', () => {
+    const plist = exportOptionsPlist('4B55ZVBVKN')
+    expect(plist).toContain('<key>method</key>\n  <string>app-store-connect</string>')
+    expect(plist).toContain('<key>teamID</key>\n  <string>4B55ZVBVKN</string>')
+    expect(plist).toContain('<key>manageAppVersionAndBuildNumber</key>\n  <false/>')
+    expect(plist).toContain('<key>destination</key>\n  <string>export</string>')
+    expect(() => exportOptionsPlist('nope')).toThrow('not a team id')
+  })
+
+  it('puts the system tools first, so Homebrew rsync never runs the export', () => {
+    const path = systemFirstPath(['/opt/homebrew/bin', '/usr/bin', '/Users/me/bin', '/bin'].join(delimiter))
+    expect(path.split(delimiter)).toEqual(['/usr/bin', '/bin', '/usr/sbin', '/sbin', '/opt/homebrew/bin', '/Users/me/bin'])
+  })
+
+  it('uploads with the key id and issuer, never the key file', () => {
+    expect(uploadArgs('/tmp/murmur.ipa', 'KEYID12345', 'issuer-uuid')).toEqual([
+      'altool', '--upload-app', '-f', '/tmp/murmur.ipa', '-t', 'ios', '--apiKey', 'KEYID12345', '--apiIssuer', 'issuer-uuid'
+    ])
+    expect(() => uploadArgs('/tmp/murmur.ipa', '', 'issuer')).toThrow('APPLE_API_KEY_ID')
   })
 })

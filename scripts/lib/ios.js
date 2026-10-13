@@ -84,4 +84,77 @@ function parsePillShotsLine(output) {
   return line ? line.slice('PILL_SHOTS '.length) : null
 }
 
-module.exports = { SMOKE_SIMULATOR, SIM_SIGNING, compareVersions, pickSmokeSimulator, findOnPath, copySharedJson, parseSmokeLine, parsePillShotsLine }
+/** A setting's value in project.yml, such as MARKETING_VERSION. */
+function projectSetting(projectYml, name) {
+  const match = projectYml.match(new RegExp(`^\\s*${name}:\\s*"?([^"\\s]+)"?\\s*$`, 'm'))
+  if (!match) throw new Error(`project.yml has no ${name}`)
+  return match[1]
+}
+
+/** The build number for App Store Connect (IOS-015): the count of commits
+ *  behind the build, which only grows, so every upload has a new one. */
+function buildNumber(countText) {
+  const count = Number.parseInt(String(countText).trim(), 10)
+  if (!Number.isInteger(count) || count < 1 || String(count) !== String(countText).trim()) {
+    throw new Error(`not a commit count: ${String(countText).trim()}`)
+  }
+  return String(count)
+}
+
+/** Export options for an App Store Connect build signed by the team. */
+function exportOptionsPlist(teamId) {
+  if (!/^[A-Z0-9]{10}$/.test(teamId)) throw new Error(`not a team id: ${teamId}`)
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+    '<plist version="1.0">',
+    '<dict>',
+    '  <key>method</key>',
+    '  <string>app-store-connect</string>',
+    '  <key>destination</key>',
+    '  <string>export</string>',
+    '  <key>teamID</key>',
+    `  <string>${teamId}</string>`,
+    '  <key>signingStyle</key>',
+    '  <string>automatic</string>',
+    '  <key>uploadSymbols</key>',
+    '  <true/>',
+    '  <key>manageAppVersionAndBuildNumber</key>',
+    '  <false/>',
+    '</dict>',
+    '</plist>',
+    ''
+  ].join('\n')
+}
+
+const SYSTEM_PATHS = ['/usr/bin', '/bin', '/usr/sbin', '/sbin']
+
+/** PATH with the system's own tools first: Homebrew's rsync breaks the
+ *  copy step of xcodebuild -exportArchive. */
+function systemFirstPath(pathEnv = '') {
+  const rest = pathEnv.split(delimiter).filter((entry) => entry && !SYSTEM_PATHS.includes(entry))
+  return [...SYSTEM_PATHS, ...rest].join(delimiter)
+}
+
+/** xcrun's arguments to upload an ipa with an App Store Connect API key:
+ *  the key's id and issuer only, as altool reads the key file itself. */
+function uploadArgs(ipa, keyId, issuer) {
+  if (!keyId || !issuer) throw new Error('uploading needs APPLE_API_KEY_ID and APPLE_API_ISSUER')
+  return ['altool', '--upload-app', '-f', ipa, '-t', 'ios', '--apiKey', keyId, '--apiIssuer', issuer]
+}
+
+module.exports = {
+  SMOKE_SIMULATOR,
+  SIM_SIGNING,
+  compareVersions,
+  pickSmokeSimulator,
+  findOnPath,
+  copySharedJson,
+  parseSmokeLine,
+  parsePillShotsLine,
+  projectSetting,
+  buildNumber,
+  exportOptionsPlist,
+  systemFirstPath,
+  uploadArgs
+}
