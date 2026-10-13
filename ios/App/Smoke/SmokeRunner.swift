@@ -4,6 +4,7 @@
 // The same contract as desktop's smoke: {"ok": Bool, "checks": {name: Bool}},
 // and a failed check explains itself on a line starting "smoke <name>:".
 import Foundation
+import UIKit
 import MurmurCore
 import Synchronization
 
@@ -50,6 +51,7 @@ enum SmokeRunner {
             ("journey", checkJourney),
             ("achievements", checkAchievements),
             ("journeyPage", checkJourneyPage),
+            ("paintingDay", checkPaintingDay),
             ("sharedJson", { try checkSharedJson(expected: request.sharedCount) })
         ]
         var results: [String: Bool] = [:]
@@ -542,6 +544,50 @@ enum SmokeRunner {
         guard let road = try? await painter.picture(.road(standing), scale: 1), road.groups.first?.name == "white", road.you != nil
         else { return "the page painted no road" }
         return nil
+    }
+
+    /// A painting a day (IOS-019): a seeded history goes into a scratch
+    /// book, and the painter page paints the day and its card, neither blank.
+    static func checkPaintingDay() throws {
+        if let failure = onMain({ await paintingDayFailure() }) { throw SmokeFailure(failure) }
+    }
+
+    @MainActor private static func paintingDayFailure() async -> String? {
+        guard let ladder = JourneyRules.live?.ranks.ranks else { return "the ladder did not load" }
+        let folder = FileManager.default.temporaryDirectory.appending(path: "smoke-paintings-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = PaintingStore(file: folder.appending(path: "paintings.json"), ladder: ladder)
+        let start = Date.now.addingTimeInterval(-3 * 86_400)
+        let takes = (0..<12).map { i in
+            HistoryEntry(at: start.addingTimeInterval(Double(i / 4) * 86_400 + Double(i % 4) * 900), durationMs: 20_000, words: Array(repeating: "word", count: 40 + i * 5).joined(separator: " "))
+        }
+        store.sync(takes)
+        guard store.book.count == 3, let day = store.book.keys.sorted().last, let record = store.book[day] else { return "the book has \(store.book.count) days, not 3" }
+        let painter = JourneyPainter()
+        do {
+            try await painter.waitUntilReady(seconds: 30)
+        } catch {
+            return "the painter page never said it was ready"
+        }
+        guard let picture = try? await painter.picture(.painting(record, width: 120, height: 90), scale: 2) else { return "the page painted no day" }
+        guard inked(picture.image) > 100 else { return "the day's painting is blank" }
+        guard let card = try? await painter.png(.card(day: day, record: record, longestMs: 20_000), scale: 2), let image = UIImage(data: card.data),
+              image.size == CGSize(width: 1080, height: 1350), inked(image) > 10_000
+        else { return "the card is missing or blank" }
+        return nil
+    }
+
+    /// How many pixels hold paint.
+    @MainActor private static func inked(_ image: UIImage) -> Int {
+        guard let cg = image.cgImage else { return 0 }
+        var bytes = [UInt8](repeating: 0, count: cg.width * cg.height * 4)
+        let drawn = bytes.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(data: buffer.baseAddress, width: cg.width, height: cg.height, bitsPerComponent: 8, bytesPerRow: cg.width * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            context.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
+            return true
+        }
+        guard drawn else { return 0 }
+        return stride(from: 3, to: bytes.count, by: 4).reduce(0) { $0 + (bytes[$1] > 20 ? 1 : 0) }
     }
 
     /// Runs main-actor work to the end from the smoke's synchronous start
