@@ -148,4 +148,19 @@ import UIKit
         PillLook(style: .speckle).write(to: file)
         #expect(PillLook.read(from: file).style == .speckle)
     }
+
+    @Test func theKeyboardFollowsTheMailbox() {
+        let phases: [MailboxEntry.Phase?] = [nil, .listening, .working, .ready, .nothing, .failed]
+        #expect(phases.map(PillStage.init) == [.idle, .recording, .processing, .inserted, .noSpeech, .error])
+    }
+
+    /// The level file carries the level and a count, and nothing else.
+    @Test func theLevelFileCarriesOnlyTheLevel() throws {
+        let file = LevelFile(url: FileManager.default.temporaryDirectory.appending(path: "level-\(UUID().uuidString)"))
+        #expect(file.read() == nil)
+        file.write(0.42, count: 7)
+        let read = try #require(file.read())
+        #expect(read.level == 0.42 && read.count == 7)
+        #expect(try Data(contentsOf: try #require(file.url)).count == 8)
+    }
 }
