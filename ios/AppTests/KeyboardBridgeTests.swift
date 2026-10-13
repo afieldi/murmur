@@ -79,6 +79,24 @@ import Testing
 
     /// A take started on the Dictate screen never goes to the mailbox, while
     /// a keyboard take after it does.
+    /// What the keyboard did with a take is logged when the next keyboard
+    /// take begins (IOS-014).
+    @Test func theLastKeyboardTakeIsNotedWhenTheNextBegins() async throws {
+        let log = scratchLog()
+        let model = try model(.says("Send the invoice tomorrow."))
+        let bridge = KeyboardBridge(model: model, mailbox: mailbox, log: log) { _ in }
+        bridge.listen()
+        let first = start(bridge)
+        try await waitUntilRecording(model)
+        bridge.hear(.stop)
+        _ = try await waitFor(.ready)
+        #expect(mailbox.claim(first) == "Send the invoice tomorrow.")
+        #expect(log.recent().isEmpty)
+        start(bridge)
+        _ = try await waitFor(.listening)
+        #expect(log.recent().map { $0.split(separator: " ", maxSplits: 1).last.map(String.init) } == ["keyboard take=\(ActivityEvent.short(first)) inserted"])
+    }
+
     @Test func aDictateScreenTakeStaysInTheApp() async throws {
         let model = try model(.says("Private words."))
         let bridge = bridge(model)

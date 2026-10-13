@@ -59,13 +59,16 @@ struct TakeRules: Sendable {
     @ObservationIgnored private let keepAlive: @MainActor () -> @MainActor () -> Void
     /// Keeps a take that came back as words in history (IOS-012).
     @ObservationIgnored private let record: @MainActor (HistoryEntry) -> Void
+    /// Notes what happened to each take in the activity log (IOS-014).
+    @ObservationIgnored private let note: @MainActor (ActivityEvent) -> Void
 
     init(
         microphone: any Microphone, store: WaitingStore, rules: TakeRules, catalog: ProviderCatalog,
         connections: ConnectionStore, cleanup: CleanupStore, ring: any KeyRing, send: @escaping ConnectionTest.Send,
         copy: @escaping @MainActor (String) -> Void, now: @escaping @MainActor () -> Date = { .now },
         keepAlive: @escaping @MainActor () -> @MainActor () -> Void = { {} },
-        record: @escaping @MainActor (HistoryEntry) -> Void = { _ in }
+        record: @escaping @MainActor (HistoryEntry) -> Void = { _ in },
+        note: @escaping @MainActor (ActivityEvent) -> Void = { _ in }
     ) {
         self.microphone = microphone
         self.store = store
@@ -79,6 +82,7 @@ struct TakeRules: Sendable {
         self.now = now
         self.keepAlive = keepAlive
         self.record = record
+        self.note = note
         waiting = store.list()
     }
 
@@ -108,6 +112,7 @@ struct TakeRules: Sendable {
         armed = nil
         guard await microphone.allow() else {
             state = .micOff
+            note(.micOff)
             return
         }
         do {
@@ -115,6 +120,7 @@ struct TakeRules: Sendable {
             state = .recording(since: now())
         } catch {
             state = .micFailed
+            note(.micFailed)
         }
     }
 
@@ -126,19 +132,30 @@ struct TakeRules: Sendable {
         defer { release() }
         let samples = microphone.stop()
         let length = Int(now().timeIntervalSince(since) * 1000)
+        let peak = SpeechGate.peakLevel(samples)
+        let voiced = Int(SpeechGate.voicedMs(samples, sampleRate: Wav.targetSampleRate, spec: rules.gate))
         guard let wav = TakeAudio.upload(samples, gate: rules.gate) else {
             state = .heardNothing(sent: false)
+            note(.heardNothing(durationMs: length, peak: peak, voicedMs: voiced, sent: false))
             return
         }
+        note(.captured(durationMs: length, peak: peak, voicedMs: voiced))
         state = .transcribing
         switch await words(for: wav) {
         case .success(let words):
             state = words.map(State.words) ?? .heardNothing(sent: true)
-            if let words { record(HistoryEntry(at: since, durationMs: length, words: words)) }
+            if let words {
+                let entry = HistoryEntry(at: since, durationMs: length, words: words)
+                record(entry)
+                note(.words(count: entry.wordCount, retried: false))
+            } else {
+                note(.heardNothing(durationMs: length, peak: peak, voicedMs: voiced, sent: true))
+            }
         case .failure(let failure):
             let saved = (try? store.save(wav, startedAt: since, failure: failure, now: now())) != nil
             waiting = store.list()
             state = .failed(failure, saved: saved)
+            note(.failed(failure, saved: saved, retried: false))
         }
     }
 
@@ -177,14 +194,18 @@ struct TakeRules: Sendable {
             switch await words(for: audio) {
             case .success(.some(let words)):
                 delivered.append(words)
-                record(HistoryEntry(at: spoken, durationMs: Wav.durationMs(audio), words: words, retried: true))
+                let entry = HistoryEntry(at: spoken, durationMs: Wav.durationMs(audio), words: words, retried: true)
+                record(entry)
+                note(.words(count: entry.wordCount, retried: true))
                 copy(delivered.joined(separator: "\n\n"))
                 try? store.remove(id)
             case .success(.none):
                 try? store.markFailed(id, .noSpeech)
+                note(.failed(.noSpeech, saved: true, retried: true))
                 failed += 1
             case .failure(let failure):
                 try? store.markFailed(id, failure)
+                note(.failed(failure, saved: true, retried: true))
                 failed += 1
             }
             waiting = store.list()

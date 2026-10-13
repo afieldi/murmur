@@ -40,10 +40,12 @@ final class FakeProvider: Sendable {
     let microphone = ScriptedMicrophone(samples: ScriptedMicrophone.tone)
     let sink = Sink()
 
-    /// What a take copied, what it kept in history, and the time it reads.
+    /// What a take copied, what it kept in history, what it noted, and the
+    /// time it reads.
     @MainActor final class Sink {
         var copied: [String] = []
         var kept: [HistoryEntry] = []
+        var noted: [ActivityEvent] = []
         var now = Date(timeIntervalSince1970: 1_790_000_000)
     }
 
@@ -66,7 +68,8 @@ final class FakeProvider: Sendable {
             connections: ConnectionStore(defaults: defaults), cleanup: CleanupStore(defaults: defaults), ring: ring, send: send,
             copy: { [sink] text in sink.copied.append(text) },
             now: { [sink] in sink.now },
-            record: { [sink] entry in sink.kept.append(entry) }
+            record: { [sink] entry in sink.kept.append(entry) },
+            note: { [sink] event in sink.noted.append(event) }
         )
     }
 
@@ -162,6 +165,36 @@ final class FakeProvider: Sendable {
         await take(model)
         #expect(String(decoding: try #require(provider.requests.last?.httpBody), as: UTF8.self).contains("name=\"prompt\"\r\n\r\nLaBroi.\r\n"))
     }
+
+    /// Each take notes what happened to it (IOS-014): captured with its
+    /// level, then its words as a count; silence with its level; a failure
+    /// with its kind; the microphone being off.
+    @Test func eachTakeNotesWhatHappened() async throws {
+        let provider = FakeProvider.says("Send the invoice tomorrow.")
+        let model = model(provider)
+        await take(model)
+        #expect(sink.noted.count == 2)
+        guard case .captured(let ms, let peak, let voiced) = sink.noted.first else { throw TakeModelTestsError.unexpected }
+        #expect(ms == 2000)
+        #expect(peak > 0.1 && voiced > 0)
+        #expect(sink.noted.last == .words(count: 4, retried: false))
+        microphone.samples = ScriptedMicrophone.silence
+        await take(model)
+        guard case .heardNothing(_, let quiet, 0, false) = sink.noted.last else { throw TakeModelTestsError.unexpected }
+        #expect(quiet == 0)
+        microphone.samples = ScriptedMicrophone.tone
+        provider.answer([(401, "{}")])
+        await take(model)
+        #expect(sink.noted.last == .failed(TakeFailure(kind: "auth", detail: "http 401"), saved: true, retried: false))
+        provider.answer([(200, #"{"text":"Kept."}"#)])
+        await model.retry(model.waiting.map(\.id))
+        #expect(sink.noted.last == .words(count: 1, retried: true))
+        microphone.allowed = false
+        await model.start()
+        #expect(sink.noted.last == .micOff)
+    }
+
+    enum TakeModelTestsError: Error { case unexpected }
 
     @Test func silenceIsNeverSent() async {
         microphone.samples = ScriptedMicrophone.silence

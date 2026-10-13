@@ -25,6 +25,8 @@ import Observation
     private let announce: @MainActor (Signal) -> Void
     private let limit: TimeInterval
     private let levels: LevelFile
+    /// Where what the keyboard did with each take is noted (IOS-014).
+    private let log: ActivityLog?
     private var listener: SignalListener?
     /// The take the keyboard asked for, until it ends.
     private var take: UUID?
@@ -34,12 +36,13 @@ import Observation
 
     init(
         model: TakeModel, mailbox: Mailbox, limit: TimeInterval = KeyboardBridge.takeLimit, levels: LevelFile = .shared,
-        announce: @escaping @MainActor (Signal) -> Void = { $0.post() }
+        log: ActivityLog? = nil, announce: @escaping @MainActor (Signal) -> Void = { $0.post() }
     ) {
         self.model = model
         self.mailbox = mailbox
         self.limit = limit
         self.levels = levels
+        self.log = log
         self.announce = announce
     }
 
@@ -91,6 +94,9 @@ import Observation
             announce(.busy)
             return false
         }
+        // The last take's entry is about to go: note what the keyboard did
+        // with its words first.
+        log?.noteKeyboard(mailbox.read())
         take = id
         startedAt = .now
         cancelled = false
@@ -179,7 +185,7 @@ extension KeyboardBridge {
     static func live() -> KeyboardBridge? {
         if let shared { return shared }
         guard let model = TakeModel.live(), let mailbox = Mailbox.shared else { return nil }
-        let bridge = KeyboardBridge(model: model, mailbox: mailbox)
+        let bridge = KeyboardBridge(model: model, mailbox: mailbox, log: .standard)
         bridge.listen()
         shared = bridge
         return bridge
