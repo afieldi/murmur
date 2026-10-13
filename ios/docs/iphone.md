@@ -182,3 +182,13 @@ murmur's home screen shows your takes, newest first, with their words, when you 
 ## How do I delete my history on iPhone?
 
 On murmur's home screen, swipe left on a take and tap Delete, then Delete take. To delete everything, tap Clear all above your takes; murmur asks first and says how many takes will go. Deleting murmur from your iPhone deletes your history too.
+
+## How do I teach murmur a word on iPhone?
+
+In murmur, tap the gear at the top right, then Dictionary and expansions. Under Words, tap Add. In When murmur hears, type what murmur writes wrong (la broy), and in Write it as, type it your way (LaBroi), then tap Save.
+
+murmur writes the word your way wherever you say it, with your casing kept even at the start of a sentence. It also tells your provider how the word is spelled, so the speech model gets it right more often to begin with. Tap a word to change it; swipe left on it to delete it, and murmur asks first.
+
+## How do expansions work on iPhone?
+
+An expansion turns a short thing you say into longer text. In murmur, tap the gear, then Dictionary and expansions. Under Expansions, tap Add, type the trigger (my address) and the text (1 Main Street, Springfield), and tap Save. Say the trigger on its own or in a sentence, and murmur writes the text in its place. Expansions run last, after cleanup, so the text comes out exactly as you typed it.
