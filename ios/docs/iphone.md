@@ -192,3 +192,11 @@ murmur writes the word your way wherever you say it, with your casing kept even 
 ## How do expansions work on iPhone?
 
 An expansion turns a short thing you say into longer text. In murmur, tap the gear, then Dictionary and expansions. Under Expansions, tap Add, type the trigger (my address) and the text (1 Main Street, Springfield), and tap Save. Say the trigger on its own or in a sentence, and murmur writes the text in its place. Expansions run last, after cleanup, so the text comes out exactly as you typed it.
+
+## How do I send diagnostics from my iPhone?
+
+In murmur, tap the gear at the top right, then Diagnostics, then Save report. murmur shows you the whole report first. Tap Share to send it by Mail, Messages, or any app you choose, or tap Done to keep it to yourself. murmur never sends a report by itself.
+
+The report is one plain text file. It holds the murmur version, your iPhone model and iOS version, whether the murmur keyboard has reported with Full Access, your session length, your settings as names and counts (your provider and models, how many dictionary words and expansions you have, whether a key is saved), and the recent activity log.
+
+The activity log is one short line for what happened to each take: captured with its loudness, heard nothing with its loudness, failed with the kind of failure and its error number, the number of words it came back as, and whether the keyboard typed the words or offered them as Insert last. It never holds your words, your dictionary or expansions, a custom provider address, or your key. It stays in murmur's own storage on your iPhone, out of iCloud backups, and keeps only the most recent few hundred lines.
