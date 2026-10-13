@@ -173,3 +173,67 @@ import UIKit
         #expect(stamp["id"] as? String == "marathon" && stamp["got"] as? Bool == false && stamp["seed"] as? Int == 1290)
     }
 }
+
+/// The paintings for a report, from the real page (IOS-018).
+@MainActor @Suite(.serialized) struct JourneyArtTests {
+    func report(_ words: [Int]) throws -> (ProgressReport, JourneyRules) {
+        let rules = try BundledRules.journey()
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = try #require(TimeZone(identifier: "UTC"))
+        let start = Date(timeIntervalSince1970: 1_790_000_000)
+        let entries = words.enumerated().map { day, count in
+            HistoryEntry(at: start.addingTimeInterval(Double(day) * 86_400), durationMs: 1000, words: Array(repeating: "word", count: count).joined(separator: " "), calendar: utc)
+        }
+        return (Journey.report(entries, rules: rules), rules)
+    }
+
+    @Test func everythingIsPainted() async throws {
+        let (report, rules) = try report([1300, 1300])
+        let art = JourneyArt(painter: JourneyPainter())
+        await art.paint(report, rules: rules, earned: ["first-words"], gateWidth: 320, scale: 2)
+        #expect(art.belt?.size == JourneyArt.beltSize)
+        #expect(art.road?.groups.isEmpty == false)
+        #expect(art.words?.size == CGSize(width: 320, height: JourneyArt.wordsHeight))
+        #expect(art.tallies?.size == CGSize(width: 320, height: JourneyArt.talliesHeight))
+        #expect(art.stamps.count == rules.achievements.achievements.count)
+        #expect(art.painted == 2)
+    }
+
+    /// Before the row has a width the gates wait; the rest still paints.
+    @Test func theGatesWaitForTheirWidth() async throws {
+        let (report, rules) = try report([1300])
+        let art = JourneyArt(painter: JourneyPainter())
+        await art.paint(report, rules: rules, earned: [], gateWidth: 0, scale: 2)
+        #expect(art.belt != nil)
+        #expect(art.words == nil && art.tallies == nil)
+    }
+
+    /// The tape drops in frames that land on the finished belt.
+    @Test func theTapeDropsInFrames() async throws {
+        let (report, rules) = try report([1300, 1300])
+        let painter = JourneyPainter()
+        let art = JourneyArt(painter: painter)
+        await art.paintTape(report.rank, scale: 2)
+        #expect(art.tape.count == JourneyArt.tapeFrames)
+        await art.paint(report, rules: rules, earned: [], gateWidth: 320, scale: 2)
+        let first = try #require(art.tape.first)
+        let last = try #require(art.tape.last)
+        let belt = try #require(art.belt)
+        #expect(PaintingDifference(last, belt).same)
+        #expect(!PaintingDifference(first, belt).same)
+    }
+
+    /// With no page, nothing is painted and nothing waits: the Journey keeps
+    /// its plain drawing.
+    @Test func withoutThePageNothingIsPainted() async throws {
+        let (report, rules) = try report([1300])
+        let art = JourneyArt(painter: JourneyPainter(page: nil))
+        let clock = ContinuousClock()
+        let took = try await clock.measure {
+            await art.paint(report, rules: rules, earned: [], gateWidth: 320, scale: 2)
+            await art.paintTape(try #require(rules.ranks.ranks.first { $0.id == "white-1" }), scale: 2)
+        }
+        #expect(art.belt == nil && art.road == nil && art.stamps.isEmpty && art.tape.isEmpty)
+        #expect(took < .seconds(2))
+    }
+}
