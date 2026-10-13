@@ -52,6 +52,21 @@ struct AboutScreen: View {
             .listRowBackground(Tokens.panel)
             Section {
                 Text(AboutCopy.bundled)
+                if let license = AboutCopy.fontLicense() {
+                    Text(AboutCopy.font)
+                    NavigationLink(AboutCopy.readFontLicense) {
+                        ScrollView {
+                            Text(license)
+                                .font(.system(.footnote, design: .monospaced))
+                                .padding(16)
+                        }
+                        .background(Tokens.ink)
+                        .foregroundStyle(Tokens.text)
+                        .navigationTitle(AboutCopy.fontLicenseTitle)
+                        .navigationBarTitleDisplayMode(.inline)
+                    }
+                    .foregroundStyle(Tokens.brand)
+                }
             } header: {
                 SectionTitle("Licenses")
             }
@@ -71,6 +86,15 @@ enum AboutCopy {
     static let readLicense = "Read the license"
     static let noOutsideCode = "murmur does not accept outside code: pull requests are closed without being merged. That keeps Eze Media LLC the sole copyright holder, which is what lets murmur ship on the App Store as well as under the GPL."
     static let bundled = "murmur bundles no outside code. The app, the keyboard, and the code they share are murmur's own, all under the GPL, version 3."
+    static let font = "The painting cards set their titles in Bricolage Grotesque, a font under the SIL Open Font License, version 1.1, which comes with it."
+    static let readFontLicense = "Read the font's license"
+    static let fontLicenseTitle = "SIL Open Font License"
+
+    /// The display face's license, shipped beside the painter page with the
+    /// font (IOS-019); nil in a build without the font.
+    static func fontLicense() -> String? {
+        Bundle.main.url(forResource: "OFL", withExtension: "txt", subdirectory: "web").flatMap { try? String(contentsOf: $0, encoding: .utf8) }
+    }
     static let source = URL(string: "https://github.com/lbwalton/murmur")!
     static let gpl = URL(string: "https://www.gnu.org/licenses/gpl-3.0.html")!
 

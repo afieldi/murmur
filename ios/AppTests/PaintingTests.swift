@@ -228,3 +228,21 @@ func pageHasDisplayFace() -> Bool {
         #expect(UIImage(data: data)?.size == CGSize(width: 1080, height: 1350))
     }
 }
+
+/// The cards' display face and its license (IOS-019).
+@Suite struct PaintingFontTests {
+    /// The license travels with the font, or neither ships.
+    @Test func theLicenseShipsWithTheFont() {
+        #expect((AboutCopy.fontLicense() != nil) == pageHasDisplayFace())
+        if let license = AboutCopy.fontLicense() {
+            #expect(license.contains("SIL OPEN FONT LICENSE"))
+        }
+    }
+
+    @Test func theCreditFollowsTheWritingRules() {
+        for line in [AboutCopy.font, AboutCopy.readFontLicense, AboutCopy.fontLicenseTitle] {
+            #expect(!line.contains("Murmur"))
+            #expect(!line.contains("\u{2014}") && !line.contains(" - ") && !line.contains("--"))
+        }
+    }
+}
