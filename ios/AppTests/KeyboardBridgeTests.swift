@@ -203,6 +203,42 @@ import Testing
         model.cancel()
     }
 
+    /// The keyboard opened murmur with a link (IOS-009): the take starts
+    /// however long murmur took to open.
+    @Test func anOpenedTakeStartsFromItsLink() async throws {
+        let model = try model(.says("From the link."))
+        let bridge = bridge(model)
+        let take = UUID()
+        mailbox.ask(take, at: .now.addingTimeInterval(-30))
+        bridge.opened(take)
+        #expect(try await waitFor(.listening)?.take == take)
+        try await waitUntilRecording(model)
+        bridge.hear(.stop)
+        let ready = try #require(try await waitFor(.ready))
+        #expect(ready.take == take)
+        #expect(ready.words == "From the link.")
+    }
+
+    /// The ask the keyboard left before opening murmur is used up by the
+    /// link, so a start after it never begins a second take, and the same
+    /// link twice is one take.
+    @Test func theLinksAskIsUsedUp() async throws {
+        let model = try model(.says("x"))
+        let bridge = bridge(model)
+        let take = UUID()
+        mailbox.ask(take)
+        bridge.opened(take)
+        bridge.opened(take)
+        #expect(announced.signals.contains(.busy) == false)
+        try await waitUntilRecording(model)
+        model.cancel()
+        #expect(try await waitFor(.nothing)?.take == take)
+        bridge.hear(.start)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(!model.isRecording)
+        #expect(mailbox.read()?.phase == .nothing)
+    }
+
     /// A stop with no keyboard take running does nothing.
     @Test func aStrayStopIsIgnored() async throws {
         let model = try model(.says("hi"))

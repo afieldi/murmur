@@ -23,7 +23,7 @@ struct ContentView: View {
         }
         .tint(Tokens.brand)
         .preferredColorScheme(.dark)
-        .task { KeyboardBridge.startOnce() }
+        .task { _ = KeyboardBridge.live() }
     }
 }
 

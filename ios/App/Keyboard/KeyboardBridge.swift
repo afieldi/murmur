@@ -41,17 +41,7 @@ import Observation
         switch signal {
         case .start:
             guard let id = mailbox.answer(within: Self.askLife) else { return }
-            guard take == nil, !model.isRecording, !model.isBusy else {
-                announce(.busy)
-                return
-            }
-            take = id
-            startedAt = .now
-            cancelled = false
-            // Written here, not read from the model, whose state may still
-            // be the last take's words.
-            write(.listening)
-            Task { await settle(id) }
+            begin(id)
         case .stop:
             guard take != nil, model.isRecording else { return }
             Task { await model.stop() }
@@ -61,6 +51,31 @@ import Observation
         case .changed, .busy, .end:
             break
         }
+    }
+
+    /// The keyboard opened murmur with a take link (IOS-009). The link is
+    /// the ask, however long murmur took to open, so the ask it left in
+    /// the mailbox is used up here and never starts a second take.
+    func opened(_ id: UUID) {
+        _ = mailbox.answer(within: .infinity)
+        // The same link twice (the keyboard opened murmur after a start it
+        // sent went unanswered) is one take.
+        guard take != id else { return }
+        begin(id)
+    }
+
+    private func begin(_ id: UUID) {
+        guard take == nil, !model.isRecording, !model.isBusy else {
+            announce(.busy)
+            return
+        }
+        take = id
+        startedAt = .now
+        cancelled = false
+        // Written here, not read from the model, whose state may still
+        // be the last take's words.
+        write(.listening)
+        Task { await settle(id) }
     }
 
     /// Settles how the start went. A start that did not record ends failed
@@ -114,11 +129,14 @@ import Observation
 extension KeyboardBridge {
     private static var shared: KeyboardBridge?
 
-    /// Starts the one bridge for the app's life, on the app's take model.
-    static func startOnce() {
-        guard shared == nil, let model = TakeModel.live(), let mailbox = Mailbox.shared else { return }
+    /// The one bridge for the app's life, on the app's take model, started
+    /// by whichever comes first: the app's first screen or a take link.
+    static func live() -> KeyboardBridge? {
+        if let shared { return shared }
+        guard let model = TakeModel.live(), let mailbox = Mailbox.shared else { return nil }
         let bridge = KeyboardBridge(model: model, mailbox: mailbox)
         bridge.listen()
         shared = bridge
+        return bridge
     }
 }
