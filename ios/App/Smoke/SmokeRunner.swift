@@ -40,6 +40,7 @@ enum SmokeRunner {
             ("waitingTakes", checkWaitingTakes),
             ("polish", checkPolish),
             ("mailbox", checkMailbox),
+            ("session", checkSession),
             ("sharedJson", { try checkSharedJson(expected: request.sharedCount) })
         ]
         var results: [String: Bool] = [:]
@@ -206,6 +207,79 @@ enum SmokeRunner {
         mailbox.write(MailboxEntry(take: take, phase: .ready, words: "smoke words for the keyboard", at: .now))
         guard mailbox.claim(take) == "smoke words for the keyboard" else { throw SmokeFailure("the keyboard did not get the words") }
         guard mailbox.claim(take) == nil, mailbox.claim() == nil else { throw SmokeFailure("a second read got the words again") }
+    }
+
+    /// A session at a shortened length, through the device microphone's own
+    /// gate with sound handed in instead of heard: it starts warm, a take
+    /// holds only what was said during it (a steady sound before and after
+    /// never reaches it), and with no further take the session ends by
+    /// itself and lets the microphone go. No audio file exists anywhere
+    /// from between takes.
+    static func checkSession() throws {
+        if let failure = onMain({ await sessionFailure() }) { throw SmokeFailure(failure) }
+    }
+
+    @MainActor private static func sessionFailure() async -> String? {
+        guard let microphone = FedMicrophone(rate: Double(Wav.targetSampleRate)), let key = APIKey(StubProtocol.key),
+              let defaults = UserDefaults(suiteName: "murmur.smoke.\(UUID().uuidString)"),
+              let catalog = try? BundledRules.catalog(), let rules = try? BundledRules.takeRules()
+        else { return "the stand-ins did not build" }
+        let scratch = FileManager.default.temporaryDirectory.appending(path: "smoke-session-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let connections = ConnectionStore(defaults: defaults)
+        let ring = MemoryKeyRing()
+        try? ring.save(key, for: connections.load(catalog: catalog).transcription.baseUrl)
+        let cleanup = CleanupStore(defaults: defaults)
+        cleanup.save(CleanupSettings(polish: false))
+        let model = TakeModel(
+            microphone: microphone, store: WaitingStore(directory: scratch.appending(path: "takes", directoryHint: .isDirectory)),
+            rules: rules, catalog: catalog, connections: connections, cleanup: cleanup, ring: ring,
+            send: { request in (Data(#"{"text":"smoke session words"}"#.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!) },
+            copy: { _ in }
+        )
+        let file = scratch.appending(path: "session.json")
+        try? FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        let session = Session(microphone: microphone, model: model, defaults: defaults, stateFile: file, seconds: { _ in 0.5 }, announce: { _ in })
+        session.listen()
+        guard await session.begin(), microphone.isWarm, SessionState.read(from: file).isOn() else { return "the session did not start warm" }
+        let steady = [Float](repeating: 0.5, count: Wav.targetSampleRate / 2)
+        microphone.hear(steady)
+        await model.start()
+        microphone.hear(ScriptedMicrophone.tone)
+        await model.stop()
+        microphone.hear(steady)
+        guard case .words = model.state else { return "the take gave \(model.state)" }
+        let take = microphone.lastTake
+        guard abs(take.count - ScriptedMicrophone.tone.count) < 200, take.allSatisfy({ abs($0) < 0.35 }) else {
+            return "the take held \(take.count) samples, peak \(take.map(abs).max() ?? 0)"
+        }
+        guard session.isOn, microphone.isWarm else { return "the session let go after a take" }
+        for _ in 0..<150 where session.isOn {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        guard !session.isOn, !microphone.isWarm, SessionState.read(from: file) == .off else { return "the session did not end by itself" }
+        var places = [scratch]
+        if let container = AppGroup.containerURL { places.append(container) }
+        for place in places {
+            let audio = (FileManager.default.subpaths(atPath: place.path) ?? []).filter { $0.hasSuffix(".wav") }
+            guard audio.isEmpty else { return "audio exists in \(place.lastPathComponent): \(audio)" }
+        }
+        return nil
+    }
+
+    /// Runs main-actor work to the end from the smoke's synchronous start
+    /// on the main thread, turning the run loop so the work gets to run.
+    private static func onMain<T: Sendable>(_ work: @escaping @MainActor () async -> T) -> T {
+        let outcome = Mutex<(done: Bool, value: T?)>((false, nil))
+        Task { @MainActor in
+            let value = await work()
+            outcome.withLock { $0 = (true, value) }
+        }
+        while !outcome.withLock({ $0.done }) {
+            RunLoop.main.run(mode: .default, before: .now.addingTimeInterval(0.01))
+        }
+        guard let value = outcome.withLock({ $0.value }) else { preconditionFailure("the work finished without a value") }
+        return value
     }
 
     /// Fallback reasons, collected across the smoke's async bridge.
