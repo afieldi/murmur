@@ -69,10 +69,21 @@ import Testing
     }
 
     @Test func itsWordsFollowTheWritingRules() {
-        for line in [SessionActivityCopy.ready, SessionActivityCopy.recording, SessionActivityCopy.end, SessionActivityCopy.title] {
+        let lines = [
+            SessionActivityCopy.ready, SessionActivityCopy.recording, SessionActivityCopy.ended, SessionActivityCopy.end,
+            SessionActivityCopy.title, SessionActivityCopy.timeLeft
+        ]
+        for line in lines {
             #expect(!line.contains("Murmur"))
             #expect(!line.contains("\u{2014}") && !line.contains(" - ") && !line.contains("--"))
         }
         #expect(SessionActivityCopy.state(true) == "Recording" && SessionActivityCopy.state(false) == "Ready")
+    }
+
+    /// One left on screen after murmur closed, its end time passed, says
+    /// Ended, whatever it last said.
+    @Test func aStaleOneSaysEnded() {
+        #expect(SessionActivityCopy.state(true, stale: true) == "Ended")
+        #expect(SessionActivityCopy.state(false, stale: true) == "Ended")
     }
 }

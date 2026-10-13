@@ -35,39 +35,81 @@ struct SessionControlWidget: ControlWidget {
 struct SessionLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: SessionActivity.self) { context in
-            LockScreenSession(state: context.state)
+            LockScreenSession(state: context.state, stale: context.isStale)
                 .activityBackgroundTint(Tokens.ink)
                 .activitySystemActionForegroundColor(Tokens.text)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    PillMark(recording: context.state.recording)
+                    PillMark(recording: context.state.recording, stale: context.isStale, labeled: false)
                         .frame(width: 72, height: 28)
                         .padding(.leading, 4)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    TimeLeft(until: context.state.until)
-                        .padding(.trailing, 4)
+                    if !context.isStale {
+                        TimeLeft(until: context.state.until)
+                            .padding(.trailing, 4)
+                    }
                 }
                 DynamicIslandExpandedRegion(.center) {
-                    Text(SessionActivityCopy.state(context.state.recording))
+                    StateLine(recording: context.state.recording, stale: context.isStale)
                         .font(.headline)
-                        .foregroundStyle(context.state.recording ? Tokens.amber : Tokens.text)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     EndButton()
                 }
             } compactLeading: {
-                PillMark(recording: context.state.recording)
+                PillMark(recording: context.state.recording, stale: context.isStale)
                     .frame(width: 30, height: 14)
             } compactTrailing: {
-                TimeLeft(until: context.state.until, compact: true)
-                    .frame(width: 42)
+                if context.isStale {
+                    StateLine(recording: false, stale: true)
+                        .font(.caption)
+                        .frame(width: 42)
+                } else {
+                    TimeLeft(until: context.state.until, compact: true)
+                        .frame(width: 42)
+                }
             } minimal: {
-                PillMark(recording: context.state.recording)
+                PillMark(recording: context.state.recording, stale: context.isStale)
                     .frame(width: 22, height: 12)
             }
             .keylineTint(Tokens.brand)
         }
     }
 }
+
+#if DEBUG
+extension SessionActivity.ContentState {
+    static let previewReady = Self(recording: false, until: .now.addingTimeInterval(14 * 60))
+    static let previewRecording = Self(recording: true, until: .now.addingTimeInterval(14 * 60))
+}
+
+#Preview("Lock Screen", as: .content, using: SessionActivity()) {
+    SessionLiveActivity()
+} contentStates: {
+    SessionActivity.ContentState.previewReady
+    SessionActivity.ContentState.previewRecording
+}
+
+#Preview("Expanded", as: .dynamicIsland(.expanded), using: SessionActivity()) {
+    SessionLiveActivity()
+} contentStates: {
+    SessionActivity.ContentState.previewReady
+    SessionActivity.ContentState.previewRecording
+}
+
+#Preview("Compact", as: .dynamicIsland(.compact), using: SessionActivity()) {
+    SessionLiveActivity()
+} contentStates: {
+    SessionActivity.ContentState.previewReady
+    SessionActivity.ContentState.previewRecording
+}
+
+#Preview("Minimal", as: .dynamicIsland(.minimal), using: SessionActivity()) {
+    SessionLiveActivity()
+} contentStates: {
+    SessionActivity.ContentState.previewReady
+    SessionActivity.ContentState.previewRecording
+}
+#endif

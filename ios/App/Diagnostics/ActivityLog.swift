@@ -33,6 +33,8 @@ enum ActivityEvent: Equatable, Sendable {
     /// Dropped before it was sent: you left the screen, the keyboard went
     /// away, or it ran to its limit.
     case cancelled(durationMs: Int)
+    /// iOS would not show the session's Live Activity (IOS-016).
+    case liveActivityRefused
     /// What the keyboard did with a keyboard take's words.
     case keyboard(UUID, KeyboardOutcome)
 
@@ -55,6 +57,8 @@ enum ActivityEvent: Equatable, Sendable {
             "take mic-failed"
         case .cancelled(let durationMs):
             "take cancelled ms=\(durationMs)"
+        case .liveActivityRefused:
+            "session live-activity-refused"
         case .keyboard(let take, let outcome):
             "keyboard take=\(Self.short(take)) \(outcome.rawValue)"
         }

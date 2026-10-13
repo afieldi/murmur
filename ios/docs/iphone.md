@@ -129,7 +129,7 @@ Between takes murmur keeps nothing: the sound is dropped as it arrives, never sa
 
 15 minutes after your last take, unless you change it. In murmur, tap the gear at the top right, then Session, and pick 5 minutes, 15 minutes, or 1 hour. The time counts from the end of your last take, so a session lasts as long as you keep dictating.
 
-To end it sooner, tap End session in murmur, or press and hold the pill in the keyboard and tap End session. A phone call, Siri, or another app taking the microphone ends it too. A take in progress when a session ends still goes through, as if you had tapped stop.
+To end it sooner, tap End session in murmur, tap End on murmur's Live Activity on the Lock Screen, or press and hold the pill in the keyboard and tap End session. A phone call, Siri, or another app taking the microphone ends it too. A take in progress when a session ends still goes through, as if you had tapped stop.
 
 A take started from the keyboard that nobody stops ends at 10 minutes, and murmur drops it without sending it: a take that long is almost always one you walked away from. If you leave the keyboard while a take is listening, after coming back to it from murmur, the take is dropped the same way.
 
@@ -208,12 +208,14 @@ murmur has a control called Start murmur. One tap starts a session without openi
 - **Control Center:** open Control Center, touch and hold an empty spot (or tap the plus at the top left) to edit it, tap Add a Control at the bottom, and pick Start murmur.
 - **Lock Screen:** touch and hold the Lock Screen, tap Customize, then Lock Screen. Tap the minus by one of the two controls at the bottom, tap the plus, and pick Start murmur.
 - **Action Button:** open Settings, then Action Button, swipe to Controls, tap the button under it, and pick Start murmur.
-- **Shortcuts and Siri:** murmur adds Start a murmur session and End the murmur session to the Shortcuts app; you can also say "Start a murmur session".
+- **Shortcuts:** murmur adds Start a murmur session and End the murmur session to the Shortcuts app.
 
 These steps follow Apple's iPhone User Guide, checked 2026-10-13.
 
-The first time, open murmur once and allow the microphone: a control cannot ask for it. If the microphone is not allowed yet, Start murmur says so and starts nothing.
+The first time, open murmur once and allow the microphone: a control has no screen to ask from, so until then Start murmur starts nothing. Starting this way also needs Live Activities on for murmur (Settings, then murmur, then Live Activities), because iOS keeps the microphone for a session started from a control only while murmur shows one. In Shortcuts, Start murmur says why when it cannot start.
 
 ## What does murmur show on the Lock Screen?
 
-While a session runs, murmur shows a Live Activity on the Lock Screen and in the Dynamic Island: the pill, Ready or Recording, the time left in the session, and End. iOS redraws it only now and then, so the pill there stands still and never moves with your voice; the keyboard's pill is the one that listens. End there ends the session at once. If you turned off Live Activities for murmur in Settings, the session still starts and runs as usual.
+While a session runs, murmur shows a Live Activity on the Lock Screen and in the Dynamic Island: the pill, Ready or Recording, the time left in the session, and End. iOS redraws it only now and then, so the pill there stands still and never moves with your voice; the keyboard's pill is the one that listens. End there ends the session at once. If you turn off Live Activities for murmur, a session you start in murmur or from the keyboard still runs as usual; only Start murmur needs them.
+
+If murmur closes while a session runs (you swipe it away, or iOS stops it), the session ends and the orange dot goes out. The Live Activity can stay a while; once its time runs out it says Ended. Tap End or open murmur to clear it.

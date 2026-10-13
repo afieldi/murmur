@@ -416,8 +416,9 @@ enum SmokeRunner {
 
     /// Starting without opening murmur (IOS-016): the Start murmur intent,
     /// as Control Center and the Action Button run it, starts a session with
-    /// the microphone warm and its Live Activity up; the End intent, as the
-    /// Live Activity's End runs it, ends both.
+    /// the microphone warm and its Live Activity up before it returns; the
+    /// End intent, as the Live Activity's End runs it, ends both before it
+    /// returns.
     static func checkSessionIntents() throws {
         if let failure = onMain({ await sessionIntentsFailure() }) { throw SmokeFailure(failure) }
     }
@@ -444,14 +445,14 @@ enum SmokeRunner {
             announce: { _ in }, present: { LiveSession.shared.show($0) }
         )
         session.listen()
-        let before = SessionControl.source
-        defer { SessionControl.source = before }
+        let before = (SessionControl.source, SessionControl.microphoneAllowed)
+        defer { (SessionControl.source, SessionControl.microphoneAllowed) = before }
         SessionControl.source = { session }
+        // The stand-in microphone is allowed, as first run leaves the real one.
+        SessionControl.microphoneAllowed = { true }
         guard (try? await StartSessionIntent().perform()) != nil, session.isOn, microphone.isWarm else { return "Start murmur did not start a warm session" }
-        await LiveSession.shared.settle()
         guard LiveSession.shared.isShowing else { return "Start murmur showed no Live Activity" }
         guard (try? await EndSessionIntent().perform()) != nil, !session.isOn, !microphone.isWarm else { return "End did not end the session" }
-        await LiveSession.shared.settle()
         guard !LiveSession.shared.isShowing else { return "the Live Activity outlived the session" }
         return nil
     }

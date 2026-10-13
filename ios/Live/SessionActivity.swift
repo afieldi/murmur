@@ -19,10 +19,13 @@ struct SessionActivity: ActivityAttributes {
 enum SessionActivityCopy {
     static let ready = "Ready"
     static let recording = "Recording"
+    /// Its end time passed with murmur no longer running to take it down.
+    static let ended = "Ended"
     static let end = "End"
     static let title = "murmur"
+    static let timeLeft = "Time left in the session"
 
-    static func state(_ recording: Bool) -> String {
-        recording ? self.recording : ready
+    static func state(_ recording: Bool, stale: Bool = false) -> String {
+        stale ? ended : recording ? self.recording : ready
     }
 }
