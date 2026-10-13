@@ -15,7 +15,10 @@ npm run ios:generate   # the colors, the icon, the shared rules, and ios/murmur.
 open ios/murmur.xcodeproj
 npm run ios:test       # MurmurCore's tests on the Mac, then the app's tests on a simulator
 npm run ios:smoke      # builds the app, launches it headless, and prints SMOKE_RESULT
+npm run ios:release    # archives for the App Store and uploads to TestFlight (see RELEASING.md)
 ```
+
+Releasing to TestFlight needs murmur's App Store Connect API key and Apple Distribution certificate; `ios/RELEASING.md` is the runbook.
 
 The tests and the smoke run on murmur's own simulator, named murmur smoke, created the first time and shut down afterward. Other simulators are left alone.
 
