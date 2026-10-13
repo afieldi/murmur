@@ -47,6 +47,7 @@ enum SmokeRunner {
             ("dictionary", checkDictionary),
             ("diagnostics", checkDiagnostics),
             ("sessionIntents", checkSessionIntents),
+            ("journey", checkJourney),
             ("sharedJson", { try checkSharedJson(expected: request.sharedCount) })
         ]
         var results: [String: Bool] = [:]
@@ -457,6 +458,36 @@ enum SmokeRunner {
         return nil
     }
 
+    /// Belts and stripes (IOS-017): histories from shared/rank-vectors.json
+    /// go through the history store and back, then the belt math, and come
+    /// out where desktop's math put them.
+    static func checkJourney() throws {
+        guard let rules = try? BundledRules.journey(),
+              let directory = Bundle.main.url(forResource: "shared", withExtension: nil),
+              let vectors = try? SharedData(directory: directory).decode(SmokeRankVectors.self, from: "rank-vectors.json")
+        else { throw SmokeFailure("the ladder or the rank vectors did not load") }
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC") ?? .gmt
+        let wanted = ["steady practice earns blue with a dated trail", "takes out of order are walked in time order", "several takes in one day count one day"]
+        let cases = vectors.cases.filter { wanted.contains($0.name) }
+        guard cases.count == wanted.count else { throw SmokeFailure("the rank vectors lack a case the smoke runs") }
+        for vector in cases {
+            let file = FileManager.default.temporaryDirectory.appending(path: "smoke-journey-\(UUID().uuidString).jsonl")
+            defer { try? FileManager.default.removeItem(at: file) }
+            let store = HistoryStore(file: file)
+            for event in vector.events {
+                let words = Array(repeating: "word", count: event.words).joined(separator: " ")
+                try store.append(HistoryEntry(at: Date(timeIntervalSince1970: TimeInterval(event.at) / 1000), durationMs: 1000, words: words, calendar: utc))
+            }
+            let report = Journey.report(store.list(), rules: rules)
+            guard report.rank.id == vector.expect.rank, report.totals.words == vector.expect.totals.words,
+                  report.totals.activeDays == vector.expect.totals.activeDays,
+                  report.promotions.map(\.id) == vector.expect.promotions.map(\.id),
+                  report.promotions.map(\.at) == vector.expect.promotions.map(\.at)
+            else { throw SmokeFailure("\(vector.name): the iPhone reached \(report.rank.id), desktop \(vector.expect.rank)") }
+        }
+    }
+
     /// Runs main-actor work to the end from the smoke's synchronous start
     /// on the main thread, turning the run loop so the work gets to run.
     private static func onMain<T: Sendable>(_ work: @escaping @MainActor () async -> T) -> T {
@@ -500,4 +531,36 @@ enum SmokeRunner {
             throw SmokeFailure("bundled \(names.count) shared rules, expected \(expected)")
         }
     }
+}
+
+/// The parts of shared/rank-vectors.json the smoke reads.
+private struct SmokeRankVectors: Decodable {
+    struct Case: Decodable {
+        let name: String
+        let events: [Event]
+        let expect: Expect
+    }
+
+    struct Event: Decodable {
+        let at: Int64
+        let words: Int
+    }
+
+    struct Expect: Decodable {
+        let rank: String
+        let totals: Totals
+        let promotions: [Step]
+    }
+
+    struct Totals: Decodable {
+        let words: Int
+        let activeDays: Int
+    }
+
+    struct Step: Decodable {
+        let id: String
+        let at: Int64
+    }
+
+    let cases: [Case]
 }
