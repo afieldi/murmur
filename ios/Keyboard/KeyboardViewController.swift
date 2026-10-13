@@ -257,6 +257,7 @@ final class KeyboardViewController: UIInputViewController {
             end(nil, showing: .inserted)
         case .offerInsertLast:
             pad.insertLast.isHidden = false
+            if let take = entry?.take { mailbox.offer(take) }
             if entry?.take == waiting?.take { end(nil) }
         case .status(let line):
             pad.status.text = line

@@ -13,12 +13,22 @@ struct MailboxEntry: Codable, Equatable, Sendable {
         case listening, working, ready, nothing, failed
     }
 
+    /// What the keyboard did with the words (IOS-014), for the activity log.
+    enum Typed: String, Codable, Sendable {
+        /// Typed into the field.
+        case inserted
+        /// Offered as Insert last, the field being gone.
+        case offered
+    }
+
     /// The id the keyboard asked with, so each keyboard knows its own take.
     let take: UUID
     var phase: Phase
     /// The words, only while ready and not yet claimed.
     var words: String?
     let at: Date
+    /// Nil until the keyboard types or offers the words.
+    var typed: Typed? = nil
 }
 
 struct Mailbox: Sendable {
@@ -65,9 +75,23 @@ struct Mailbox: Sendable {
             else { return }
             words = ready
             entry.words = nil
+            entry.typed = .inserted
             try? JSONEncoder().encode(entry).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         }
         return words
+    }
+
+    /// Notes that the keyboard offered the take's words as Insert last
+    /// (IOS-014). The words stay; only the note changes.
+    func offer(_ take: UUID) {
+        coordinate(file, writing: true) { url in
+            guard let data = try? Data(contentsOf: url),
+                  var entry = try? JSONDecoder().decode(MailboxEntry.self, from: data),
+                  entry.take == take, entry.phase == .ready, entry.words != nil, entry.typed == nil
+            else { return }
+            entry.typed = .offered
+            try? JSONEncoder().encode(entry).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        }
     }
 
     /// Drops words still waiting to be typed (Insert last) when you delete

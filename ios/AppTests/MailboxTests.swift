@@ -60,6 +60,24 @@ import Testing
         #expect(mailbox.read()?.phase == .listening)
     }
 
+    /// A claim notes that the words were typed, and Insert last notes that
+    /// they were offered (IOS-014), only for the take's own ready words.
+    @Test func whatTheKeyboardDidIsNoted() {
+        mailbox.write(MailboxEntry(take: take, phase: .ready, words: "Send the invoice.", at: at))
+        mailbox.offer(UUID())
+        #expect(mailbox.read()?.typed == nil)
+        mailbox.offer(take)
+        #expect(mailbox.read()?.typed == .offered)
+        #expect(mailbox.read()?.words == "Send the invoice.")
+        #expect(mailbox.claim(take) == "Send the invoice.")
+        #expect(mailbox.read()?.typed == .inserted)
+        mailbox.offer(take)
+        #expect(mailbox.read()?.typed == .inserted)
+        mailbox.write(MailboxEntry(take: take, phase: .working, words: nil, at: at))
+        mailbox.offer(take)
+        #expect(mailbox.read()?.typed == nil)
+    }
+
     @Test func anAskIsAnsweredOnce() {
         mailbox.ask(take, at: at)
         #expect(mailbox.answer(within: 3, now: at.addingTimeInterval(1)) == take)
