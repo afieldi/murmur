@@ -56,6 +56,11 @@ public struct GateProgress: Sendable, Equatable {
 public struct Promotion: Sendable, Equatable {
     public let id: String
     public let at: Int64
+
+    public init(id: String, at: Int64) {
+        self.id = id
+        self.at = at
+    }
 }
 
 /// The rank words and days alone have earned, with the gates to the next.
