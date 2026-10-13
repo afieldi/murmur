@@ -98,3 +98,39 @@ import Testing
         #expect(setup().seen)
     }
 }
+
+@Suite struct SetupCopyTests {
+    /// Each step says in one sentence why murmur needs it.
+    @Test func eachStepSaysWhyInOneSentence() {
+        for step in Setup.Step.allCases {
+            let why = SetupCopy.why(step)
+            #expect(why.hasSuffix("."))
+            #expect(why.dropLast().contains(". ") == false)
+            #expect(!SetupCopy.title(step).isEmpty)
+        }
+    }
+
+    /// The Full Access step says plainly what the keyboard does and never does.
+    @Test func fullAccessSaysTheKeyboardSendsNothing() {
+        let why = SetupCopy.why(.fullAccess)
+        #expect(why.contains("sends nothing anywhere"))
+        #expect(why.contains("only types the words you dictate"))
+    }
+
+    /// Steps done in Settings show the exact taps.
+    @Test func settingsStepsShowTheTaps() {
+        #expect(SetupCopy.taps(.keyboard).first == "Tap Open Settings.")
+        #expect(SetupCopy.taps(.fullAccess).contains { $0.contains("Allow Full Access") })
+        #expect(SetupCopy.progress(.fullAccess) == "Step 3 of 5")
+    }
+
+    @Test func everyLineFollowsTheWritingRules() {
+        let lines = Setup.Step.allCases.flatMap { [SetupCopy.title($0), SetupCopy.why($0)] + SetupCopy.taps($0) } + [
+            SetupCopy.micDenied, SetupCopy.checkBox, SetupCopy.practiceBox, SetupCopy.practiceDone, SetupCopy.homeTitle, SetupCopy.homeFooter
+        ]
+        for line in lines {
+            #expect(!line.contains("Murmur"))
+            #expect(!line.contains("\u{2014}") && !line.contains(" - ") && !line.contains("--"))
+        }
+    }
+}

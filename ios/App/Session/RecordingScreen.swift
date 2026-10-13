@@ -109,10 +109,13 @@ struct SwipeGuide: View {
 @Observable @MainActor final class TakeOpener {
     static let shared = TakeOpener()
     var showing = false
+    /// While first run is on screen, its practice box is where the words
+    /// land, so the take starts without covering it (IOS-011).
+    var quiet = false
 
     func open(_ url: URL) async {
         guard let id = TakeLink.take(in: url), let session = Session.live(), let bridge = KeyboardBridge.live(), bridge.opened(id) else { return }
-        showing = true
+        showing = !quiet
         _ = await session.begin()
     }
 }
