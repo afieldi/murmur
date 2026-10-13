@@ -45,6 +45,7 @@ enum SmokeRunner {
             ("firstRun", checkFirstRun),
             ("history", checkHistory),
             ("dictionary", checkDictionary),
+            ("diagnostics", checkDiagnostics),
             ("sharedJson", { try checkSharedJson(expected: request.sharedCount) })
         ]
         var results: [String: Bool] = [:]
@@ -361,6 +362,54 @@ enum SmokeRunner {
         let finished = await Cleanup.finish("la broy lives at my address", settings: settings, rules: rules.cleanup, connection: nil, send: { _ in throw URLError(.notConnectedToInternet) })
         guard finished.contains("LaBroi lives at 1 Main Street, Springfield") else { return "the take came out as \(finished)" }
         guard transcriptionHint(settings.dictionary) == "LaBroi." else { return "the spelling hint was \(String(describing: transcriptionHint(settings.dictionary)))" }
+        return nil
+    }
+
+    /// Diagnostics (IOS-014): a take with a canary word and a canary key in
+    /// it is logged, and the report built after it says what happened while
+    /// holding neither canary.
+    static func checkDiagnostics() throws {
+        if let failure = onMain({ await diagnosticsFailure() }) { throw SmokeFailure(failure) }
+    }
+
+    @MainActor private static func diagnosticsFailure() async -> String? {
+        let canaryWord = "Smokeberry"
+        let canaryKey = "gsk_smokecanary4321"
+        guard let key = APIKey(canaryKey), let defaults = UserDefaults(suiteName: "murmur.smoke.\(UUID().uuidString)"),
+              let catalog = try? BundledRules.catalog(), let rules = try? BundledRules.takeRules()
+        else { return "the stand-ins did not build" }
+        let scratch = FileManager.default.temporaryDirectory.appending(path: "smoke-diagnostics-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let connections = ConnectionStore(defaults: defaults)
+        let ring = MemoryKeyRing()
+        try? ring.save(key, for: connections.load(catalog: catalog).transcription.baseUrl)
+        let cleanup = CleanupStore(defaults: defaults)
+        var settings = CleanupSettings(polish: false)
+        settings.dictionary = [DictionaryEntry(from: "smoke berry", to: canaryWord)]
+        cleanup.save(settings)
+        let log = ActivityLog(file: scratch.appending(path: "logs", directoryHint: .isDirectory).appending(path: "activity.log"))
+        let history = HistoryStore(file: scratch.appending(path: "history.jsonl"))
+        let waiting = WaitingStore(directory: scratch.appending(path: "takes", directoryHint: .isDirectory))
+        let model = TakeModel(
+            microphone: ScriptedMicrophone(samples: ScriptedMicrophone.tone), store: waiting,
+            rules: rules, catalog: catalog, connections: connections, cleanup: cleanup, ring: ring,
+            send: { request in (Data(#"{"text":"smoke berry spoken"}"#.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!) },
+            copy: { _ in }, record: { try? history.append($0) }, note: { log.write($0) }
+        )
+        await model.start()
+        await model.stop()
+        guard case .words(let words) = model.state, words.contains(canaryWord) else { return "the take gave \(model.state)" }
+        let report = DiagnosticsReport.text(DiagnosticsReport.facts(
+            catalog: catalog, connections: connections, cleanup: cleanup, ring: ring, log: log, waiting: waiting,
+            history: history, defaults: defaults, keyboard: nil, session: .off, mailbox: nil, pill: PillLook(style: .bars)
+        ))
+        guard report.contains("murmur diagnostics report"), report.contains("dictionaryEntries: 1"), report.contains("take captured"),
+              report.contains("take words count=")
+        else { return "the report missed the take: \(report)" }
+        let logged = (try? String(contentsOf: log.file, encoding: .utf8)) ?? ""
+        for text in [report, logged] where text.localizedCaseInsensitiveContains("smokeberry") || text.localizedCaseInsensitiveContains("smoke berry") || text.contains(canaryKey) {
+            return "a canary reached the log or the report"
+        }
         return nil
     }
 
