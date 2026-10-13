@@ -40,9 +40,10 @@ final class FakeProvider: Sendable {
     let microphone = ScriptedMicrophone(samples: ScriptedMicrophone.tone)
     let sink = Sink()
 
-    /// What a take copied, and the time it reads.
+    /// What a take copied, what it kept in history, and the time it reads.
     @MainActor final class Sink {
         var copied: [String] = []
+        var kept: [HistoryEntry] = []
         var now = Date(timeIntervalSince1970: 1_790_000_000)
     }
 
@@ -64,7 +65,8 @@ final class FakeProvider: Sendable {
             microphone: microphone, store: store, rules: rules, catalog: catalog,
             connections: ConnectionStore(defaults: defaults), cleanup: CleanupStore(defaults: defaults), ring: ring, send: send,
             copy: { [sink] text in sink.copied.append(text) },
-            now: { [sink] in sink.now }
+            now: { [sink] in sink.now },
+            record: { [sink] entry in sink.kept.append(entry) }
         )
     }
 
@@ -185,6 +187,38 @@ final class FakeProvider: Sendable {
         #expect(model.state == .failed(.noKey, saved: true))
         #expect(provider.requests.isEmpty)
         #expect(model.waiting.first?.failure == .noKey)
+    }
+
+    /// A take that comes back as words is kept in history (IOS-012), with
+    /// when it was spoken and how long it recorded.
+    @Test func aTakeThatLandsIsKeptInHistory() async {
+        let model = model(.says("Send the invoice tomorrow."))
+        let spoken = sink.now
+        await take(model)
+        #expect(sink.kept.count == 1)
+        #expect(sink.kept.first?.words == "Send the invoice tomorrow.")
+        #expect(sink.kept.first?.at == spoken)
+        #expect(sink.kept.first?.durationMs == 2_000)
+        #expect(sink.kept.first?.retried == false)
+    }
+
+    /// Silence and failures keep nothing; a retried take is kept at the
+    /// time it was spoken, marked retried.
+    @Test func onlyWordsAreKeptAndRetriesKeepTheirTime() async {
+        let provider = FakeProvider([(503, "{}")])
+        let model = model(provider)
+        let spoken = sink.now
+        await take(model)
+        #expect(sink.kept.isEmpty)
+        microphone.samples = ScriptedMicrophone.silence
+        await take(model)
+        #expect(sink.kept.isEmpty)
+        provider.answer([(200, #"{"text":"Late words."}"#)])
+        pass(60)
+        await model.retry(model.waiting.map(\.id))
+        #expect(sink.kept.map(\.words) == ["Late words."])
+        #expect(sink.kept.first?.retried == true)
+        #expect(sink.kept.first?.at == spoken)
     }
 
     @Test func aRetryDeliversTheWordsThenDeletesTheAudio() async throws {

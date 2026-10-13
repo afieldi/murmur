@@ -263,7 +263,8 @@ extension TakeModel {
         let model = TakeModel(
             microphone: DeviceMicrophone.shared, store: .standard, rules: rules, catalog: catalog,
             connections: ConnectionStore(), cleanup: CleanupStore(), ring: KeychainKeyRing(), send: { try await session.data(for: $0) },
-            copy: { UIPasteboard.general.string = $0 }, keepAlive: BackgroundTime.hold
+            copy: { UIPasteboard.general.string = $0 }, keepAlive: BackgroundTime.hold,
+            record: { History.live().add($0) }
         )
         shared = model
         return model

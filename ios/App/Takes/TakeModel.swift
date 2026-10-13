@@ -57,12 +57,15 @@ struct TakeRules: Sendable {
     @ObservationIgnored private let now: @MainActor () -> Date
     /// Holds background time; the closure it returns lets it go.
     @ObservationIgnored private let keepAlive: @MainActor () -> @MainActor () -> Void
+    /// Keeps a take that came back as words in history (IOS-012).
+    @ObservationIgnored private let record: @MainActor (HistoryEntry) -> Void
 
     init(
         microphone: any Microphone, store: WaitingStore, rules: TakeRules, catalog: ProviderCatalog,
         connections: ConnectionStore, cleanup: CleanupStore, ring: any KeyRing, send: @escaping ConnectionTest.Send,
         copy: @escaping @MainActor (String) -> Void, now: @escaping @MainActor () -> Date = { .now },
-        keepAlive: @escaping @MainActor () -> @MainActor () -> Void = { {} }
+        keepAlive: @escaping @MainActor () -> @MainActor () -> Void = { {} },
+        record: @escaping @MainActor (HistoryEntry) -> Void = { _ in }
     ) {
         self.microphone = microphone
         self.store = store
@@ -75,6 +78,7 @@ struct TakeRules: Sendable {
         self.copy = copy
         self.now = now
         self.keepAlive = keepAlive
+        self.record = record
         waiting = store.list()
     }
 
@@ -121,6 +125,7 @@ struct TakeRules: Sendable {
         let release = keepAlive()
         defer { release() }
         let samples = microphone.stop()
+        let length = Int(now().timeIntervalSince(since) * 1000)
         guard let wav = TakeAudio.upload(samples, gate: rules.gate) else {
             state = .heardNothing(sent: false)
             return
@@ -129,6 +134,7 @@ struct TakeRules: Sendable {
         switch await words(for: wav) {
         case .success(let words):
             state = words.map(State.words) ?? .heardNothing(sent: true)
+            if let words { record(HistoryEntry(at: since, durationMs: length, words: words)) }
         case .failure(let failure):
             let saved = (try? store.save(wav, startedAt: since, failure: failure, now: now())) != nil
             waiting = store.list()
@@ -159,9 +165,11 @@ struct TakeRules: Sendable {
         var failed = 0
         for id in ids.sorted() {
             guard let audio = try? store.audio(id) else { continue }
+            let spoken = store.take(id)?.startedAt ?? now()
             switch await words(for: audio) {
             case .success(.some(let words)):
                 delivered.append(words)
+                record(HistoryEntry(at: spoken, durationMs: Wav.durationMs(audio), words: words, retried: true))
                 copy(delivered.joined(separator: "\n\n"))
                 try? store.remove(id)
             case .success(.none):
