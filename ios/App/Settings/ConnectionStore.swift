@@ -42,7 +42,8 @@ enum BundledRules {
         let shared = try shared()
         return JourneyRules(
             ranks: try shared.decode(RanksFile.self, from: "ranks.json"),
-            beltColors: try shared.decode(BeltColors.self, from: "cosmetics.json").beltColors
+            beltColors: try shared.decode(BeltColors.self, from: "cosmetics.json").beltColors,
+            achievements: try shared.decode(AchievementsFile.self, from: "achievements.json")
         )
     }
 

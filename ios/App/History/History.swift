@@ -21,6 +21,9 @@ struct HistoryEntry: Codable, Equatable, Identifiable, Sendable {
     /// keeps it, so a timezone change never moves a take to another day and
     /// a belt once earned stays earned (IOS-017). Nil on takes kept before.
     let day: String?
+    /// The local hour it was spoken in, 0 to 23, kept the same way for the
+    /// achievements that count the hour (IOS-018). Nil on takes kept before.
+    let hour: Int?
 
     init(id: UUID = UUID(), at: Date, durationMs: Int, words: String, retried: Bool = false, calendar: Calendar = .current) {
         self.id = id
@@ -30,6 +33,7 @@ struct HistoryEntry: Codable, Equatable, Identifiable, Sendable {
         wordCount = words.split(whereSeparator: \.isWhitespace).count
         self.retried = retried
         day = Self.dayKey(at, calendar: calendar)
+        hour = Self.hourOf(at, calendar: calendar)
     }
 
     /// A local day as yyyy-MM-dd, the form desktop's dayKey writes: always
@@ -40,6 +44,18 @@ struct HistoryEntry: Codable, Equatable, Identifiable, Sendable {
         gregorian.timeZone = calendar.timeZone
         let parts = gregorian.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
+
+    /// The local hour, 0 to 23, in the given calendar's time zone.
+    static func hourOf(_ date: Date, calendar: Calendar = .current) -> Int {
+        var gregorian = Calendar(identifier: .gregorian)
+        gregorian.timeZone = calendar.timeZone
+        return gregorian.component(.hour, from: date)
+    }
+
+    /// The take as the achievements see it.
+    var achievementEvent: AchievementEvent {
+        AchievementEvent(at: rankEvent.at, words: wordCount, durationMs: durationMs, day: day ?? Self.dayKey(at), hour: hour ?? Self.hourOf(at))
     }
 
     /// The take as the belt math sees it.

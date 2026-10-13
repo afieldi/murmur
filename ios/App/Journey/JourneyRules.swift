@@ -1,16 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The belt ladder and the belts' colors (ios/prd.json IOS-017), from the
-// shared data both platforms read: shared/ranks.json and the belt colors in
-// shared/cosmetics.json.
+// The belt ladder and the belts' colors (ios/prd.json IOS-017) and the
+// achievements (IOS-018), from the shared data both platforms read:
+// shared/ranks.json, the belt colors in shared/cosmetics.json, and
+// shared/achievements.json.
 import Foundation
 import MurmurCore
 import SwiftUI
 
-/// The ladder and the belts' colors, read once from the app bundle.
+/// The ladder, the belts' colors, and the achievements, read once from the
+/// app bundle.
 struct JourneyRules: Sendable {
     let ranks: RanksFile
     /// Belt name to its color, from shared/cosmetics.json.
     let beltColors: [String: String]
+    /// shared/achievements.json (IOS-018).
+    let achievements: AchievementsFile
 
     /// The app's own, read once.
     static let live: JourneyRules? = try? BundledRules.journey()
