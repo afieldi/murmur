@@ -58,6 +58,12 @@ struct HistoryEntry: Codable, Equatable, Identifiable, Sendable {
         AchievementEvent(at: rankEvent.at, words: wordCount, durationMs: durationMs, day: day ?? Self.dayKey(at), hour: hour ?? Self.hourOf(at))
     }
 
+    /// The take as the painting a day sees it (IOS-019): its words paint
+    /// the stroke and count toward the belts.
+    var paintingEvent: PaintingEvent {
+        PaintingEvent(at: rankEvent.at, day: day ?? Self.dayKey(at), hour: hour ?? Self.hourOf(at), strokeWords: wordCount)
+    }
+
     /// The take as the belt math sees it.
     var rankEvent: RankEvent {
         RankEvent(at: Int64((at.timeIntervalSince1970 * 1000).rounded()), words: wordCount, day: day ?? Self.dayKey(at))
@@ -130,10 +136,14 @@ struct HistoryStore: Sendable {
     /// Forgets deleted words wherever else they wait: the given words, or
     /// all with nil.
     @ObservationIgnored private let forget: @MainActor (Set<String>?) -> Void
+    /// Keeps what the takes made (the painting a day, IOS-019): told after
+    /// a take lands and before takes are deleted, so what they painted stays.
+    @ObservationIgnored private let keep: @MainActor ([HistoryEntry]) -> Void
 
-    init(store: HistoryStore, forget: @escaping @MainActor (Set<String>?) -> Void = { _ in }) {
+    init(store: HistoryStore, forget: @escaping @MainActor (Set<String>?) -> Void = { _ in }, keep: @escaping @MainActor ([HistoryEntry]) -> Void = { _ in }) {
         self.store = store
         self.forget = forget
+        self.keep = keep
         entries = store.list()
     }
 
@@ -142,9 +152,11 @@ struct HistoryStore: Sendable {
     func add(_ entry: HistoryEntry) {
         try? store.append(entry)
         entries.insert(entry, at: 0)
+        keep(entries)
     }
 
     func delete(_ id: UUID) {
+        keep(entries)
         let words = entries.first { $0.id == id }?.words
         try? store.remove(id)
         entries = store.list()
@@ -152,6 +164,7 @@ struct HistoryStore: Sendable {
     }
 
     func clear() {
+        keep(entries)
         try? store.clear()
         entries = []
         forget(nil)
@@ -168,7 +181,11 @@ extension History {
         let history = History(store: .standard) { words in
             TakeModel.live()?.forget(words)
             Mailbox.shared?.forget(words)
+        } keep: { entries in
+            PaintingStore.live()?.sync(entries)
         }
+        // Takes kept before the painting a day paint their days too.
+        PaintingStore.live()?.sync(history.entries)
         shared = history
         return history
     }
