@@ -23,6 +23,9 @@ import Synchronization
     var isWarm: Bool { get }
     /// Whether it stays warm when a take stops; a session sets it.
     var holdWarm: Bool { get set }
+    /// Called when the microphone goes away on its own (the route lost its
+    /// input); a take in progress keeps what it heard.
+    var onLost: (@MainActor () -> Void)? { get set }
     /// Listens without keeping anything, so the next take starts at once.
     func warmUp() throws
     /// Stops listening, and iOS's orange dot goes out.
@@ -41,6 +44,7 @@ enum MicrophoneError: Error {
     private let gate = TapGate()
     private(set) var isWarm = false
     var holdWarm = false
+    var onLost: (@MainActor () -> Void)?
 
     private init() {
         // The engine stops when the route changes (AirPods connect or a
@@ -125,10 +129,13 @@ enum MicrophoneError: Error {
         do {
             try listen()
         } catch {
-            // No input now (the route went away): the take ends with what
-            // it heard, and the session goes cold.
+            // No input now (the route went away). The take keeps what it
+            // heard; whoever holds the microphone hears it is gone, and the
+            // session ends and processes the take.
+            isWarm = false
             holdWarm = false
-            coolDown()
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            onLost?()
         }
     }
 }

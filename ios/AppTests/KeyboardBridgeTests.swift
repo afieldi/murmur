@@ -210,7 +210,7 @@ import Testing
         let bridge = bridge(model)
         let take = UUID()
         mailbox.ask(take, at: .now.addingTimeInterval(-30))
-        bridge.opened(take)
+        #expect(bridge.opened(take))
         #expect(try await waitFor(.listening)?.take == take)
         try await waitUntilRecording(model)
         bridge.hear(.stop)
@@ -227,8 +227,8 @@ import Testing
         let bridge = bridge(model)
         let take = UUID()
         mailbox.ask(take)
-        bridge.opened(take)
-        bridge.opened(take)
+        #expect(bridge.opened(take))
+        #expect(bridge.opened(take))
         #expect(announced.signals.contains(.busy) == false)
         try await waitUntilRecording(model)
         model.cancel()
@@ -237,6 +237,64 @@ import Testing
         try await Task.sleep(for: .milliseconds(100))
         #expect(!model.isRecording)
         #expect(mailbox.read()?.phase == .nothing)
+    }
+
+    /// A link that arrives while another take runs starts nothing and says
+    /// so, so murmur never shows Recording for a take that is not there.
+    @Test func aLinkWhileBusyStartsNothing() async throws {
+        let model = try model(.says("hi"))
+        let bridge = bridge(model)
+        await model.start()
+        let take = UUID()
+        mailbox.ask(take)
+        #expect(bridge.opened(take) == false)
+        #expect(announced.signals == [.busy])
+        model.cancel()
+    }
+
+    /// Only the keyboard's own ask lets a link start a take: a link from
+    /// anywhere else, or for another take, starts nothing.
+    @Test func aLinkWithoutTheKeyboardsAskStartsNothing() async throws {
+        let model = try model(.says("hi"))
+        let bridge = bridge(model)
+        #expect(bridge.opened(UUID()) == false)
+        mailbox.ask(UUID())
+        #expect(bridge.opened(UUID()) == false)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(!model.isRecording)
+        #expect(mailbox.read() == nil)
+    }
+
+    /// murmur answered the keyboard's start late, then the link for the same
+    /// take arrived: one take, and a cancel heard on the way never drops it.
+    @Test func aLateStartAndItsLinkAreOneTake() async throws {
+        let model = try model(.says("One take."))
+        let bridge = bridge(model)
+        let take = start(bridge)
+        bridge.hear(.cancel)
+        mailbox.ask(take)
+        #expect(bridge.opened(take))
+        try await waitUntilRecording(model)
+        #expect(model.isRecording)
+        #expect(mailbox.read()?.take == take)
+        #expect(mailbox.answer(within: 60) == nil)
+    }
+
+    /// A keyboard take nobody stops ends at its limit, and nothing it heard
+    /// is sent.
+    @Test func aKeyboardTakeEndsAtItsLimitUnsent() async throws {
+        let provider = FakeProvider.says("never sent")
+        let model = try model(provider)
+        let bridge = KeyboardBridge(model: model, mailbox: mailbox, limit: 0.2) { [announced] signal in
+            announced.signals.append(signal)
+        }
+        bridge.listen()
+        let take = start(bridge)
+        try await waitUntilRecording(model)
+        #expect(try await waitFor(.nothing)?.take == take)
+        #expect(!model.isRecording)
+        #expect(provider.requests.isEmpty)
+        #expect(KeyboardBridge.takeLimit == 600)
     }
 
     /// A stop with no keyboard take running does nothing.

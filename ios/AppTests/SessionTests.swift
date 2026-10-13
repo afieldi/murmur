@@ -109,6 +109,31 @@ import Testing
         #expect(!session.isOn)
     }
 
+    /// The length running out during work that ends without a new take (a
+    /// retry that fails again) still ends the session once the work is done.
+    @Test func theSessionEndsAfterAFailedRetry() async throws {
+        let rules = try BundledRules.takeRules()
+        let store = WaitingStore(directory: FileManager.default.temporaryDirectory.appending(path: "session-retry-\(UUID().uuidString)", directoryHint: .isDirectory))
+        let wav = try #require(TakeAudio.upload(ScriptedMicrophone.tone, gate: rules.gate))
+        let id = try store.save(wav, startedAt: .now, failure: TakeFailure(kind: "server", detail: "down"))
+        let model = TakeModel(
+            microphone: microphone, store: store, rules: rules, catalog: try BundledRules.catalog(),
+            connections: ConnectionStore(defaults: defaults), cleanup: CleanupStore(defaults: defaults), ring: ring,
+            send: { request in
+                try await Task.sleep(for: .milliseconds(300))
+                return (Data("{}".utf8), HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: nil)!)
+            },
+            copy: { _ in }
+        )
+        let session = session(model, lasting: 0.2)
+        #expect(await session.begin())
+        await model.retry([id])
+        #expect(model.state == .idle)
+        try await waitUntil { !session.isOn }
+        #expect(!session.isOn)
+        #expect(!microphone.isWarm)
+    }
+
     /// End session finishes a take in progress as if you tapped stop.
     @Test func endSessionProcessesATakeInProgress() async throws {
         let model = try model(.says("Keep these words."))
@@ -138,6 +163,20 @@ import Testing
         #expect(model.state == .words("Before the call."))
         #expect(!session.isOn)
         #expect(!microphone.isWarm)
+    }
+
+    /// The microphone going away mid take (the route lost its input) ends
+    /// the session and processes what the take heard.
+    @Test func losingTheMicrophoneEndsTheSession() async throws {
+        let model = try model(.says("Before it went."))
+        let session = session(model)
+        #expect(await session.begin())
+        await model.start()
+        microphone.lose()
+        try await waitUntil { model.state == .words("Before it went.") }
+        #expect(model.state == .words("Before it went."))
+        #expect(!session.isOn)
+        #expect(SessionState.read(from: file) == .off)
     }
 
     /// Without a session, an interruption still processes the take.

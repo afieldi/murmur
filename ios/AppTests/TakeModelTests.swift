@@ -78,6 +78,41 @@ final class FakeProvider: Sendable {
         await model.stop()
     }
 
+    /// Background time held by takes: how many are held now, and how many
+    /// were held while the provider was being asked.
+    final class Held: Sendable {
+        let now = Mutex(0)
+        let whileSending = Mutex<[Int]>([])
+    }
+
+    /// A take holds background time from stop until its words are safe, and
+    /// so does a retry, so the words land even when the session that kept
+    /// murmur running has just ended.
+    @Test func takesHoldBackgroundTimeUntilTheirWordsAreSafe() async throws {
+        let held = Held()
+        let provider = FakeProvider([(500, "down"), (500, "down"), (200, #"{"text":"Kept."}"#)])
+        let model = TakeModel(
+            microphone: microphone, store: store, rules: rules, catalog: catalog,
+            connections: ConnectionStore(defaults: defaults), cleanup: CleanupStore(defaults: defaults), ring: ring,
+            send: { request in
+                held.whileSending.withLock { $0.append(held.now.withLock { $0 }) }
+                return try await provider.send(request)
+            },
+            copy: { _ in },
+            keepAlive: {
+                held.now.withLock { $0 += 1 }
+                return { held.now.withLock { $0 -= 1 } }
+            }
+        )
+        await model.start()
+        await model.stop()
+        #expect(model.waiting.count == 1)
+        await model.retry(model.waiting.map(\.id))
+        #expect(model.state == .words("Kept."))
+        #expect(held.now.withLock { $0 } == 0)
+        #expect(held.whileSending.withLock { $0 } == [1, 1, 1])
+    }
+
     @Test func theFirstTakeAsksForTheMicrophone() async {
         let model = model(.says("hello"))
         await model.start()

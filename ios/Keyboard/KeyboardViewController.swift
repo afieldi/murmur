@@ -54,9 +54,10 @@ final class KeyboardViewController: UIInputViewController {
         visible = true
         pad.setFullAccess(hasFullAccess)
         waiting = Pad.Waiting.load(from: memory)
-        // A take that opened murmur lands in the field you come back to.
-        if var opened = waiting, opened.opened, opened.field == nil {
-            opened.field = textDocumentProxy.documentIdentifier
+        // A take that opened murmur is taken over by the keyboard you come
+        // back to, and lands in its field.
+        if var opened = waiting, opened.opened, !opened.adopted {
+            opened.adopt(textDocumentProxy.documentIdentifier)
             waiting = opened
         }
         refresh()
@@ -69,8 +70,9 @@ final class KeyboardViewController: UIInputViewController {
         visible = false
         // A take still starting or listening when the keyboard goes away is
         // dropped; one being transcribed comes back as Insert last. A take
-        // that opened murmur goes on: the keyboard left so you could go there.
-        if let waiting, !waiting.opened, phase == nil || phase == .listening {
+        // that opened murmur goes on while you go there, and is dropped like
+        // any other once a keyboard has taken it over.
+        if let waiting, waiting.cancelsOnLeave(phase: phase) {
             Signal.cancel.post()
             end(nil)
         }
@@ -110,9 +112,9 @@ final class KeyboardViewController: UIInputViewController {
                 pad.status.text = "Starting"
                 Signal.start.post()
                 // A running session answers within a moment; when it does not,
-                // murmur was closed, so open it.
+                // murmur was closed, so open it with the same take. A late
+                // answer to the start and the link are one take.
                 expectAnswer(within: 2) { [weak self] in
-                    Signal.cancel.post()
                     self?.openMurmur(take)
                 }
             } else {

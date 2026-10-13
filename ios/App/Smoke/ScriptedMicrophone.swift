@@ -11,6 +11,7 @@ import MurmurCore
     var samples: [Float]
     var level: Float = 0
     var holdWarm = false
+    var onLost: (@MainActor () -> Void)?
     private(set) var isWarm = false
     private(set) var asked = 0
     private(set) var started = 0
@@ -30,6 +31,13 @@ import MurmurCore
     }
 
     func coolDown() { isWarm = false }
+
+    /// The microphone goes away on its own, as when the route loses its input.
+    func lose() {
+        isWarm = false
+        holdWarm = false
+        onLost?()
+    }
 
     func start() throws {
         try warmUp()
@@ -62,6 +70,7 @@ import MurmurCore
     private let gate = TapGate()
     private(set) var isWarm = false
     var holdWarm = false
+    var onLost: (@MainActor () -> Void)?
     /// What the last take heard, at 16 kHz.
     private(set) var lastTake: [Float] = []
 

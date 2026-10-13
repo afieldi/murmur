@@ -262,10 +262,35 @@ extension TakeModel {
         let model = TakeModel(
             microphone: DeviceMicrophone.shared, store: .standard, rules: rules, catalog: catalog,
             connections: ConnectionStore(), cleanup: CleanupStore(), ring: KeychainKeyRing(), send: { try await session.data(for: $0) },
-            copy: { UIPasteboard.general.string = $0 }
+            copy: { UIPasteboard.general.string = $0 }, keepAlive: BackgroundTime.hold
         )
         shared = model
         return model
+    }
+}
+
+/// Background time from iOS, so a take's words land even when nothing else
+/// keeps murmur running: the session that held the microphone has just
+/// ended, or you left murmur mid take.
+@MainActor final class BackgroundTime {
+    private var id = UIBackgroundTaskIdentifier.invalid
+
+    private init() {
+        id = UIApplication.shared.beginBackgroundTask(withName: "murmur take") { [weak self] in
+            MainActor.assumeIsolated { self?.end() }
+        }
+    }
+
+    /// Holds background time until the returned closure runs.
+    static func hold() -> @MainActor () -> Void {
+        let time = BackgroundTime()
+        return { time.end() }
+    }
+
+    private func end() {
+        guard id != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(id)
+        id = .invalid
     }
 }
 

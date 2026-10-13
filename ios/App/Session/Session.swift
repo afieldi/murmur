@@ -18,6 +18,8 @@ import Observation
     }
 
     static let lengthKey = "sessionLength"
+    /// How often a length that ran out during a take or a retry looks again.
+    static let recheck: TimeInterval = 1
 
     /// When the session ends unless another take comes first; nil when off.
     private(set) var until: Date?
@@ -54,6 +56,7 @@ import Observation
     /// outlives the app that ran it.
     func listen() {
         listener = SignalListener([.end]) { [weak self] _ in self?.end() }
+        microphone.onLost = { [weak self] in self?.interrupted() }
         interruptions = NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
             let type = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
             guard type == AVAudioSession.InterruptionType.began.rawValue else { return }
@@ -100,8 +103,9 @@ import Observation
         if isOn { extend() }
     }
 
-    /// A call, Siri, or another app took the microphone: the session ends,
-    /// and a take in progress is processed with what it heard.
+    /// A call, Siri, or another app took the microphone, or the microphone
+    /// went away: the session ends, and a take in progress is processed
+    /// with what it heard.
     func interrupted() {
         if isOn {
             end()
@@ -124,9 +128,19 @@ import Observation
     }
 
     /// The length ran out. A take still running keeps the session until it
-    /// ends, and the length counts again from then.
+    /// ends, and the length counts again from then. Work that ends without
+    /// a new take (a retry that fails again) changes nothing to follow, so
+    /// while anything runs the session looks again shortly.
     private func lapse() {
-        guard isOn, !model.isRecording, !model.isBusy else { return }
+        guard isOn else { return }
+        guard !model.isRecording, !model.isBusy else {
+            timer = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(Self.recheck))
+                guard !Task.isCancelled else { return }
+                self?.lapse()
+            }
+            return
+        }
         end()
     }
 

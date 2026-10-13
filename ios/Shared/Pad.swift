@@ -74,6 +74,8 @@ enum Pad {
         /// keyboard came back to.
         var field: UUID?
         let at: Date
+        /// An opened take that a keyboard you came back to has taken over.
+        private(set) var adopted = false
 
         /// A take waited on longer than this is let go: its words, if any,
         /// wait as Insert last.
@@ -99,6 +101,21 @@ enum Pad {
         /// the first field the keyboard comes back to.
         func sameField(as current: UUID?) -> Bool {
             field == nil || field == current
+        }
+
+        /// The keyboard you came back to from murmur takes the opened take
+        /// over, in the field it is in.
+        mutating func adopt(_ current: UUID?) {
+            field = current
+            adopted = true
+        }
+
+        /// Whether leaving the keyboard drops this take: one still starting or
+        /// listening is dropped, except on the trip to murmur an opened take
+        /// is for. Once taken over, an opened take is dropped like any other,
+        /// so a take you walked away from never runs on unattended.
+        func cancelsOnLeave(phase: MailboxEntry.Phase?) -> Bool {
+            (!opened || adopted) && (phase == nil || phase == .listening)
         }
     }
 

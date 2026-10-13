@@ -29,4 +29,4 @@ function networkUses(source) {
   return NETWORK.filter((pattern) => pattern.test(code)).map((pattern) => code.match(pattern)[0].trim())
 }
 
-module.exports = { networkUses }
+module.exports = { networkUses, withoutComments }

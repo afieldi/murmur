@@ -24,6 +24,7 @@ enum SessionCopy {
     static let startFooter = "Starts listening now, so a tap on the pill in any app starts a take at once."
 
     static let recording = "Recording"
+    static let starting = "Starting"
     static let stop = "Stop"
     static let guide = "Swipe right along the bottom edge to go back to your app. Keep talking; it all counts."
     static let guideStill = "Swipe right along the bottom edge to go back to your app."

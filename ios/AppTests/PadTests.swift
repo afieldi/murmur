@@ -85,6 +85,25 @@ import UIKit
         #expect(!inPlace.sameField(as: UUID()))
     }
 
+    /// Leaving the keyboard drops a take still starting or listening,
+    /// except on the trip to murmur an opened take is for; once a keyboard
+    /// you came back to has taken it over, leaving drops it too.
+    @Test func leavingDropsATakeYouWalkedAwayFrom() {
+        let inPlace = Pad.Waiting(take: take, opened: false, field: UUID(), at: .now)
+        #expect(inPlace.cancelsOnLeave(phase: nil))
+        #expect(inPlace.cancelsOnLeave(phase: .listening))
+        #expect(!inPlace.cancelsOnLeave(phase: .working))
+        var opened = Pad.Waiting(take: take, opened: true, field: nil, at: .now)
+        #expect(!opened.cancelsOnLeave(phase: nil))
+        #expect(!opened.cancelsOnLeave(phase: .listening))
+        let field = UUID()
+        opened.adopt(field)
+        #expect(opened.adopted)
+        #expect(opened.field == field)
+        #expect(opened.cancelsOnLeave(phase: .listening))
+        #expect(!opened.cancelsOnLeave(phase: .working))
+    }
+
     @Test(arguments: [
         (nil as String?, "hello", "hello"),
         ("", "hello", "hello"),

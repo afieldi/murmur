@@ -12,10 +12,17 @@ import Observation
     /// How long a keyboard's ask stays good. One that waited longer, sent
     /// while murmur was not running, is dropped.
     static let askLife: TimeInterval = 3
+    /// How long a keyboard's ask stays good for a take link: opening murmur
+    /// from cold can take a while.
+    static let linkLife: TimeInterval = 60
+    /// The longest a keyboard take may record. One nobody stopped (you
+    /// walked away from it) ends here and is dropped, never sent.
+    static let takeLimit: TimeInterval = 10 * 60
 
     private let model: TakeModel
     private let mailbox: Mailbox
     private let announce: @MainActor (Signal) -> Void
+    private let limit: TimeInterval
     private var listener: SignalListener?
     /// The take the keyboard asked for, until it ends.
     private var take: UUID?
@@ -23,9 +30,10 @@ import Observation
     private var cancelled = false
     private var startedAt = Date.distantPast
 
-    init(model: TakeModel, mailbox: Mailbox, announce: @escaping @MainActor (Signal) -> Void = { $0.post() }) {
+    init(model: TakeModel, mailbox: Mailbox, limit: TimeInterval = KeyboardBridge.takeLimit, announce: @escaping @MainActor (Signal) -> Void = { $0.post() }) {
         self.model = model
         self.mailbox = mailbox
+        self.limit = limit
         self.announce = announce
     }
 
@@ -53,21 +61,29 @@ import Observation
         }
     }
 
-    /// The keyboard opened murmur with a take link (IOS-009). The link is
-    /// the ask, however long murmur took to open, so the ask it left in
-    /// the mailbox is used up here and never starts a second take.
-    func opened(_ id: UUID) {
-        _ = mailbox.answer(within: .infinity)
-        // The same link twice (the keyboard opened murmur after a start it
-        // sent went unanswered) is one take.
-        guard take != id else { return }
-        begin(id)
+    /// The keyboard opened murmur with a take link (IOS-009). True when the
+    /// take began, so murmur shows Recording only for a take that is there.
+    /// Only the keyboard's own ask, left in the mailbox before it opened
+    /// murmur, lets a link start a take: a link from anywhere else starts
+    /// nothing. The ask is used up here, so it never starts a second take.
+    @discardableResult
+    func opened(_ id: UUID) -> Bool {
+        let asked = mailbox.answer(within: Self.linkLife)
+        // A start murmur answered late and the link for the same take are one
+        // take, and a cancel heard on the way does not drop it.
+        if take == id {
+            cancelled = false
+            return true
+        }
+        guard asked == id else { return false }
+        return begin(id)
     }
 
-    private func begin(_ id: UUID) {
+    @discardableResult
+    private func begin(_ id: UUID) -> Bool {
         guard take == nil, !model.isRecording, !model.isBusy else {
             announce(.busy)
-            return
+            return false
         }
         take = id
         startedAt = .now
@@ -76,6 +92,7 @@ import Observation
         // be the last take's words.
         write(.listening)
         Task { await settle(id) }
+        return true
     }
 
     /// Settles how the start went. A start that did not record ends failed
@@ -89,7 +106,16 @@ import Observation
             write(.nothing, ends: true)
         } else if !model.isRecording {
             write(.failed, ends: true)
+        } else {
+            Task { await limit(id) }
         }
+    }
+
+    /// Ends a take still recording at the limit, dropping what it heard.
+    private func limit(_ id: UUID) async {
+        try? await Task.sleep(for: .seconds(limit))
+        guard take == id, model.isRecording else { return }
+        model.cancel()
     }
 
     /// Publishes each change of the take model's state, for as long as the

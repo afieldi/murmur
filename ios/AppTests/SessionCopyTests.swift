@@ -18,7 +18,7 @@ import Testing
     @Test func everyLineFollowsTheWritingRules() {
         let lines = [
             SessionCopy.explain, SessionCopy.length, SessionCopy.lengthFooter, SessionCopy.end, SessionCopy.start, SessionCopy.startFooter,
-            SessionCopy.recording, SessionCopy.stop, SessionCopy.guide, SessionCopy.guideStill, SessionCopy.micOff, SessionCopy.close
+            SessionCopy.recording, SessionCopy.starting, SessionCopy.stop, SessionCopy.guide, SessionCopy.guideStill, SessionCopy.micOff, SessionCopy.close
         ]
         for line in lines {
             #expect(!line.contains("Murmur"))

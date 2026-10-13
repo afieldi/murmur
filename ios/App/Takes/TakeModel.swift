@@ -55,11 +55,14 @@ struct TakeRules: Sendable {
     @ObservationIgnored private let send: ConnectionTest.Send
     @ObservationIgnored private let copy: @MainActor (String) -> Void
     @ObservationIgnored private let now: @MainActor () -> Date
+    /// Holds background time; the closure it returns lets it go.
+    @ObservationIgnored private let keepAlive: @MainActor () -> @MainActor () -> Void
 
     init(
         microphone: any Microphone, store: WaitingStore, rules: TakeRules, catalog: ProviderCatalog,
         connections: ConnectionStore, cleanup: CleanupStore, ring: any KeyRing, send: @escaping ConnectionTest.Send,
-        copy: @escaping @MainActor (String) -> Void, now: @escaping @MainActor () -> Date = { .now }
+        copy: @escaping @MainActor (String) -> Void, now: @escaping @MainActor () -> Date = { .now },
+        keepAlive: @escaping @MainActor () -> @MainActor () -> Void = { {} }
     ) {
         self.microphone = microphone
         self.store = store
@@ -71,6 +74,7 @@ struct TakeRules: Sendable {
         self.send = send
         self.copy = copy
         self.now = now
+        self.keepAlive = keepAlive
         waiting = store.list()
     }
 
@@ -112,6 +116,10 @@ struct TakeRules: Sendable {
 
     func stop() async {
         guard case .recording(let since) = state else { return }
+        // Asked before the microphone lets go: when a session has just ended,
+        // the microphone was all that kept murmur running in the background.
+        let release = keepAlive()
+        defer { release() }
         let samples = microphone.stop()
         guard let wav = TakeAudio.upload(samples, gate: rules.gate) else {
             state = .heardNothing(sent: false)
@@ -141,6 +149,8 @@ struct TakeRules: Sendable {
     /// audio is deleted.
     func retry(_ ids: [String]) async {
         guard !ids.isEmpty, !isRecording, !isBusy else { return }
+        let release = keepAlive()
+        defer { release() }
         retrying = ids
         message = nil
         armed = nil

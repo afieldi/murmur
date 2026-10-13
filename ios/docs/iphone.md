@@ -131,6 +131,8 @@ Between takes murmur keeps nothing: the sound is dropped as it arrives, never sa
 
 To end it sooner, tap End session in murmur, or press and hold the pill in the keyboard and tap End session. A phone call, Siri, or another app taking the microphone ends it too. A take in progress when a session ends still goes through, as if you had tapped stop.
 
+A take started from the keyboard that nobody stops ends at 10 minutes, and murmur drops it without sending it: a take that long is almost always one you walked away from. If you leave the keyboard while a take is listening, after coming back to it from murmur, the take is dropped the same way.
+
 ## How much battery does a session use?
 
 Some, because the microphone stays on while a session runs. murmur does no work on the sound between takes: it is dropped as it arrives, and nothing is sent until you tap the pill. A session ends by itself after the length you pick, and End session stops it at once. If you dictate in short bursts, pick 5 minutes.
