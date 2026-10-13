@@ -227,3 +227,19 @@ The same way as on the Mac: the same ladder of belts and stripes (white, blue, p
 On iPhone, the Journey row on Home shows your belt. Tap it to see your stripes, your words and your days against what the next belt needs, your level (one more for every hundred thousand words), and the day you earned each belt.
 
 Your iPhone counts only the takes it keeps in its own history. Deleting takes there lowers your count, as clearing history does on the Mac. For now your iPhone and your Mac each keep their own belt; one Journey across your devices comes with the murmur account.
+
+## What is the Journey on iPhone?
+
+The Journey is where your practice shows, painted the way it is on the Mac, by the same brush code. Tap the Journey row on Home to open it. It shows:
+
+- **Your belt,** painted with its stripes, with its name, its title, and your level.
+- **The road:** every rank from white belt to red, left to right, painted as far as your words and days have taken you, with your words over your spot. Swipe it sideways to see the whole ladder. The gold ring is your next promotion.
+- **The two gates** toward the next belt: a brush stroke for your words, and tally marks for the days you dictated. Both must close.
+- **Achievements,** as ink stamps: the first take, three, seven, thirty, and a hundred days in a row, a thousand, five thousand, and ten thousand words in one day, a hundred and a thousand takes, a take past five minutes, dictating after midnight or before six in the morning, and coming back after a week away. Earned stamps are inked; the rest show what earns them.
+- **Your promotions,** each with the day you earned it.
+
+When you earn a new belt, the Journey holds the ceremony the next time you open it: one big stroke in the new belt's color, splatter, and your new rank set large. Tap to continue. A new stripe slaps its tape onto your belt instead. Each promotion plays once.
+
+With Reduce Motion on (Settings, Accessibility, Motion), every painting appears finished at once, with no strokes drawing on. Every word on the Journey is ordinary text, so it follows your text size, and VoiceOver reads your belt, where you stand on the road, each gate, and each achievement.
+
+The paintings are made on your iPhone by a small page inside murmur that can load nothing else and reach nothing on the internet.

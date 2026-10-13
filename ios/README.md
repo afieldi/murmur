@@ -22,15 +22,18 @@ Releasing to TestFlight needs murmur's App Store Connect API key and Apple Distr
 
 The tests and the smoke run on murmur's own simulator, named murmur smoke, created the first time and shut down afterward. Other simulators are left alone.
 
-Nothing generated is committed: `ios/Generated`, `ios/build`, and `ios/murmur.xcodeproj` are rebuilt from `ios/project.yml`, `src/renderer/tokens.css`, the icon scripts, and `shared/`. Change those, never the generated files.
+Nothing generated is committed: `ios/Generated`, `ios/build`, and `ios/murmur.xcodeproj` are rebuilt from `ios/project.yml`, `src/renderer/tokens.css`, the icon scripts, `shared/`, and the Journey's painter page (`ios/Web`, bundled with desktop's brush engine). Change those, never the generated files.
 
 ## How is it laid out?
 
-- `project.yml`: the XcodeGen recipe for the app (`murmur`), the keyboard (`murmurKeyboard`), and the tests (`murmurTests`)
+- `project.yml`: the XcodeGen recipe for the app (`murmur`), the keyboard (`murmurKeyboard`), the widgets (`murmurWidgets`), and the tests (`murmurTests`)
 - `MurmurCore/`: murmur's rules in Swift, with no UI, tested by `swift test`
 - `App/`: the app, which owns the microphone, the key, and history
 - `Keyboard/`: the keyboard extension, which stays thin and never touches the network
 - `Shared/`: code both targets compile, such as the app group (the shared drawer between them)
+- `Live/`: the Live Activity's shape and the App Intents that start and end a session
+- `Widgets/`: the Control Center control and the Lock Screen Live Activity
+- `Web/`: the Journey's painter page, which desktop's own brush engine and Journey painter are bundled into at build time
 
 ## Can I put my own build on my iPhone?
 
