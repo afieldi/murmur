@@ -200,3 +200,20 @@ In murmur, tap the gear at the top right, then Diagnostics, then Save report. mu
 The report is one plain text file. It holds the murmur version, your iPhone model and iOS version, whether the murmur keyboard has reported with Full Access, your session length, your settings as names and counts (your provider and models, how many dictionary words and expansions you have, whether a key is saved; a model id you typed in yourself shows only how long it is), and the recent activity log.
 
 The activity log is one short line for what happened to each take: captured with its loudness, heard nothing with its loudness, failed with the kind of failure and its error number, cancelled before it was sent, the number of words it came back as, and whether the keyboard typed the words or offered them as Insert last. It never holds your words, your dictionary or expansions, a custom provider address, or your key. It stays in murmur's own storage on your iPhone, out of iCloud backups, and keeps only its most recent lines: at most 128 KB, a couple of thousand lines, with older lines dropped.
+
+## How do I start murmur from Control Center or the Action Button?
+
+murmur has a control called Start murmur. One tap starts a session without opening murmur: the microphone is ready, so a tap on the murmur keyboard's pill in any app starts a take at once.
+
+- **Control Center:** open Control Center, touch and hold an empty spot (or tap the plus at the top left) to edit it, tap Add a Control at the bottom, and pick Start murmur.
+- **Lock Screen:** touch and hold the Lock Screen, tap Customize, then Lock Screen. Tap the minus by one of the two controls at the bottom, tap the plus, and pick Start murmur.
+- **Action Button:** open Settings, then Action Button, swipe to Controls, tap the button under it, and pick Start murmur.
+- **Shortcuts and Siri:** murmur adds Start a murmur session and End the murmur session to the Shortcuts app; you can also say "Start a murmur session".
+
+These steps follow Apple's iPhone User Guide, checked 2026-10-13.
+
+The first time, open murmur once and allow the microphone: a control cannot ask for it. If the microphone is not allowed yet, Start murmur says so and starts nothing.
+
+## What does murmur show on the Lock Screen?
+
+While a session runs, murmur shows a Live Activity on the Lock Screen and in the Dynamic Island: the pill, Ready or Recording, the time left in the session, and End. iOS redraws it only now and then, so the pill there stands still and never moves with your voice; the keyboard's pill is the one that listens. End there ends the session at once. If you turned off Live Activities for murmur in Settings, the session still starts and runs as usual.
