@@ -61,6 +61,9 @@ final class KeyboardViewController: UIInputViewController {
         super.viewWillAppear(animated)
         visible = true
         pad.setFullAccess(hasFullAccess)
+        // Tells first run the keyboard is added with Full Access (IOS-011);
+        // without Full Access it cannot write, which says the same.
+        if hasFullAccess { KeyboardReport(fullAccess: true, at: .now).write() }
         pad.wave.style = PillLook.read().style
         waiting = Pad.Waiting.load(from: memory)
         // A take that opened murmur is taken over by the keyboard you come
