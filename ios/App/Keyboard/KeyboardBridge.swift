@@ -58,7 +58,7 @@ import Observation
         case .cancel:
             guard take != nil else { return }
             if model.isRecording { model.cancel() } else { cancelled = true }
-        case .changed, .busy:
+        case .changed, .busy, .end:
             break
         }
     }

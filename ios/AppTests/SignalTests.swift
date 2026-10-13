@@ -19,7 +19,7 @@ import Testing
 
     @Test func signalsAreNamedUnderTheAppGroup() {
         #expect(Signal.allCases.allSatisfy { $0.name.hasPrefix(AppGroup.identifier + ".") })
-        #expect(Set(Signal.allCases.map(\.name)).count == 5)
+        #expect(Set(Signal.allCases.map(\.name)).count == 6)
     }
 
     @MainActor final class Heard {

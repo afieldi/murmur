@@ -53,6 +53,12 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         LSRequiresIPhoneOS: true
         MurmurAppGroup: $(MURMUR_APP_GROUP)
+        # The keyboard opens murmur with <scheme>://take (IOS-009); the
+        # bundle id keeps the scheme unique to each build.
+        MurmurURLScheme: $(MURMUR_BUNDLE_ID)
+        CFBundleURLTypes:
+          - CFBundleURLName: $(MURMUR_BUNDLE_ID)
+            CFBundleURLSchemes: [$(MURMUR_BUNDLE_ID)]
         NSMicrophoneUsageDescription: murmur listens only while you dictate and sends what you say to the provider you chose.
         UIBackgroundModes: [audio]
         UILaunchScreen:
@@ -85,6 +91,7 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         MurmurAppGroup: $(MURMUR_APP_GROUP)
+        MurmurURLScheme: $(MURMUR_BUNDLE_ID)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.keyboard-service
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).KeyboardViewController
