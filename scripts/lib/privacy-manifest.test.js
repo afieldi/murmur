@@ -17,9 +17,9 @@ function swiftFiles(dir) {
   })
 }
 
-/** The categories used anywhere in these folders, MurmurCore included. */
-function used(...folders) {
-  const files = [...folders, 'MurmurCore/Sources'].flatMap((folder) => swiftFiles(join(ios, folder)))
+/** The categories used anywhere in these folders and files. */
+function used(...paths) {
+  const files = paths.flatMap((path) => (path.endsWith('.swift') ? [join(ios, path)] : swiftFiles(join(ios, path))))
   return [...new Set(files.flatMap((file) => categoriesUsed(readFileSync(file, 'utf8'))))].sort()
 }
 
@@ -37,16 +37,18 @@ describe('the privacy manifests declare what the code uses', () => {
     expect(declared('<key>NSPrivacyAccessedAPITypes</key><array/>')).toEqual({})
   })
 
-  for (const [target, folders] of [
-    ['App', ['App', 'Shared']],
-    ['Keyboard', ['Keyboard', 'Shared']]
+  // Each target's sources, as ios/project.yml lists them.
+  for (const [target, sources] of [
+    ['App', ['App', 'Shared', 'Live', 'MurmurCore/Sources']],
+    ['Keyboard', ['Keyboard', 'Shared', 'MurmurCore/Sources']],
+    ['Widgets', ['Widgets', 'Live', 'Shared/Pill.swift', 'Shared/AppGroup.swift']]
   ]) {
     it(`declares every category the ${target} target uses, for its own defaults only`, () => {
       const manifest = declared(readFileSync(join(ios, target, 'PrivacyInfo.xcprivacy'), 'utf8'))
-      expect(Object.keys(manifest).sort()).toEqual(used(...folders))
-      // Each target reads and writes only its own defaults (CA92.1); the
-      // app group holds files, never shared defaults.
-      expect(manifest.NSPrivacyAccessedAPICategoryUserDefaults).toEqual(['CA92.1'])
+      expect(Object.keys(manifest).sort()).toEqual(used(...sources))
+      // A target that uses defaults reads and writes only its own (CA92.1);
+      // the app group holds files, never shared defaults.
+      expect(manifest.NSPrivacyAccessedAPICategoryUserDefaults ?? ['CA92.1']).toEqual(['CA92.1'])
     })
   }
 })

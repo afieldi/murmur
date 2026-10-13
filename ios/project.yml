@@ -41,6 +41,7 @@ targets:
         buildPhase: resources
     dependencies:
       - target: murmurKeyboard
+      - target: murmurWidgets
       - package: MurmurCore
     settings:
       base:
@@ -64,6 +65,8 @@ targets:
           - CFBundleURLName: $(MURMUR_BUNDLE_ID)
             CFBundleURLSchemes: [$(MURMUR_BUNDLE_ID)]
         NSMicrophoneUsageDescription: murmur listens only while you dictate and sends what you say to the provider you chose.
+        # The session's Live Activity (IOS-016).
+        NSSupportsLiveActivities: true
         UIBackgroundModes: [audio]
         UILaunchScreen:
           UIColorName: LaunchInk
@@ -106,6 +109,34 @@ targets:
             RequestsOpenAccess: true
     entitlements:
       path: Generated/murmurKeyboard.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - $(MURMUR_APP_GROUP)
+  # The Start murmur control and the session's Live Activity (IOS-016).
+  murmurWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Widgets
+      - path: Live
+      - path: Shared/Pill.swift
+      - path: Shared/AppGroup.swift
+      - path: Generated/Tokens.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(MURMUR_BUNDLE_ID).widgets
+        PRODUCT_NAME: murmurWidgets
+    info:
+      path: Generated/Widgets-Info.plist
+      properties:
+        CFBundleDisplayName: murmur
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        MurmurAppGroup: $(MURMUR_APP_GROUP)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: Generated/murmurWidgets.entitlements
       properties:
         com.apple.security.application-groups:
           - $(MURMUR_APP_GROUP)
