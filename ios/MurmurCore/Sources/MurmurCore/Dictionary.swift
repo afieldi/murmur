@@ -57,9 +57,12 @@ public func enforceDictionaryCasing(_ text: String, _ entries: [DictionaryEntry]
 
 /// The dictionary as a spelling hint for transcription (ios/prd.json
 /// IOS-013): its spellings, in order and each once, as one line the speech
-/// model reads as words it has already heard. It stops before about 150
-/// tokens, well under the 224 the providers allow (Groq's speech to text
-/// docs, checked 2026-10-12). Nil for an empty dictionary.
+/// model reads as words it has already heard. It stops at about 600
+/// characters. The speech model reads at most the last 224 tokens of a
+/// prompt (Groq's speech to text docs, checked 2026-10-12), so a long
+/// dictionary's first spellings may go unread; the dictionary still fixes
+/// them after transcription, and a provider that refuses the hint gets the
+/// take again without it (Transcription.run). Nil for an empty dictionary.
 public func transcriptionHint(_ entries: [DictionaryEntry], limit: Int = 600) -> String? {
     var seen = Set<String>()
     var words: [String] = []

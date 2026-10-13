@@ -42,7 +42,7 @@ struct WordsScreen: View {
                     }
                 }
             } header: {
-                SectionHeader(title: WordsCopy.words, add: WordsCopy.addWord) {
+                SectionHeader(title: WordsCopy.words, add: WordsCopy.addWord, label: WordsCopy.addWordLabel) {
                     editing = .word(index: nil, DictionaryEntry(from: "", to: ""))
                 }
             }
@@ -62,7 +62,7 @@ struct WordsScreen: View {
                     }
                 }
             } header: {
-                SectionHeader(title: WordsCopy.expansions, add: WordsCopy.addExpansion) {
+                SectionHeader(title: WordsCopy.expansions, add: WordsCopy.addExpansion, label: WordsCopy.addExpansionLabel) {
                     editing = .expansion(index: nil, ExpansionEntry(trigger: "", text: ""))
                 }
             }
@@ -92,10 +92,11 @@ struct WordsScreen: View {
     }
 }
 
-/// A section title with its Add button.
+/// A section title with its Add button, which VoiceOver names by its list.
 private struct SectionHeader: View {
     let title: String
     let add: String
+    let label: String
     let action: () -> Void
 
     var body: some View {
@@ -110,6 +111,7 @@ private struct SectionHeader: View {
             .foregroundStyle(Tokens.brand)
             .textCase(nil)
             .frame(minHeight: 44)
+            .accessibilityLabel(label)
         }
     }
 }
@@ -149,32 +151,34 @@ private struct EntryRow: View {
     }
 }
 
+/// Which list an entry belongs to.
+enum EntryKind { case word, expansion }
+
 /// Adds or edits one entry: two fields, Save while both hold words.
 private struct EntryEditor: View {
-    enum Kind { case word, expansion }
-
-    let kind: Kind
+    let kind: EntryKind
     @State var first: String
     @State var second: String
     let save: (String, String) -> Bool
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
+        let fields = WordsCopy.fields(kind)
         Form {
             Section {
-                TextField(kind == .word ? WordsCopy.heardPlaceholder : WordsCopy.triggerPlaceholder, text: $first)
+                TextField(fields[0].label, text: $first, prompt: Text(fields[0].example))
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
             } header: {
-                SectionTitle(kind == .word ? WordsCopy.whenHeard : WordsCopy.whenSaid)
+                SectionTitle(fields[0].label)
             }
             .listRowBackground(Tokens.panel)
             Section {
-                TextField(kind == .word ? WordsCopy.spellingPlaceholder : WordsCopy.textPlaceholder, text: $second, axis: .vertical)
+                TextField(fields[1].label, text: $second, prompt: Text(fields[1].example), axis: .vertical)
                     .lineLimit(kind == .word ? 1...2 : 2...8)
                     .autocorrectionDisabled()
             } header: {
-                SectionTitle(kind == .word ? WordsCopy.writeAs : WordsCopy.write)
+                SectionTitle(fields[1].label)
             } footer: {
                 Text(kind == .word ? WordsCopy.wordFooter : WordsCopy.expansionFooter).foregroundStyle(Tokens.textDim)
             }
@@ -216,6 +220,8 @@ enum WordsCopy {
     static let expansions = "Expansions"
     static let addWord = "Add"
     static let addExpansion = "Add"
+    static let addWordLabel = "Add a word"
+    static let addExpansionLabel = "Add an expansion"
     static let search = "Search words and expansions"
     static let noMatch = "Nothing here matches your search."
     static let wordsEmpty = "Teach murmur a word it gets wrong. For example, when it hears la broy, write LaBroi."
@@ -232,12 +238,20 @@ enum WordsCopy {
     static let spellingPlaceholder = "LaBroi"
     static let triggerPlaceholder = "my address"
     static let textPlaceholder = "1 Main Street, Springfield"
-    static let wordFooter = "murmur writes it this way, with this casing, wherever you say it, and tells your provider how it is spelled."
+    static let wordFooter = "murmur writes it this way, with this casing, wherever you say it, and offers your provider the spelling as a hint."
     static let expansionFooter = "Say the trigger on its own or in a sentence; murmur writes the text in its place, last of all."
     static let wordTitle = "Word"
     static let expansionTitle = "Expansion"
     static let cancel = "Cancel"
     static let save = "Save"
+
+    /// Each field's name and its example, in order.
+    static func fields(_ kind: EntryKind) -> [(label: String, example: String)] {
+        switch kind {
+        case .word: [(whenHeard, heardPlaceholder), (writeAs, spellingPlaceholder)]
+        case .expansion: [(whenSaid, triggerPlaceholder), (write, textPlaceholder)]
+        }
+    }
 
     static func heard(_ from: String) -> String {
         "When murmur hears \(from)"

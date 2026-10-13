@@ -40,6 +40,21 @@ import Testing
         #expect(model().dictionary.map(\.to) == ["Eze Media"])
     }
 
+    /// Editing one entry onto another's key leaves one entry, the edited one,
+    /// so the edit is the one that applies.
+    @Test func editingOntoAnotherKeyLeavesOne() {
+        let words = model()
+        words.saveWord(DictionaryEntry(from: "la broy", to: "LaBroi"))
+        words.saveWord(DictionaryEntry(from: "eze", to: "Eze"))
+        words.saveWord(DictionaryEntry(from: "La Broy", to: "LaBroi Walton"), at: 1)
+        #expect(words.dictionary == [DictionaryEntry(from: "La Broy", to: "LaBroi Walton")])
+        words.saveExpansion(ExpansionEntry(trigger: "my address", text: "1 Main Street"))
+        words.saveExpansion(ExpansionEntry(trigger: "sign off", text: "Thanks"))
+        words.saveExpansion(ExpansionEntry(trigger: "My Address", text: "2 Oak Lane"), at: 1)
+        #expect(words.expansions == [ExpansionEntry(trigger: "My Address", text: "2 Oak Lane")])
+        #expect(model().dictionary.count == 1 && model().expansions.count == 1)
+    }
+
     @Test func expansionsWorkTheSameWay() {
         let words = model()
         #expect(words.saveExpansion(ExpansionEntry(trigger: " my address ", text: " 1 Main Street, Springfield ")))
@@ -85,6 +100,17 @@ import Testing
             #expect(line.components(separatedBy: "For example").count == 2)
         }
         #expect(WordsCopy.deleteQuestion("LaBroi") == "Delete LaBroi?")
+    }
+
+    /// VoiceOver tells the two Add buttons apart, and each field is named by
+    /// what it is for, with its example only as the prompt.
+    @Test func voiceOverNamesEachControl() {
+        #expect(WordsCopy.addWordLabel == "Add a word")
+        #expect(WordsCopy.addExpansionLabel == "Add an expansion")
+        #expect(WordsCopy.fields(.word).map(\.label) == ["When murmur hears", "Write it as"])
+        #expect(WordsCopy.fields(.word).map(\.example) == ["la broy", "LaBroi"])
+        #expect(WordsCopy.fields(.expansion).map(\.label) == ["When you say", "Write"])
+        #expect(WordsCopy.fields(.expansion).map(\.example) == ["my address", "1 Main Street, Springfield"])
     }
 
     @Test func everyLineFollowsTheWritingRules() {

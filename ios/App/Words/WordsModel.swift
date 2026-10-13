@@ -21,20 +21,13 @@ import Observation
 
     /// Saves a word: both sides trimmed and not empty. Editing replaces the
     /// entry at that place; a new word that murmur already listens for
-    /// replaces that one, so a word is never in the list twice. False when
-    /// a side is empty.
+    /// replaces that one; and any other entry for the same heard words
+    /// goes, so a word is never in the list twice. False when a side is
+    /// empty.
     @discardableResult
     func saveWord(_ entry: DictionaryEntry, at index: Int? = nil) -> Bool {
         guard let entry = Self.clean(entry) else { return false }
-        var next = dictionary
-        if let index, next.indices.contains(index) {
-            next[index] = entry
-        } else if let same = next.firstIndex(where: { $0.from.caseInsensitiveCompare(entry.from) == .orderedSame }) {
-            next[same] = entry
-        } else {
-            next.append(entry)
-        }
-        dictionary = next
+        dictionary = Self.placing(entry, at: index, in: dictionary) { $0.from }
         persist()
         return true
     }
@@ -51,16 +44,7 @@ import Observation
         let trigger = entry.trigger.trimmingCharacters(in: .whitespacesAndNewlines)
         let text = entry.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trigger.isEmpty, !text.isEmpty else { return false }
-        let clean = ExpansionEntry(trigger: trigger, text: text)
-        var next = expansions
-        if let index, next.indices.contains(index) {
-            next[index] = clean
-        } else if let same = next.firstIndex(where: { $0.trigger.caseInsensitiveCompare(trigger) == .orderedSame }) {
-            next[same] = clean
-        } else {
-            next.append(clean)
-        }
-        expansions = next
+        expansions = Self.placing(ExpansionEntry(trigger: trigger, text: text), at: index, in: expansions) { $0.trigger }
         persist()
         return true
     }
@@ -84,6 +68,19 @@ import Observation
         return expansions.enumerated()
             .filter { query.isEmpty || $0.element.trigger.localizedCaseInsensitiveContains(query) || $0.element.text.localizedCaseInsensitiveContains(query) }
             .map { ($0.offset, $0.element) }
+    }
+
+    /// The list with the entry at its place (editing), or over the entry
+    /// with the same key, or at the end; any other entry with that key is
+    /// dropped, so a key is listed once and the saved entry is the one that
+    /// applies.
+    private static func placing<Entry>(_ entry: Entry, at index: Int?, in list: [Entry], key: (Entry) -> String) -> [Entry] {
+        func same(_ other: Entry) -> Bool { key(other).caseInsensitiveCompare(key(entry)) == .orderedSame }
+        var next = list
+        let target = index.flatMap { next.indices.contains($0) ? $0 : nil } ?? next.firstIndex(where: same)
+        if let target { next[target] = entry } else { next.append(entry) }
+        let kept = target ?? next.count - 1
+        return next.enumerated().filter { $0.offset == kept || !same($0.element) }.map { $0.element }
     }
 
     private static func clean(_ entry: DictionaryEntry) -> DictionaryEntry? {

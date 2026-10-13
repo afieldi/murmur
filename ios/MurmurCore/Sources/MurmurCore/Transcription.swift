@@ -62,7 +62,26 @@ public enum Transcription {
         return body
     }
 
+    /// The hint is never what loses a take: a provider that refuses it gets
+    /// the take again without it, and words that are only the hint's own
+    /// spellings (Whisper says a prompt back on near silence) are heard
+    /// again without it too.
     public static func run(wav: Data, baseUrl: String, model: String, key: APIKey, prompt: String? = nil, send: ConnectionTest.Send) async -> TranscriptionResult {
+        let hint = prompt.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+        let result = await tries(wav: wav, baseUrl: baseUrl, model: model, key: key, prompt: hint, send: send)
+        guard let hint else { return result }
+        switch result {
+        case .failed(.badrequest, _):
+            return await tries(wav: wav, baseUrl: baseUrl, model: model, key: key, prompt: nil, send: send)
+        case .words(let text) where echoes(text, hint):
+            return await tries(wav: wav, baseUrl: baseUrl, model: model, key: key, prompt: nil, send: send)
+        default:
+            return result
+        }
+    }
+
+    /// One attempt, and one more after a transient failure.
+    static func tries(wav: Data, baseUrl: String, model: String, key: APIKey, prompt: String?, send: ConnectionTest.Send) async -> TranscriptionResult {
         var result = await attempt(wav: wav, baseUrl: baseUrl, model: model, key: key, prompt: prompt, send: send)
         var remaining = retries
         while case .failed(let kind, _) = result, kind.isTransient, remaining > 0 {
@@ -70,6 +89,17 @@ public enum Transcription {
             result = await attempt(wav: wav, baseUrl: baseUrl, model: model, key: key, prompt: prompt, send: send)
         }
         return result
+    }
+
+    /// Words made only of the hint's own words, ignoring case and
+    /// punctuation.
+    static func echoes(_ text: String, _ hint: String) -> Bool {
+        func words(_ text: String) -> [String] {
+            text.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
+        }
+        let heard = words(text)
+        let hinted = Set(words(hint))
+        return !heard.isEmpty && heard.allSatisfy(hinted.contains)
     }
 
     static func attempt(wav: Data, baseUrl: String, model: String, key: APIKey, prompt: String? = nil, send: ConnectionTest.Send) async -> TranscriptionResult {

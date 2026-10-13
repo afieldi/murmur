@@ -62,6 +62,52 @@ import Testing
         #expect(!String(decoding: try #require(blank.httpBody), as: UTF8.self).contains("name=\"prompt\""))
     }
 
+    /// Answers each request with the next reply, then the last, and notes
+    /// whether each request carried a prompt.
+    final class Replies: Sendable {
+        let replies: [(Int, String)]
+        let prompted = Mutex<[Bool]>([])
+        init(_ replies: [(Int, String)]) { self.replies = replies }
+
+        var send: ConnectionTest.Send {
+            { request in
+                let body = String(decoding: request.httpBody ?? Data(), as: UTF8.self)
+                let index = self.prompted.withLock { prompted in
+                    prompted.append(body.contains("name=\"prompt\""))
+                    return prompted.count - 1
+                }
+                let (status, text) = self.replies[min(index, self.replies.count - 1)]
+                return (Data(text.utf8), HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!)
+            }
+        }
+    }
+
+    /// A provider that refuses the hint still hears the take: it is sent
+    /// once more without it. A take refused with no hint is not.
+    @Test func aRefusedHintIsDroppedAndTheTakeSentAgain() async {
+        let refused = Replies([(400, "{}"), (200, #"{"text":"la broy called"}"#)])
+        #expect(await Transcription.run(wav: wav, baseUrl: groq, model: "m", key: key, prompt: "LaBroi.", send: refused.send) == .words("la broy called"))
+        #expect(refused.prompted.withLock { $0 } == [true, false])
+        let plain = Replies([(400, "{}"), (200, #"{"text":"never"}"#)])
+        #expect(await Transcription.run(wav: wav, baseUrl: groq, model: "m", key: key, send: plain.send) == .failed(.badrequest, detail: "http 400"))
+        #expect(plain.prompted.withLock { $0 } == [false])
+    }
+
+    /// Whisper can say a prompt back on near silence. Words that are only
+    /// the hint's own spellings are heard again without it, so the hint is
+    /// never typed in your place, and a take of only your word still gets it.
+    @Test func anEchoedHintIsHeardAgainWithoutIt() async {
+        let hint = "LaBroi, Eze Media, murmur."
+        let echoed = Replies([(200, #"{"text":"LaBroi, Eze Media, murmur."}"#), (200, #"{"text":""}"#)])
+        #expect(await Transcription.run(wav: wav, baseUrl: groq, model: "m", key: key, prompt: hint, send: echoed.send) == .words(""))
+        #expect(echoed.prompted.withLock { $0 } == [true, false])
+        let alone = Replies([(200, #"{"text":"LaBroi."}"#), (200, #"{"text":"La Broy."}"#)])
+        #expect(await Transcription.run(wav: wav, baseUrl: groq, model: "m", key: key, prompt: hint, send: alone.send) == .words("La Broy."))
+        let spoken = Replies([(200, #"{"text":"LaBroi called Eze Media."}"#)])
+        #expect(await Transcription.run(wav: wav, baseUrl: groq, model: "m", key: key, prompt: hint, send: spoken.send) == .words("LaBroi called Eze Media."))
+        #expect(spoken.prompted.withLock { $0 } == [true])
+    }
+
     @Test func anAddressTheIPhoneCannotCallSendsNothing() async {
         #expect(Transcription.request(wav: wav, baseUrl: "http://192.168.1.5:8000/v1", model: "m", key: key) == nil)
         let script = Script([200])
