@@ -95,7 +95,7 @@ Add it once in Settings, turn on Full Access, then pick it with the globe key.
 
 The keyboard is a dictation pad: the pill to talk, and globe, space, delete, and return. Tap the pill, speak, and tap it again; your words land where the cursor is. Typing letters stays with your other keyboards. In password and phone number fields, iOS always shows its own keyboard instead.
 
-For now the pill works while murmur is open. Starting a take from another app comes with murmur's listening session.
+The first tap opens murmur, which starts a listening session; after that, taps start takes without leaving your app. The answers below explain how.
 
 ## Why does murmur need Full Access?
 
@@ -106,3 +106,36 @@ The keyboard itself never connects to the internet. A test checks that every tim
 ## What is Insert last?
 
 If you leave the text field before your words are ready, murmur does not type them into whatever field you moved to. The keyboard shows Insert last instead. Tap it to type your newest take where your cursor is now. A take is typed once: after that, its words are cleared from the keyboard.
+
+## Why does murmur open when I first tap the pill?
+
+The keyboard is not allowed to use the microphone; only the murmur app is. So the first tap opens murmur, which starts listening at once and starts a session. Everything you say from that moment counts, even before you go back to your app.
+
+While the session runs, murmur keeps the microphone ready in the background, so your next taps start a take right where you are, without opening murmur again.
+
+## How do I get back to my app?
+
+Swipe right along the bottom edge of the screen, the same swipe that switches between your recent apps. murmur shows it along the bottom while it records. Keep talking as you go: the take goes on, and when you tap the pill again your words land in your app.
+
+If iOS shows your app's name as a back link in the top left corner, tapping it works too.
+
+## Why is the orange dot on?
+
+iOS shows an orange dot whenever an app has the microphone on. During a session murmur keeps the microphone ready between takes, so the dot stays on until the session ends.
+
+Between takes murmur keeps nothing: the sound is dropped as it arrives, never saved, and never sent. Only a take, from your tap to your tap, goes to your provider.
+
+## How long does murmur keep listening?
+
+15 minutes after your last take, unless you change it. In murmur, open Session and pick 5 minutes, 15 minutes, or 1 hour. The time counts from the end of your last take, so a session lasts as long as you keep dictating.
+
+To end it sooner, tap End session in murmur, or press and hold the pill in the keyboard and tap End session. A phone call, Siri, or another app taking the microphone ends it too. A take in progress when a session ends still goes through, as if you had tapped stop.
+
+## How much battery does a session use?
+
+Some, because the microphone stays on while a session runs. murmur does no work on the sound between takes: it is dropped as it arrives, and nothing is sent until you tap the pill. A session ends by itself after the length you pick, and End session stops it at once. If you dictate in short bursts, pick 5 minutes.
+
+## What if the pill says Open murmur to start?
+
+That means iOS did not let the keyboard open murmur. Check that Allow Full Access is on for murmur in Settings, then General, Keyboard, Keyboards. If it is, open murmur yourself, tap Session, and tap Start session. Then go back to your app and tap the pill: it starts a take right there while the session runs.
+
