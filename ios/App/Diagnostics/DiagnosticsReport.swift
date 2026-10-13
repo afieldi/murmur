@@ -25,6 +25,7 @@ struct DiagnosticsFacts: Sendable {
     var sessionOn: Bool
     /// A preset's name, or custom: a custom address is never written.
     var provider: String
+    /// A model murmur lists, or only the length of one typed by hand.
     var sttModel: String
     var cleanupProvider: String
     var cleanupModel: String
@@ -77,6 +78,15 @@ enum DiagnosticsReport {
         "murmur-diagnostics-\(date.formatted(.iso8601.year().month().day())).txt"
     }
 
+    /// A model id as murmur lists it, or only its length: an id murmur does
+    /// not list was typed by hand, and could hold a pasted key or address.
+    static func listed(_ id: String, in catalog: ProviderCatalog) -> String {
+        let known = catalog.providers.contains { provider in
+            provider.sttModels.contains { $0.id == id } || provider.llmModels.contains { $0.id == id }
+        }
+        return known ? id : "not listed by murmur (\(id.count) characters)"
+    }
+
     /// A preset's name for an address, or custom.
     static func name(_ baseUrl: String, in catalog: ProviderCatalog) -> String {
         catalog.preset(forBaseUrl: baseUrl)?.name ?? "custom"
@@ -106,9 +116,9 @@ enum DiagnosticsReport {
             sessionMinutes: Session.Length(rawValue: minutes)?.rawValue ?? Session.Length.fifteen.rawValue,
             sessionOn: session.isOn(at: now),
             provider: name(connection.transcription.baseUrl, in: catalog),
-            sttModel: connection.transcription.sttModel,
+            sttModel: listed(connection.transcription.sttModel, in: catalog),
             cleanupProvider: name(connection.cleanupBaseUrl, in: catalog),
-            cleanupModel: connection.cleanupModel,
+            cleanupModel: listed(connection.cleanupModel, in: catalog),
             keySaved: ((try? ring.key(for: connection.transcription.baseUrl)) ?? nil) != nil,
             level: settings.level.rawValue,
             numbers: settings.numbers.rawValue,

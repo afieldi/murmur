@@ -196,6 +196,21 @@ final class FakeProvider: Sendable {
 
     enum TakeModelTestsError: Error { case unexpected }
 
+    /// A take dropped before it was sent (you left the screen, the keyboard
+    /// went away, or it ran to its limit) still leaves a line, with how long
+    /// it recorded.
+    @Test func aCancelledTakeIsNoted() async {
+        let model = model(.says("never sent"))
+        await model.start()
+        pass(1.5)
+        model.cancel()
+        #expect(model.state == .idle)
+        #expect(sink.noted == [.cancelled(durationMs: 1500)])
+        #expect(ActivityEvent.cancelled(durationMs: 1500).line == "take cancelled ms=1500")
+        model.cancel()
+        #expect(sink.noted.count == 1)
+    }
+
     @Test func silenceIsNeverSent() async {
         microphone.samples = ScriptedMicrophone.silence
         let provider = FakeProvider.says("Thank you.")

@@ -167,11 +167,13 @@ struct TakeRules: Sendable {
         state = .idle
     }
 
-    /// Leaving the screen mid-take drops the take: nothing is kept or sent.
+    /// Leaving the screen mid-take drops the take: nothing is kept or sent,
+    /// and the activity log notes it (IOS-014).
     func cancel() {
-        guard isRecording else { return }
+        guard case .recording(let since) = state else { return }
         _ = microphone.stop()
         state = .idle
+        note(.cancelled(durationMs: Int(now().timeIntervalSince(since) * 1000)))
     }
 
     /// Runs the waiting takes one at a time through today's provider, in

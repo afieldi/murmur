@@ -30,6 +30,9 @@ enum ActivityEvent: Equatable, Sendable {
     case failed(TakeFailure, saved: Bool, retried: Bool)
     case micOff
     case micFailed
+    /// Dropped before it was sent: you left the screen, the keyboard went
+    /// away, or it ran to its limit.
+    case cancelled(durationMs: Int)
     /// What the keyboard did with a keyboard take's words.
     case keyboard(UUID, KeyboardOutcome)
 
@@ -50,6 +53,8 @@ enum ActivityEvent: Equatable, Sendable {
             "take mic-off"
         case .micFailed:
             "take mic-failed"
+        case .cancelled(let durationMs):
+            "take cancelled ms=\(durationMs)"
         case .keyboard(let take, let outcome):
             "keyboard take=\(Self.short(take)) \(outcome.rawValue)"
         }
@@ -77,7 +82,8 @@ enum ActivityEvent: Equatable, Sendable {
 }
 
 struct ActivityLog: Sendable {
-    /// About 600 lines; one older file is kept beside it.
+    /// About 1,200 lines; one older file is kept beside it, so the log
+    /// never holds more than twice this.
     static let budget = 64 * 1024
     let file: URL
 

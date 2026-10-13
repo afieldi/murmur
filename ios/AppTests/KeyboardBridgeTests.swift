@@ -77,8 +77,6 @@ import Testing
         #expect(announced.signals.filter { $0 == .changed }.count >= 2)
     }
 
-    /// A take started on the Dictate screen never goes to the mailbox, while
-    /// a keyboard take after it does.
     /// What the keyboard did with a take is logged when the next keyboard
     /// take begins (IOS-014).
     @Test func theLastKeyboardTakeIsNotedWhenTheNextBegins() async throws {
@@ -97,6 +95,8 @@ import Testing
         #expect(log.recent().map { $0.split(separator: " ", maxSplits: 1).last.map(String.init) } == ["keyboard take=\(ActivityEvent.short(first)) inserted"])
     }
 
+    /// A take started on the Dictate screen never goes to the mailbox, while
+    /// a keyboard take after it does.
     @Test func aDictateScreenTakeStaysInTheApp() async throws {
         let model = try model(.says("Private words."))
         let bridge = bridge(model)

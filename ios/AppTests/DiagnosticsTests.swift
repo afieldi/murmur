@@ -64,6 +64,22 @@ import Testing
         #expect(text.contains("(nothing yet)"))
     }
 
+    /// A model id murmur does not list is typed text, which could hold a
+    /// pasted key or address: the report gives only its length.
+    @Test func anUnlistedModelIdIsNeverWritten() {
+        var connection = ConnectionStore(defaults: defaults).load(catalog: catalog)
+        connection.transcription.baseUrl = "https://speech.private.example.com/v1"
+        connection.transcription.sttModel = "gsk_pastedcanary5678"
+        connection.transcription.llmModel = "https://models.private.example.com/m"
+        ConnectionStore(defaults: defaults).save(connection)
+        let text = DiagnosticsReport.text(facts())
+        #expect(text.contains("transcription: custom, model not listed by murmur (20 characters)"))
+        #expect(text.contains("cleanup: custom, model not listed by murmur (36 characters)"))
+        #expect(!text.contains("gsk_") && !text.contains("private.example.com"))
+        // A model murmur lists is written as it is.
+        #expect(DiagnosticsReport.listed("whisper-large-v3-turbo", in: catalog) == "whisper-large-v3-turbo")
+    }
+
     /// The report notes the keyboard's last take first, so it is included.
     @Test func theKeyboardsLastTakeIsIncluded() {
         mailbox.write(MailboxEntry(take: UUID(), phase: .ready, words: nil, at: at, typed: .inserted))
