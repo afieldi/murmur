@@ -4,6 +4,7 @@
 // the app, through the real URLSession, without a network or a server.
 import Foundation
 import MurmurCore
+import Synchronization
 
 final class StubProtocol: URLProtocol {
     /// One stand-in host for each answer Test connection can give.
@@ -32,6 +33,26 @@ final class StubProtocol: URLProtocol {
     /// The cleanup stand-ins (IOS-007): one that errors, one that chats.
     static let chatErrorBaseUrl = "https://chaterror.stub.invalid/v1"
     static let chattyBaseUrl = "https://chatty.stub.invalid/v1"
+
+    /// The note sorter's stand-in (IOS-023): it answers with the replies the
+    /// smoke scripted, in order, and keeps what it was asked.
+    static let sortBaseUrl = "https://sort.stub.invalid/v1"
+
+    struct SortReply: Decodable, Sendable {
+        let content: String?
+        let status: Int?
+    }
+
+    private static let sort = Mutex<(replies: [SortReply], asked: [[String]])>(([], []))
+
+    static func script(_ replies: [SortReply]) {
+        sort.withLock { $0 = (replies, []) }
+    }
+
+    /// Each request's system and user prompts, in order.
+    static func sortAsked() -> [[String]] {
+        sort.withLock { $0.asked }
+    }
 
     /// The only key the stand-ins accept, so a missing header fails.
     static let key = "smoke-not-a-real-key-1234"
@@ -62,6 +83,8 @@ final class StubProtocol: URLProtocol {
             (status, body) = (503, #"{"error":{"message":"Service unavailable"}}"#)
         case ("chaterror", _):
             (status, body) = (500, #"{"error":{"message":"Internal error"}}"#)
+        case ("sort", _):
+            (status, body) = authorized ? Self.sortAnswer(request) : (401, "{}")
         case ("chatty", _):
             (status, body) = (200, #"{"choices":[{"message":{"content":"Sure! Here is the cleaned text: send the report."}}]}"#)
         case (_, .offline?):
@@ -84,6 +107,21 @@ final class StubProtocol: URLProtocol {
     }
 
     override func stopLoading() {}
+
+    /// The next scripted reply to a sort request, as a chat completion.
+    private static func sortAnswer(_ request: URLRequest) -> (Int, String) {
+        let body = request.httpBody ?? request.httpBodyStream.map(read) ?? Data()
+        let messages = ((try? JSONSerialization.jsonObject(with: body)) as? [String: Any])?["messages"] as? [[String: String]] ?? []
+        let reply: SortReply? = sort.withLock { state in
+            state.asked.append(messages.compactMap { $0["content"] })
+            return state.replies.isEmpty ? nil : state.replies.removeFirst()
+        }
+        guard let reply else { return (599, "{}") }
+        guard let content = reply.content else { return (reply.status ?? 500, "{}") }
+        let completion: [String: Any] = ["choices": [["message": ["content": content]]]]
+        let data = (try? JSONSerialization.data(withJSONObject: completion)) ?? Data()
+        return (200, String(decoding: data, as: UTF8.self))
+    }
 
     /// A take reached us whole: a form with a WAV file and a model in it.
     /// URLSession hands a protocol the body as a stream.

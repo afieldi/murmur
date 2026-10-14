@@ -322,3 +322,39 @@ The same way as on the Mac, painted by the same code. Each day gets one ink pain
 Earlier days wait under it in a strip; tap one to open it large. Save card saves a portrait card of the day (1080 by 1350) with its name, how far it got, and who painted it. Save the week, there once two of the last seven days have paintings, saves the seven days as one long scroll. Both open the share sheet, where Save Image puts them in Photos; murmur only adds to your photos and never looks at your library.
 
 A painting is made from its takes: deleting a take takes its stroke away, and Clear all clears the paintings too, as on the Mac. Your iPhone keeps its own paintings, from the takes it keeps, and its seed is its own, so the same takes on your iPhone and your Mac paint different subjects until one murmur account joins them. With Reduce Motion on (Settings, Accessibility, Motion), the painting appears finished at once.
+
+## How do I take a note by voice on iPhone?
+
+Tap New note on murmur's Home screen and talk. When you stop, the words are kept as a note instead of offered to copy, and murmur says Noted to inbox. An iPhone has no hotkey, so murmur gives you three quicker ways in, each opening New note already listening:
+
+- **The murmur icon:** touch and hold murmur's icon on the Home Screen and tap New note.
+- **Control Center or the Action Button:** add the New note control the same way as Start murmur (see How do I start murmur from Control Center or the Action Button?). On an iPhone with an Action Button, one press opens a note.
+- **Shortcuts:** murmur adds New murmur note to the Shortcuts app.
+
+From any app, use the murmur keyboard: press and hold the pill and tap Note. Under the pill it says Next take is a note. Tap the pill and talk as usual: when you stop, nothing is typed, and the line under the pill says Noted to inbox. Note is for the next take only; the take after it types again. To change your mind before you talk, press and hold the pill and tap Type the next take.
+
+Every note lands first in that day's inbox file, under the time you said it, word for word as cleanup left it, the same file a Mac writes (murmur/inbox/2026-10-14.md for a note on October 14). The take is in your takes on Home too, as every take is. If murmur cannot write the note, the keyboard types the words instead, so a note is never lost.
+
+## How does murmur sort my notes on iPhone?
+
+The same way as the Mac, with the same rules. Sorting is off until you turn it on: tap the gear, then Notes, then Sort into tasks and ideas. On, after a note lands, murmur asks your cleanup connection (Settings, Provider and key) to label each sentence a task, an idea, or a note. Tasks are copied to murmur/todo.md as checkboxes and ideas to murmur/ideas.md, each with a link back to the note; notes stay in the inbox. Nothing is reworded. A run like "I need milk, eggs, and bread" files as one lead line with each item under it.
+
+murmur also checks a new task or idea against what is already filed. A line that repeats something filed, sounds like you finished an open task, or repeats something you already finished is held in the inbox instead of filed twice. Notes, under Held for you, shows each held line and what it was tied to, with up to three choices: Tick it marks the finished task done in todo.md (one box, nothing else in the file changes), File it anyway files it as labeled, and Skip leaves it in the inbox.
+
+With sorting off, notes stay in the inbox only, and the words of a note never leave your phone for sorting. With no cleanup connection, or when the request fails, the note stays in the inbox and Notes offers Sort again. Your iPhone's sorter is a chat; the Mac can also use a decision model, which the iPhone does not.
+
+## Can murmur save my notes to Obsidian on iPhone?
+
+Yes. Your notes are plain markdown files, so any folder works, an Obsidian vault included. Tap the gear, then Notes, then Choose folder, and pick your vault. On iPhone, Obsidian keeps a vault that syncs through iCloud in iCloud Drive, then Obsidian, then your vault's name, and any other vault (Obsidian Sync, for one) in On My iPhone, then Obsidian, then your vault's name (Obsidian's help, checked 2026-10-14). murmur writes there what it writes on a Mac with the same folder: murmur/inbox for each day's notes, murmur/todo.md, and murmur/ideas.md. Point the Mac at the same vault and both add to the same files.
+
+If both devices add to the same day's file before they sync, a vault in iCloud Drive can keep only one of the two versions. Obsidian Sync merges the two, except when both devices start the same day's file within a couple of minutes of each other, when it keeps one (Obsidian's help, checked 2026-10-14). Either way the words are still in that device's takes. Notes already written stay where they were: switching folders moves nothing. To go back, tap Keep notes in murmur. If murmur can no longer reach the folder, say after the vault moved, Settings, Notes says so, and a note from the keyboard is typed instead until you choose the folder again.
+
+## Where are my notes kept on iPhone?
+
+In murmur's own storage on your iPhone, out of iCloud backups like your takes, unless you choose a folder of your own (see Can murmur save my notes to Obsidian on iPhone?). The Notes screen lists your tasks, your ideas, and every inbox day; open any of them to read it as murmur wrote it, and tap Share to send it as text to Notes, Files, Mail, or anywhere else. The words of a note go to your cleanup connection only when sorting is on. Home's Notes row shows your newest note's first line and where it landed.
+
+## How do task reminders work on iPhone?
+
+Tap the gear, then Notes, and turn on Task reminders. murmur asks to send notifications only then. At each of three times you pick (8:30 AM, 1:00 PM, and 5:30 PM until you change them, as on the Mac), a "murmur tasks" notification says how many tasks are still open in todo.md and names the next few, the way the Mac's reminders do. With nothing open, nothing arrives. Send one now shows how one reads right away.
+
+An iPhone app cannot wake up to read a file, so murmur sets the coming week's reminders ahead with your tasks as they stand, and sets them again whenever murmur changes your tasks (a note sorted, a box ticked, or a time changed) and each time you open murmur. A box you tick in Obsidian or on your Mac shows in the reminders after you next open murmur. After a week without opening murmur they pause until you open it again.

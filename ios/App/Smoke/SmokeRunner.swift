@@ -55,6 +55,7 @@ enum SmokeRunner {
             ("look", checkLook),
             ("shareCard", checkShareCard),
             ("analytics", checkAnalytics),
+            ("notes", checkNotes),
             ("sharedJson", { try checkSharedJson(expected: request.sharedCount) })
         ]
         var results: [String: Bool] = [:]
@@ -779,6 +780,72 @@ enum SmokeRunner {
         done.wait()
         guard let value = result.withLock({ $0 }) else { preconditionFailure("the work signaled without a value") }
         return value
+    }
+
+    /// Notes (IOS-023): desktop's sort scenarios through the real path. Each
+    /// note is saved by Notes into a folder picked as a vault is, and sorted
+    /// by a chat through the real URLSession to the stand-in, which answers
+    /// with the replies desktop's model gave; the requests, the files, and
+    /// the reports must be the ones desktop's sorter left on the same notes.
+    static func checkNotes() throws {
+        if let failure = onMain({ await notesFailure() }) { throw SmokeFailure(failure) }
+    }
+
+    @MainActor private static func notesFailure() async -> String? {
+        guard let rules = try? BundledRules.sorter(), let key = APIKey(StubProtocol.key),
+              let directory = Bundle.main.url(forResource: "shared", withExtension: nil),
+              let file = try? SharedData(directory: directory).decode(SortScenarioFile.self, from: "sort-scenarios.json")
+        else { return "the sorter's rules or desktop's scenarios did not load" }
+        guard let defaults = UserDefaults(suiteName: "murmur.smoke.notes.\(UUID().uuidString)") else { return "no scratch defaults" }
+        let scratch = FileManager.default.temporaryDirectory.appending(path: "smoke-notes-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let vault = scratch.appending(path: "vault", directoryHint: .isDirectory)
+        let choice = NotesFolderChoice(defaults)
+        do {
+            try FileManager.default.createDirectory(at: vault, withIntermediateDirectories: true)
+            try choice.pick(vault)
+        } catch {
+            return "the scratch vault could not be picked: \(error)"
+        }
+        let folder = choice.store()
+        guard folder.picked, !folder.lost else { return "the picked vault did not open again" }
+        let day = file.when.date.split(separator: "-").compactMap { Int($0) }
+        let clock = file.when.time.split(separator: ":").compactMap { Int($0) }
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = .gmt
+        guard day.count == 3, clock.count == 2,
+              let when = utc.date(from: DateComponents(year: day[0], month: day[1], day: day[2], hour: clock[0], minute: clock[1]))
+        else { return "the scenarios' moment did not read" }
+        let session = StubProtocol.session()
+        let connection = PolishConnection(baseUrl: StubProtocol.sortBaseUrl, model: "smoke-model", key: key)
+        func same(_ got: SortReport?, _ want: SortScenarioFile.Report?) -> Bool {
+            guard let got, let want else { return got == nil && want == nil }
+            return got.outcome.rawValue == want.outcome && got.tasks == want.tasks && got.ideas == want.ideas && got.notes == want.notes
+                && got.held == want.held && got.reason == want.reason && got.places == want.places.map(\.relative)
+        }
+        let utf16: (String?) -> [UInt16]? = { $0.map { Array($0.utf16) } }
+        for scenario in file.scenarios {
+            try? FileManager.default.removeItem(at: vault.appending(path: "murmur", directoryHint: .isDirectory))
+            if let todo = scenario.todoBefore { try? folder.replace(rules.layout.tasks, todo) }
+            if let ideas = scenario.ideasBefore { try? folder.replace(rules.layout.ideas, ideas) }
+            StubProtocol.script(scenario.calls.map(\.reply))
+            let notes = Notes(
+                folder: folder, rules: rules, stateFile: NotesStateFile(file: scratch.appending(path: "state-\(UUID().uuidString).json")),
+                sortOn: { true }, ask: { NoteSort.chat(connection, rules: rules, send: { try await session.data(for: $0) }) }, timeZone: { .gmt }
+            )
+            guard notes.save(scenario.text, at: when) != nil else { return "\(scenario.name): the note was not saved" }
+            await notes.settle()
+            let first = notes.state.report
+            if scenario.again != nil { await notes.sortAgain() }
+            let asked = StubProtocol.sortAsked()
+            guard asked == scenario.calls.map({ [$0.system, $0.user] }) else { return "\(scenario.name): the requests are not desktop's" }
+            guard utf16(folder.read(rules.layout.tasks)) == utf16(scenario.todo), utf16(folder.read(rules.layout.ideas)) == utf16(scenario.ideas) else {
+                return "\(scenario.name): the files are not desktop's"
+            }
+            guard same(first, scenario.report) else { return "\(scenario.name): the report is \(String(describing: first))" }
+            if let again = scenario.again, !same(notes.state.report, again) { return "\(scenario.name): Sort again reported \(String(describing: notes.state.report))" }
+        }
+        return nil
     }
 
     static func checkSharedJson(expected: Int) throws {
