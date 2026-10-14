@@ -4,7 +4,8 @@
 // takes with their words, time, and length. Tap a take to copy it;
 // deleting one asks first, in red, and Clear all says the real count. The
 // Journey row shows the belt this iPhone's takes have earned (IOS-017),
-// and the painting row today's painting (IOS-019).
+// the painting row today's painting (IOS-019), and Back today the time
+// back today against a typical day, with the way to your numbers (IOS-022).
 import MurmurCore
 import SwiftUI
 import UIKit
@@ -18,6 +19,8 @@ struct HomeScreen: View {
     var journey: JourneyRules? = JourneyRules.live
     /// The painting book; nil only if the app's own files could not be read.
     var paintings: PaintingStore? = PaintingStore.live()
+    /// The rates and catalog the numbers use; nil only if the app's own files could not be read.
+    var numbers: NumbersRules? = NumbersRules.live
     let resume: (Setup.Step) -> Void
     @State private var copied: UUID?
     @State private var askingClear = false
@@ -40,6 +43,9 @@ struct HomeScreen: View {
                     }
                 }
                 .listRowBackground(Tokens.panel)
+            }
+            if let numbers, !history.entries.isEmpty {
+                BackToday(history: history, rules: numbers)
             }
             if journey != nil || paintings != nil {
                 Section {

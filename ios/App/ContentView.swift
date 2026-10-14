@@ -49,7 +49,11 @@ struct ContentView: View {
             }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { setup.refresh() }
+            guard phase == .active else { return }
+            setup.refresh()
+            // A day or more away: the coming days' recaps are laid down again.
+            let entries = history.entries
+            Task { await RecapNotifications.refresh(entries) }
         }
         .onOpenURL { url in
             Task { await opener.open(url) }

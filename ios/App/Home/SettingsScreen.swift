@@ -14,6 +14,7 @@ struct SettingsScreen: View {
                 NavigationLink("Session") { SessionRoute() }
                 NavigationLink("Keyboard") { KeyboardScreen() }
                 NavigationLink("Look") { LookRoute() }
+                NavigationLink(NumbersCopy.screen) { TimeBackScreen(history: History.live()) }
                 NavigationLink("Diagnostics") { DiagnosticsRoute() }
                 NavigationLink("About") { AboutScreen() }
             }

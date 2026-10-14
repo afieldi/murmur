@@ -215,6 +215,14 @@ enum JourneyArtwork: Hashable, Sendable {
     case stamp(id: String, got: Bool, seed: Int, size: Double)
     /// The belt share card, at desktop's 840 by 440 points (IOS-021).
     case share(days: [DayTotal], rank: String, level: Int)
+    /// The fourteen days as brush dabs, 76 points high (IOS-022).
+    case dabs(days: [HeatDay], width: Double)
+    /// The activity wall as blots, a column a week, Sunday on top.
+    case wall(days: [HeatDay])
+    /// The wall's five levels, from none to most.
+    case legend
+    /// Home's gold stroke for today against a typical day, 24 points high.
+    case stroke(share: Double, day: String, width: Double)
 
     var fields: [String: Any] {
         switch self {
@@ -239,8 +247,21 @@ enum JourneyArtwork: Hashable, Sendable {
         case let .share(days, rank, level):
             let painted = days.map { ["day": $0.day, "words": $0.words, "sessions": $0.sessions] as [String: Any] }
             return ["kind": "share", "days": painted, "rank": rank, "level": level]
+        case let .dabs(days, width):
+            return ["kind": "dabs", "days": days.map(\.fields), "width": width]
+        case let .wall(days):
+            return ["kind": "wall", "days": days.map(\.fields)]
+        case .legend:
+            return ["kind": "legend"]
+        case let .stroke(share, day, width):
+            return ["kind": "stroke", "share": share, "day": day, "width": width]
         }
     }
+}
+
+extension HeatDay {
+    /// The day as the page reads it.
+    var fields: [String: Any] { ["day": day, "words": words] }
 }
 
 extension PaintingRecord {

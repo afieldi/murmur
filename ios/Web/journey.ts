@@ -10,10 +10,12 @@
 // day's painting, its newest stroke painting in, and the saved card and
 // week scroll, whose words are part of the picture, as on desktop. The belt
 // share card (IOS-021) is desktop's too (settings/cardPaint.ts): the last
-// thirty days as strokes, the rank in the display face.
+// thirty days as strokes, the rank in the display face. So are the numbers'
+// marks (IOS-022, settings/analyticsPaint.ts): the fourteen days as dabs,
+// the activity wall as blots, and Home's gold stroke for today.
 import cosmetics from '../../shared/cosmetics.json'
 import ranks from '../../shared/ranks.json'
-import { animateScene, paintScene, type Surface } from '../../src/renderer/brush'
+import { animateScene, paintScene, type Surface, tokenColor } from '../../src/renderer/brush'
 import {
   ROAD,
   beltOnInk,
@@ -32,6 +34,18 @@ import type { PaintingBook, PaintingRecord } from '../../src/shared/painting'
 import type { ProgressReport, RankSpec } from '../../src/shared/ranks'
 import { CARD, SCROLL, paintPainting } from '../../src/renderer/settings/painting'
 import { CARD_H, CARD_W, type CardDay, paintShareCard } from '../../src/renderer/settings/cardPaint'
+import {
+  CHART_H,
+  DAY_STROKE_H,
+  HEAT_PCT,
+  type WallMark,
+  dabHeight,
+  heatLevel,
+  paintChartDab,
+  paintDayStroke,
+  paintWallMarks,
+  wallSize
+} from '../../src/renderer/settings/analyticsPaint'
 import { cardFonts, dayColors, drawDayCard, drawWeekScroll, lightOf, planFor, progressOf, sealOf } from '../../src/renderer/settings/paintingDay'
 
 const LADDER = (ranks as { ranks: RankSpec[] }).ranks
@@ -55,6 +69,25 @@ export type PictureRequest =
   | { kind: 'tallies'; width: number; height: number; scale: number; standing: Standing }
   | { kind: 'stamp'; size: number; scale: number; id: string; got: boolean; seed: number }
   | { kind: 'share'; scale: number; days: CardDay[]; rank: string; level: number }
+  | { kind: 'dabs'; width: number; scale: number; days: DayWords[] }
+  | { kind: 'wall'; scale: number; days: DayWords[] }
+  | { kind: 'legend'; scale: number }
+  | { kind: 'stroke'; width: number; scale: number; share: number; day: string }
+
+/** A day and its words, for the numbers' marks. */
+export interface DayWords {
+  day: string
+  words: number
+}
+
+/** The wall's color: desktop's vibrant orange default. */
+const heatBase = (): [number, number, number] => tokenColor('--heat-default', [249, 115, 22])
+
+/** Sunday-top weeks: the blank cells before the first day. */
+function wallPad(first: string | undefined): number {
+  if (!first) return 0
+  return new Date(Number(first.slice(0, 4)), Number(first.slice(5, 7)) - 1, Number(first.slice(8, 10))).getDay()
+}
 
 export interface Picture {
   png: string
@@ -189,6 +222,36 @@ export async function picture(req: PictureRequest): Promise<Picture> {
       const { el, ctx } = canvas(CARD_W, CARD_H, req.scale)
       // No founder on the iPhone yet: practice is the rank (IOS-029 joins them).
       paintShareCard(ctx, { days: req.days, rank: rank(req.rank) ?? LADDER[0], level: req.level, founder: false }, colors, fonts)
+      return { png: el.toDataURL('image/png') }
+    }
+    case 'dabs': {
+      const { el, ctx } = canvas(req.width, CHART_H, req.scale)
+      const column = req.width / Math.max(1, req.days.length)
+      const most = Math.max(1, ...req.days.map((d) => d.words))
+      req.days.forEach((d, i) => {
+        paintChartDab(ctx, column * (i + 0.5), column, d.day, dabHeight(d.words, most), d.words === 0, i === req.days.length - 1)
+      })
+      return { png: el.toDataURL('image/png') }
+    }
+    case 'wall': {
+      const pad = wallPad(req.days[0]?.day)
+      const most = Math.max(1, ...req.days.map((d) => d.words))
+      const marks: Array<WallMark | null> = [...Array.from({ length: pad }, () => null), ...req.days.map((d) => ({ seed: d.day, level: heatLevel(d.words, most) }))]
+      const size = wallSize(marks.length, 7)
+      const { el, ctx } = canvas(size.width, size.height, req.scale)
+      paintWallMarks(ctx, marks, 7, heatBase(), false)
+      return { png: el.toDataURL('image/png') }
+    }
+    case 'legend': {
+      const marks = HEAT_PCT.map((_, level) => ({ seed: `legend-${level}`, level }))
+      const size = wallSize(marks.length, 1)
+      const { el, ctx } = canvas(size.width, size.height, req.scale)
+      paintWallMarks(ctx, marks, 1, heatBase(), false)
+      return { png: el.toDataURL('image/png') }
+    }
+    case 'stroke': {
+      const { el, ctx } = canvas(req.width, DAY_STROKE_H, req.scale)
+      paintDayStroke(ctx, req.width, req.share, req.day)
       return { png: el.toDataURL('image/png') }
     }
   }

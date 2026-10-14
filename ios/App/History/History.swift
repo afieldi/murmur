@@ -196,6 +196,9 @@ extension History {
         } changed: { change in
             PaintingStore.live()?.apply(change)
             Looks.refresh(change.kept)
+            // The recap says the day as it stands after this take.
+            let kept = change.kept
+            Task { await RecapNotifications.refresh(kept) }
         }
         // Takes kept before the painting a day paint their days too.
         PaintingStore.live()?.sync(history.entries)
