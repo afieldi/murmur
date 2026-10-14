@@ -10,15 +10,27 @@ import SwiftUI
 /// The choices and what this iPhone's takes have unlocked.
 @Observable @MainActor final class LookModel {
     private(set) var look: PillLook
-    let standing: LookStanding?
+    private(set) var standing: LookStanding?
+    @ObservationIgnored private let rules: LookRules?
+    @ObservationIgnored private let takes: @MainActor () -> [HistoryEntry]
     @ObservationIgnored private let file: URL?
 
-    init(entries: [HistoryEntry], rules: LookRules? = .live, file: URL? = PillLook.file) {
+    /// `takes` reads the takes kept now, each time the model looks.
+    init(takes: @escaping @MainActor () -> [HistoryEntry], rules: LookRules? = .live, file: URL? = PillLook.file) {
+        self.rules = rules
+        self.takes = takes
         self.file = file
-        let standing = rules?.standing(entries)
+        look = PillLook.read(from: file)
+        refresh()
+    }
+
+    /// What the takes unlock now, and the look as they paint it, written
+    /// if the file lags: as the Look opens, when murmur comes back to the
+    /// front, and before every pick, so a belt earned while the screen sat
+    /// open counts and a pick never writes an old color back.
+    func refresh() {
+        standing = rules?.standing(takes())
         let read = PillLook.read(from: file)
-        self.standing = standing
-        // The look as the takes paint it now, written if the file lags.
         look = standing?.resolved(read) ?? read
         if look != read { look.write(to: file) }
     }
@@ -42,12 +54,14 @@ import SwiftUI
     var palette: PillPalette { look.palette }
 
     func choose(_ style: PillStyle, item: CosmeticItem) {
+        refresh()
         guard unlocked(item), style != look.style else { return }
         look.style = style
         save()
     }
 
     func choose(accent item: CosmeticItem) {
+        refresh()
         guard unlocked(item), item.id != look.accent else { return }
         look.accent = item.id
         save()
@@ -59,19 +73,46 @@ import SwiftUI
     }
 }
 
-struct LookScreen: View {
-    @State private var model: LookModel
+/// The Look, built as it opens: a link's destination is made whenever the
+/// screen that links here draws, so the model waits for the Look itself.
+struct LookRoute: View {
+    @State private var model: LookModel?
 
-    init(model: LookModel? = nil) {
-        _model = State(initialValue: model ?? LookModel(entries: History.live().entries))
+    var body: some View {
+        Group {
+            if let model {
+                LookScreen(model: model)
+            } else {
+                Tokens.ink.ignoresSafeArea()
+                    .navigationTitle("Look")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+        .onAppear {
+            if let model {
+                model.refresh()
+            } else {
+                model = LookModel { History.live().entries }
+            }
+        }
     }
+}
 
-    private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+struct LookScreen: View {
+    let model: LookModel
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    /// Two tiles a row; one at the accessibility text sizes, so no tile's
+    /// words are cut short.
+    static func columns(for size: DynamicTypeSize) -> [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 12), count: size.isAccessibilitySize ? 1 : 2)
+    }
 
     var body: some View {
         Form {
             Section {
-                LazyVGrid(columns: columns, spacing: 12) {
+                LazyVGrid(columns: Self.columns(for: typeSize), spacing: 12) {
                     ForEach(model.styles, id: \.item.id) { entry in
                         StyleTile(
                             item: entry.item,
@@ -116,6 +157,10 @@ struct LookScreen: View {
         .tint(Tokens.brand)
         .navigationTitle("Look")
         .navigationBarTitleDisplayMode(.inline)
+        // Takes dictated in other apps may have earned something meanwhile.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { model.refresh() }
+        }
     }
 }
 
@@ -144,7 +189,6 @@ struct StyleTile: View {
                     Text(LookCopy.status(item, inUse: inUse, unlocked: unlocked))
                         .font(.footnote)
                         .foregroundStyle(Tokens.textDim)
-                        .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.horizontal, 4)
@@ -158,8 +202,7 @@ struct StyleTile: View {
         .disabled(!unlocked)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(LookCopy.name(item))
-        .accessibilityValue(LookCopy.status(item, inUse: inUse, unlocked: unlocked))
-        .accessibilityHint(unlocked ? "" : LookCopy.lockedHint(item))
+        .accessibilityValue(LookCopy.styleValue(item, inUse: inUse, unlocked: unlocked))
         .accessibilityAddTraits(inUse ? [.isButton, .isSelected] : .isButton)
     }
 }
@@ -203,7 +246,7 @@ struct AccentRow: View {
         .disabled(!unlocked)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(LookCopy.name(item))
-        .accessibilityHint(unlocked ? "" : LookCopy.lockedHint(item))
+        .accessibilityValue(LookCopy.accentValue(item, unlocked: unlocked))
         .accessibilityAddTraits(chosen ? [.isButton, .isSelected] : .isButton)
     }
 }
@@ -217,6 +260,6 @@ extension Color {
 
 #if DEBUG
 #Preview {
-    NavigationStack { LookScreen() }.preferredColorScheme(.dark)
+    NavigationStack { LookRoute() }.preferredColorScheme(.dark)
 }
 #endif

@@ -13,7 +13,7 @@ struct SettingsScreen: View {
                 NavigationLink("Dictionary and expansions") { WordsRoute() }
                 NavigationLink("Session") { SessionRoute() }
                 NavigationLink("Keyboard") { KeyboardScreen() }
-                NavigationLink("Look") { LookScreen() }
+                NavigationLink("Look") { LookRoute() }
                 NavigationLink("Diagnostics") { DiagnosticsRoute() }
                 NavigationLink("About") { AboutScreen() }
             }

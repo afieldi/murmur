@@ -37,7 +37,7 @@ struct KeyboardScreen: View {
 
             Section {
                 NavigationLink {
-                    LookScreen()
+                    LookRoute()
                 } label: {
                     HStack(spacing: 14) {
                         PillCanvas(style: look.style, stage: .recording, level: DemoVoice.level, palette: look.palette)

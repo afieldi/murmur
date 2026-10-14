@@ -8,6 +8,8 @@
 // for no speech, and clean red with no bristles for an error. The scene
 // paints in points as desktop paints in CSS pixels: marks keep desktop's
 // sizes, and what desktop sizes by the wave follows the pill they are in.
+// A pill taller than desktop's 40 point wave (the screen murmur opens to)
+// is desktop's pill magnified, so its marks grow with it.
 import CoreGraphics
 import Foundation
 import MurmurCore
@@ -59,6 +61,8 @@ struct InkScene {
     static let ribbonSamples = 48
     /// How long a stage change keeps animating before the pill rests.
     static let settleMs = 1600.0
+    /// Desktop's wave is 40 high; a taller pill paints it magnified.
+    static let waveHeight = 40.0
     /// Desktop runs these updates once a frame at 60 a second.
     private static let frameMs = 1000.0 / 60
 
@@ -315,10 +319,12 @@ struct InkScene {
     /// Paints the scene at its clock into the rect.
     func paint(in rect: CGRect, context: CGContext, palette p: PillPalette) {
         guard rect.width > 0, rect.height > 0 else { return }
-        let field = rect.size
+        let k = max(1, rect.height / Self.waveHeight)
+        let field = CGSize(width: rect.width / k, height: rect.height / k)
         context.saveGState()
         defer { context.restoreGState() }
         context.translateBy(x: rect.minX, y: rect.minY)
+        context.scaleBy(x: k, y: k)
         // Desktop's canvas ends at the wave's edges; so does the scene.
         context.clip(to: CGRect(origin: .zero, size: field))
         let sheen = mode == .proc && !reduced ? Sheen.at((now - modeAt) / 1000) : nil

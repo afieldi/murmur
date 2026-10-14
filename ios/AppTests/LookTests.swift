@@ -7,11 +7,14 @@ import Testing
 /// The Look (IOS-020): what this iPhone's takes unlock, by desktop's rules,
 /// and the look the keyboard reads.
 @MainActor @Suite struct LookTests {
-    /// A take a day for `days` days, `words` words each, ending yesterday.
+    /// A take a day for `days` days, `words` words each, ending yesterday,
+    /// on days kept in UTC so no clock change puts two takes on one day.
     func takes(days: Int, words: Int) -> [HistoryEntry] {
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC") ?? .gmt
         let start = Date.now.addingTimeInterval(Double(-days) * 86_400)
         return (0..<days).map { i in
-            HistoryEntry(at: start.addingTimeInterval(Double(i) * 86_400), durationMs: 60_000, words: Array(repeating: "word", count: words).joined(separator: " "))
+            HistoryEntry(at: start.addingTimeInterval(Double(i) * 86_400), durationMs: 60_000, words: Array(repeating: "word", count: words).joined(separator: " "), calendar: utc)
         }
     }
 
@@ -55,7 +58,8 @@ import Testing
     /// its color; a locked pick changes nothing.
     @Test func aPickReachesTheKeyboard() throws {
         let file = scratch()
-        let model = LookModel(entries: takes(days: 1, words: 150), rules: try rules(), file: file)
+        let whiteTakes = takes(days: 1, words: 150)
+        let model = LookModel(takes: { whiteTakes }, rules: try rules(), file: file)
         let dabs = try #require(model.styles.first { $0.style == .dabs })
         model.choose(.dabs, item: dabs.item)
         #expect(PillLook.read(from: file).style == .dabs)
@@ -76,10 +80,35 @@ import Testing
     @Test func theLookOpensResolved() throws {
         let file = scratch()
         PillLook(style: .bars, accent: "belt").write(to: file)
-        let model = LookModel(entries: takes(days: 14, words: 1800), rules: try rules(), file: file)
+        let blueTakes = takes(days: 14, words: 1800)
+        let model = LookModel(takes: { blueTakes }, rules: try rules(), file: file)
         let blue = try rules().cosmetics.beltColors["blue"]
         #expect(model.look.color == blue)
         #expect(PillLook.read(from: file).color == blue)
+    }
+
+    /// A belt earned while the Look sat open counts at the next pick, and the
+    /// pick writes the belt's new color, never the one the screen opened with.
+    @Test func aPickCountsTheTakesAsTheyAreNow() throws {
+        let rules = try rules()
+        let file = scratch()
+        PillLook(style: .bars, accent: "belt").write(to: file)
+        var current = takes(days: 1, words: 150)
+        let model = LookModel(takes: { current }, rules: rules, file: file)
+        #expect(model.look.color == rules.cosmetics.beltColors["white"])
+        current = takes(days: 14, words: 1800)
+        let flecks = try #require(model.styles.first { $0.style == .flecks })
+        model.choose(.flecks, item: flecks.item)
+        #expect(PillLook.read(from: file) == PillLook(style: .flecks, accent: "belt", color: rules.cosmetics.beltColors["blue"]))
+    }
+
+    /// The tiles sit two a row, and one a row at the accessibility text
+    /// sizes, so no tile's words are cut short.
+    @Test func theLargestTextGetsARowPerTile() {
+        #expect(LookScreen.columns(for: .large).count == 2)
+        #expect(LookScreen.columns(for: .xxxLarge).count == 2)
+        #expect(LookScreen.columns(for: .accessibility1).count == 1)
+        #expect(LookScreen.columns(for: .accessibility5).count == 1)
     }
 
     /// New takes repaint the keyboard's accent: a new belt colors the belt
@@ -115,7 +144,11 @@ import Testing
         #expect(LookCopy.status(dabs, inUse: false, unlocked: true) == "Earned at white belt")
         #expect(LookCopy.status(dabs, inUse: true, unlocked: true) == "In use")
         #expect(LookCopy.status(bars, inUse: false, unlocked: true) == "The classic")
-        #expect(LookCopy.lockedHint(ember) == "Locked. Hold a dictation past five minutes.")
+        #expect(LookCopy.styleValue(dabs, inUse: false, unlocked: false) == "Locked, earn your white belt")
+        #expect(LookCopy.styleValue(dabs, inUse: true, unlocked: false) == "In use. Locked, earn your white belt")
+        #expect(LookCopy.styleValue(dabs, inUse: false, unlocked: true) == "Earned at white belt")
+        #expect(LookCopy.accentValue(ember, unlocked: false) == "Locked, hold a dictation past five minutes")
+        #expect(LookCopy.accentValue(ember, unlocked: true).isEmpty)
         for line in [LookCopy.waveFooter, LookCopy.accentFooter] {
             #expect(!line.contains("Murmur") && !line.contains("\u{2014}") && !line.contains(" - "))
         }

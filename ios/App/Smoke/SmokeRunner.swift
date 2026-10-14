@@ -609,9 +609,12 @@ enum SmokeRunner {
         guard let rules = LookRules.live else { return "the cosmetics did not load" }
         let file = container.appending(path: "smoke-pill-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: file) }
+        // Days kept in UTC, so no clock change puts two takes on one day.
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC") ?? .gmt
         let start = Date.now.addingTimeInterval(-45 * 86_400)
         let takes = (0..<45).map { i in
-            HistoryEntry(at: start.addingTimeInterval(Double(i) * 86_400), durationMs: 60_000, words: Array(repeating: "word", count: 1700).joined(separator: " "))
+            HistoryEntry(at: start.addingTimeInterval(Double(i) * 86_400), durationMs: 60_000, words: Array(repeating: "word", count: 1700).joined(separator: " "), calendar: utc)
         }
         let standing = rules.standing(takes)
         guard standing.progress.rank.belt == "purple" else { return "the seeded takes reached \(standing.progress.rank.id), not purple" }

@@ -174,7 +174,7 @@ The pill in the keyboard shows where your take is. The screen murmur opens to sh
 
 - **At rest**, it is small, grey, and still. It never shows amber at rest, even while a session keeps the microphone ready.
 - **Recording**, it is wet amber at your voice's level, cooling toward gold as each moment ages. With another accent, it is wet in that color, cooling toward a darker shade of it.
-- **Working**, the paint dries to gold with one sheen, and a softer sheen every 2 seconds if it takes a while, so a long wait never looks frozen.
+- **Working**, the paint dries to gold (or a darker shade of your accent) with one sheen, and a softer sheen every 2 seconds if it takes a while, so a long wait never looks frozen.
 - **Words added**, it sinks flat.
 - **Heard nothing**, it is a dry grey scrape.
 - **Failed**, it is plain red. Open murmur to see why and retry.

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // The pill's stages as images (ios/prd.json IOS-010), like desktop's ink
 // shots: launched with --pill-shots (npm run ios:pill-shots), the app draws
-// every stage of both styles as the keyboard shows it, writes the PNGs,
+// every stage of every style as the keyboard shows it, writes the PNGs,
 // prints where, and exits.
 import UIKit
 

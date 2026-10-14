@@ -131,6 +131,27 @@ import UIKit
         }
     }
 
+    /// A pill taller than desktop's 40 point wave (the screen murmur opens
+    /// to) is desktop's pill magnified: its flecks, rings, and bristles grow
+    /// with it instead of thinning to dust.
+    @Test(arguments: [PillStyle.dabs, .flecks, .rings, .ribbon, .pulse])
+    func aTallPillIsDesktopsMagnified(style: PillStyle) {
+        let frame = PillFrame(style: style, stage: .recording, levels: DemoVoice.levels, time: 0.5, still: false)
+        func pixels(_ size: CGSize, scale: CGFloat) -> Data? {
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = scale
+            format.opaque = true
+            return UIGraphicsImageRenderer(size: size, format: format).image { renderer in
+                renderer.cgContext.setFillColor(UIColor(Tokens.ink).cgColor)
+                renderer.cgContext.fill(CGRect(origin: .zero, size: size))
+                Pill.paint(frame, in: CGRect(origin: .zero, size: size), context: renderer.cgContext)
+            }.cgImage?.dataProvider?.data as Data?
+        }
+        let desktops = pixels(CGSize(width: 120, height: 40), scale: 3)
+        let magnified = pixels(CGSize(width: 360, height: 120), scale: 1)
+        #expect(desktops != nil && desktops == magnified)
+    }
+
     /// The made-up voice is desktop's: phrases with a breath between them.
     @Test func theMadeUpVoiceBreathes() {
         #expect(DemoVoice.voice(2.6) < 0.05)

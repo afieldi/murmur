@@ -4,7 +4,7 @@
 //   node scripts/ios.js generate   colors, icon, shared rules, Xcode project
 //   node scripts/ios.js test       MurmurCore on the Mac, then the app's tests on murmur's own simulator
 //   node scripts/ios.js smoke      boots the app headless and relays its SMOKE_RESULT
-//   node scripts/ios.js pill-shots every stage of the pill, both styles, as images in ios/build/pill-shots
+//   node scripts/ios.js pill-shots every stage of the pill, every style, as images in ios/build/pill-shots
 //   node scripts/ios.js register   one device build that registers the bundle ids and app group
 //   node scripts/ios.js release    archives for the App Store and checks it; --upload sends it to TestFlight
 // Only the ios: commands need Xcode; npm install and the desktop gates never do.
@@ -180,7 +180,7 @@ async function smoke() {
   }
 }
 
-/** Every stage of the pill, both styles, as images (IOS-010), like
+/** Every stage of the pill, every style, as images (IOS-010), like
  *  desktop's ink shots: the app draws them in the simulator, and they land
  *  in ios/build/pill-shots. */
 async function pillShots() {

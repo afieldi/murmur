@@ -200,7 +200,7 @@ import UIKit
         #expect(states.map(PillStage.init) == [.idle, .recording, .processing, .inserted, .noSpeech, .error])
     }
 
-    /// The capture script draws every stage of both styles.
+    /// The capture script draws every stage of every style.
     @Test func theShotsCoverEveryStage() {
         let covered = Set(PillShots.shots.map { "\($0.frame.style) \($0.frame.stage)" })
         #expect(covered.count == PillStyle.allCases.count * 6)

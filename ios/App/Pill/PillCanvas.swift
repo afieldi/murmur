@@ -37,7 +37,7 @@ extension PillStage {
 }
 
 #if DEBUG
-/// Every stage of both styles, as the keyboard draws them.
+/// Every stage of every style, as the keyboard draws them.
 struct PillGallery: View {
     let stages: [PillStage] = [.idle, .recording, .processing, .inserted, .noSpeech, .error]
 

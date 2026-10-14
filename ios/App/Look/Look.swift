@@ -96,9 +96,22 @@ enum LookCopy {
         return sentence(item.hint)
     }
 
-    /// What VoiceOver adds for a locked style or accent.
-    static func lockedHint(_ item: CosmeticItem) -> String {
-        "Locked. \(sentence(item.hint))."
+    /// What VoiceOver reads after a style's name: its line, and for a
+    /// locked one what earns it, in the value, so it never rests on hints
+    /// being on.
+    static func styleValue(_ item: CosmeticItem, inUse: Bool, unlocked: Bool) -> String {
+        guard !unlocked else { return status(item, inUse: inUse, unlocked: true) }
+        return inUse ? "In use. \(locked(item))" : locked(item)
+    }
+
+    /// What VoiceOver reads after an accent's name: what earns it while
+    /// locked, and nothing more (the chosen one reads as selected).
+    static func accentValue(_ item: CosmeticItem, unlocked: Bool) -> String {
+        unlocked ? "" : locked(item)
+    }
+
+    private static func locked(_ item: CosmeticItem) -> String {
+        "Locked, \(item.hint)"
     }
 
     static func sentence(_ text: String) -> String {
