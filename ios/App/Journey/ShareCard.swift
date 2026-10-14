@@ -3,8 +3,9 @@
 // your last thirty days by desktop's own code in the painter page (a stroke
 // for each day you dictated, longer for more words, heavier for more takes,
 // ember on your three biggest), with your rank set in the display face. The
-// screen shows it and saves it through the share sheet; nothing is sent
-// anywhere.
+// screen takes your month once as it opens, as desktop's dialog does,
+// paints the card once, and saves exactly that picture through the share
+// sheet; nothing is sent anywhere.
 import MurmurCore
 import SwiftUI
 
@@ -35,7 +36,7 @@ struct ShareCard: Hashable, Sendable {
 enum ShareCardCopy {
     static let row = "Share card"
     static let title = "Your share card"
-    static let about = "Painted from your last 30 days: a stroke for each day you dictated, ember on your three biggest."
+    static let about = "Painted from your last \(Analytics.cardDays) days: a stroke for each day you dictated, ember on your three biggest."
     static let save = "Save card"
     static let painting = "Painting your card"
     static let failed = "The card did not paint."
@@ -48,44 +49,121 @@ enum ShareCardCopy {
     static func spoken(_ card: ShareCard) -> String {
         let words = card.words.formatted(.number)
         let days = card.activeDays == 1 ? "1 day" : "\(card.activeDays) days"
-        return "Share card: \(card.label), \(words) words in the last 30 days, \(days) on the mat, level \(card.level)."
+        return "Share card: \(card.label), \(words) words in the last \(Analytics.cardDays) days, \(days) on the mat, level \(card.level)."
     }
 }
 
-/// The card, shown large, with Save card.
+/// The card as painted: the picture the screen shows and the PNG it saves,
+/// the same bytes.
+struct PaintedCard: Equatable {
+    let image: UIImage
+    let png: Data
+}
+
+/// The card's paint, for one month taken as the screen opens.
+@Observable @MainActor final class ShareCardModel {
+    enum Shown: Equatable {
+        case painting
+        case painted(PaintedCard)
+        case failed
+    }
+
+    /// Desktop saves the card at twice its size: 1680 by 880.
+    static let saveScale: CGFloat = 2
+
+    let card: ShareCard
+    private(set) var shown: Shown
+    @ObservationIgnored private let painter: JourneyPainter
+
+    init(card: ShareCard, painter: JourneyPainter = .shared, shown: Shown = .painting) {
+        self.card = card
+        self.painter = painter
+        self.shown = shown
+    }
+
+    /// Paints the card once, at the size it saves at. A paint the screen
+    /// walked away from (it closed, or Try again started another) never
+    /// lands.
+    func paint() async {
+        shown = .painting
+        do {
+            let png = try await painter.png(card.artwork, scale: Self.saveScale)
+            guard !Task.isCancelled else { return }
+            guard let image = UIImage(data: png.data, scale: Self.saveScale) else {
+                shown = .failed
+                return
+            }
+            shown = .painted(PaintedCard(image: image, png: png.data))
+        } catch {
+            guard !Task.isCancelled else { return }
+            shown = .failed
+        }
+    }
+}
+
+/// The painted card, as the share sheet takes it.
+struct CardShare: Transferable {
+    let name: String
+    let png: Data
+
+    static var transferRepresentation: some TransferRepresentation {
+        DataRepresentation(exportedContentType: .png) { $0.png }
+            .suggestedFileName { $0.name }
+    }
+}
+
+/// The card, shown large, with Save card. The month is taken as the screen
+/// opens: a link's destination is made whenever the Journey draws, and a
+/// take landing while the card is open never repaints it under the share
+/// sheet.
 struct ShareCardScreen: View {
     let history: History
     let rules: JourneyRules
-    @Environment(\.displayScale) private var scale
-    @State private var shown: Shown = .painting
-    @State private var attempt = 0
+    @State private var model: ShareCardModel?
 
-    enum Shown: Equatable {
-        case painting
-        case painted(UIImage)
-        case failed
+    var body: some View {
+        Group {
+            if let model {
+                ShareCardContent(model: model)
+            } else {
+                Tokens.ink.ignoresSafeArea()
+            }
+        }
+        .navigationTitle(ShareCardCopy.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            if model == nil { model = ShareCardModel(card: ShareCard.from(history.entries, rules: rules)) }
+        }
     }
+}
+
+/// The card, its line, and Save card or Try again.
+struct ShareCardContent: View {
+    let model: ShareCardModel
+    /// False keeps the model's state as given, for previews.
+    var paints = true
+    @State private var attempt = 0
 
     /// The card's size in points, desktop's.
     static let size = CGSize(width: 840, height: 440)
 
     var body: some View {
-        // Made here, so the card is read only while the screen is open.
-        let card = ShareCard.from(history.entries, rules: rules)
         List {
             Section {
-                preview(card)
+                preview
                     .listRowInsets(EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12))
                 Text(ShareCardCopy.about)
                     .foregroundStyle(Tokens.textDim)
-                switch shown {
-                case let .painted(image):
-                    ShareLink(item: PaintingShare(name: ShareCardCopy.fileName, artwork: card.artwork), preview: SharePreview(ShareCardCopy.title, image: Image(uiImage: image))) {
+                switch model.shown {
+                case let .painted(card):
+                    ShareLink(item: CardShare(name: ShareCardCopy.fileName, png: card.png), preview: SharePreview(ShareCardCopy.title, image: Image(uiImage: card.image))) {
                         Text(ShareCardCopy.save)
                             .foregroundStyle(Tokens.brand)
                             .frame(minHeight: 44)
                     }
                 case .failed:
+                    Text(ShareCardCopy.failed)
+                        .foregroundStyle(Tokens.red)
                     Button(ShareCardCopy.tryAgain) { attempt += 1 }
                         .buttonStyle(RowAction())
                         .frame(minHeight: 44)
@@ -98,45 +176,54 @@ struct ShareCardScreen: View {
         .scrollContentBackground(.hidden)
         .background(Tokens.ink)
         .foregroundStyle(Tokens.text)
-        .navigationTitle(ShareCardCopy.title)
-        .navigationBarTitleDisplayMode(.inline)
-        .task(id: Paint(card: card, scale: scale, attempt: attempt)) {
-            shown = .painting
-            do {
-                shown = .painted(try await JourneyPainter.shared.picture(card.artwork, scale: scale).image)
-            } catch {
-                shown = .failed
-            }
+        .task(id: attempt) {
+            if paints { await model.paint() }
         }
     }
 
-    private struct Paint: Hashable {
-        let card: ShareCard
-        let scale: CGFloat
-        let attempt: Int
-    }
-
-    @ViewBuilder private func preview(_ card: ShareCard) -> some View {
+    @ViewBuilder private var preview: some View {
         let ratio = Self.size.width / Self.size.height
-        switch shown {
-        case let .painted(image):
-            Image(uiImage: image)
+        if case let .painted(card) = model.shown {
+            Image(uiImage: card.image)
                 .resizable()
                 .aspectRatio(ratio, contentMode: .fit)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
-                .accessibilityLabel(ShareCardCopy.spoken(card))
+                .accessibilityLabel(ShareCardCopy.spoken(model.card))
                 .accessibilityAddTraits(.isImage)
-        case .painting, .failed:
+        } else {
             RoundedRectangle(cornerRadius: 10)
                 .fill(Tokens.panelLift)
                 .aspectRatio(ratio, contentMode: .fit)
                 .overlay {
-                    Text(shown == .failed ? ShareCardCopy.failed : ShareCardCopy.painting)
-                        .font(.footnote)
-                        .foregroundStyle(Tokens.textDim)
-                        .padding()
+                    if model.shown == .painting {
+                        Text(ShareCardCopy.painting)
+                            .font(.footnote)
+                            .foregroundStyle(Tokens.textDim)
+                            .padding()
+                    }
                 }
-                .accessibilityElement(children: .combine)
+                .accessibilityHidden(model.shown != .painting)
         }
     }
 }
+
+#if DEBUG
+private let previewCard = ShareCard(
+    days: (0..<30).map { DayTotal(day: Paintings.shiftDay("2026-10-13", $0 - 29), words: $0 % 3 == 0 ? 0 : 80 + $0 * 37, sessions: $0 % 3 == 0 ? 0 : 1 + $0 % 4) },
+    rank: "blue-2",
+    label: "blue belt, two stripes",
+    level: 3
+)
+
+#Preview("Painted") {
+    NavigationStack { ShareCardContent(model: ShareCardModel(card: previewCard)) }.preferredColorScheme(.dark)
+}
+
+#Preview("Painting") {
+    NavigationStack { ShareCardContent(model: ShareCardModel(card: previewCard), paints: false) }.preferredColorScheme(.dark)
+}
+
+#Preview("Failed") {
+    NavigationStack { ShareCardContent(model: ShareCardModel(card: previewCard, shown: .failed), paints: false) }.preferredColorScheme(.dark)
+}
+#endif

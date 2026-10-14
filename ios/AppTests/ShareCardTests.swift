@@ -29,11 +29,17 @@ import UIKit
         try #require(JourneyRules.live)
     }
 
-    /// How many pixels hold paint or words, on the card's ink.
-    func painted(_ image: UIImage) -> Int {
+    /// How many pixels hold paint or words on the card's ink, from `fromX`
+    /// (a share of the width) to the right edge. Past 2/3 (desktop's fade
+    /// ends at 560 of 840) only the month's strokes and splatter can land.
+    func painted(_ image: UIImage, fromX: Double = 0) -> Int {
         let bytes = PaintingDifference.bytes(image)
+        guard let width = image.cgImage?.width, width > 0 else { return 0 }
+        let start: Int = Int((Double(width) * fromX).rounded(.down))
         var count = 0
         for i in stride(from: 0, to: bytes.count, by: 4) {
+            let column: Int = (i / 4) % width
+            guard column >= start else { continue }
             let red = Int(bytes[i])
             let green = Int(bytes[i + 1])
             let blue = Int(bytes[i + 2])
@@ -42,6 +48,9 @@ import UIKit
         }
         return count
     }
+
+    /// Where only strokes land: right of desktop's fade.
+    static let strokesOnly = 560.0 / 840
 
     /// The month as desktop's card reads it: thirty days ending today, the
     /// words added up, the days with words, the rank, and the level.
@@ -52,9 +61,10 @@ import UIKit
         let card = ShareCard.from(entries, rules: rules, today: today)
         #expect(card.days.count == 30)
         #expect(card.days.last?.day == today)
-        #expect(card.days.first?.day == Paintings.shiftDay(today, -29))
+        let first = Paintings.shiftDay(today, -29)
+        #expect(card.days.first?.day == first)
         #expect(card.activeDays == 30)
-        let inMonth = entries.filter { $0.day.map { $0 >= Paintings.shiftDay(today, -29) && $0 <= today } ?? false }
+        let inMonth = entries.filter { $0.day.map { $0 >= first && $0 <= today } ?? false }
         #expect(card.words == inMonth.reduce(0) { $0 + $1.wordCount })
         #expect(card.days.contains { $0.sessions == 2 })
         let report = Journey.report(entries, rules: rules)
@@ -70,6 +80,34 @@ import UIKit
         let image = try #require(UIImage(data: png.data))
         #expect(image.size == CGSize(width: 1680, height: 880))
         #expect(painted(image) > 20_000)
+        #expect(painted(image, fromX: Self.strokesOnly) > 2_000)
+    }
+
+    /// Save card shares the very PNG the screen shows, painted once at
+    /// desktop's twice size, never a second paint that could fail.
+    @Test func theSavedCardIsThePaintedOne() async throws {
+        let painter = try await JourneyPainter.started()
+        let model = ShareCardModel(card: ShareCard.from(takes(days: 20, words: 120), rules: try rules()), painter: painter)
+        await model.paint()
+        guard case let .painted(card) = model.shown else {
+            Issue.record("the card did not paint: \(model.shown)")
+            return
+        }
+        let saved = try #require(UIImage(data: CardShare(name: ShareCardCopy.fileName, png: card.png).png))
+        #expect(saved.size == CGSize(width: 1680, height: 880))
+        #expect(card.image.size == CGSize(width: 840, height: 440) && card.image.scale == 2)
+        #expect(PaintingDifference(card.image, saved).same)
+    }
+
+    /// A paint the screen walked away from (it closed, or Try again started
+    /// another) never lands: no late picture or failure overwrites the screen.
+    @Test func aCancelledPaintLeavesTheScreenAlone() async throws {
+        let painter = try await JourneyPainter.started()
+        let model = ShareCardModel(card: ShareCard.from(takes(days: 9, words: 300), rules: try rules()), painter: painter)
+        let paint = Task { await model.paint() }
+        paint.cancel()
+        await paint.value
+        #expect(model.shown == .painting)
     }
 
     /// The same month paints the same card; another month paints another.
@@ -92,12 +130,14 @@ import UIKit
         #expect(card.words == 0 && card.activeDays == 0)
         let image = try await painter.picture(card.artwork, scale: 1).image
         #expect(painted(image) > 1_000)
+        #expect(painted(image, fromX: Self.strokesOnly) < 50)
     }
 
     @Test func theWordsArePlain() throws {
         let card = ShareCard(days: [DayTotal(day: "2026-10-13", words: 1234, sessions: 2), DayTotal(day: "2026-10-12", words: 0, sessions: 0)], rank: "white", label: "White belt", level: 1)
         #expect(ShareCardCopy.spoken(card) == "Share card: White belt, 1,234 words in the last 30 days, 1 day on the mat, level 1.")
         #expect(ShareCardCopy.fileName == "murmur-belt.png")
+        #expect(ShareCardCopy.about.contains("your last \(Analytics.cardDays) days"))
         for line in [ShareCardCopy.row, ShareCardCopy.title, ShareCardCopy.about, ShareCardCopy.save, ShareCardCopy.painting, ShareCardCopy.failed, ShareCardCopy.tryAgain] {
             #expect(!line.contains("Murmur") && !line.contains("\u{2014}") && !line.contains(" - "))
         }

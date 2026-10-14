@@ -4,6 +4,7 @@
 // would (ios/prd.json IOS-021).
 import { describe, expect, it } from 'vitest'
 import vectors from '../../shared/analytics-vectors.json'
+import { CARD_DAYS } from '../renderer/settings/cardPaint'
 import { dailyTotals } from './analytics'
 import type { SessionEvent } from './history'
 
@@ -21,6 +22,10 @@ const noonOf = (day: string): number => {
 const event = (t: Take): SessionEvent => ({ at: noonOf(t.day), durationMs: 1000, rawText: '', finalText: '', words: t.words, wpm: 0, day: t.day, hour: 12 })
 
 describe('shared/analytics-vectors.json', () => {
+  it("the share card's month is CARD_DAYS long", () => {
+    expect((vectors as { cardDays?: number }).cardDays).toBe(CARD_DAYS)
+  })
+
   for (const c of vectors.dailyTotals) {
     it(`daily totals: ${c.name}`, () => {
       expect(dailyTotals(c.takes.map(event), c.count, () => noonOf(c.today))).toEqual(c.expect)

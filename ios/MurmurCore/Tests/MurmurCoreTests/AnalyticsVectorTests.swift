@@ -26,6 +26,8 @@ struct AnalyticsVectors: Decodable {
         var testDescription: String { name }
     }
 
+    /// Desktop's CARD_DAYS: the days the share card paints.
+    let cardDays: Int
     let dailyTotals: [DailyCase]
 
     static let file: AnalyticsVectors? = try? SharedData(directory: repoShared).decode(AnalyticsVectors.self, from: "analytics-vectors.json")
@@ -34,6 +36,12 @@ struct AnalyticsVectors: Decodable {
 @Suite struct AnalyticsVectorTests {
     @Test func theVectorsLoad() throws {
         #expect(try #require(AnalyticsVectors.file).dailyTotals.count >= 5)
+    }
+
+    /// The card's month is desktop's length, so its strokes and its words
+    /// ("in the last 30 days", painted by desktop's code) always agree.
+    @Test func theCardsMonthIsDesktops() throws {
+        #expect(try #require(AnalyticsVectors.file).cardDays == Analytics.cardDays)
     }
 
     @Test(arguments: AnalyticsVectors.file?.dailyTotals ?? [])

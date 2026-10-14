@@ -1,5 +1,6 @@
 {
-  "note": "Desktop's analytics (src/shared/analytics.ts) on fixed takes. dailyTotals: words and takes for each of the last count days ending today, oldest first, zero-filled, by each take's stored day, the share card's month (US-078). Desktop runs each case with its clock at local noon on today. Both platforms run these (IOS-021); IOS-022 adds the rest of the analytics.",
+  "note": "Desktop's analytics (src/shared/analytics.ts) on fixed takes. dailyTotals: words and takes for each of the last count days ending today, oldest first, zero-filled, by each take's stored day, the share card's month (US-078). Desktop runs each case with its clock at local noon on today. Both platforms run these (IOS-021); IOS-022 adds the rest of the analytics. cardDays: the share card's month, desktop's CARD_DAYS.",
+  "cardDays": 30,
   "dailyTotals": [
     {
       "name": "nothing yet",

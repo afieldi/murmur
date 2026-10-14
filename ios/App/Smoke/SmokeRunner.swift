@@ -670,11 +670,14 @@ enum SmokeRunner {
         guard let png = try? await painter.png(card.artwork, scale: 2), let image = UIImage(data: png.data) else { return "the page painted no card" }
         guard image.size == CGSize(width: 1680, height: 880) else { return "the card is \(image.size), not 1680 by 880" }
         guard lit(image) > 20_000 else { return "the card is blank" }
+        // Right of desktop's fade (560 of 840) only the month's strokes land.
+        guard lit(image, fromX: 560.0 / 840) > 2_000 else { return "the card painted no strokes" }
         return nil
     }
 
-    /// How many pixels stand clear of the ink: paint and words.
-    @MainActor private static func lit(_ image: UIImage) -> Int {
+    /// How many pixels stand clear of the ink, paint and words, from
+    /// `fromX` (a share of the width) to the right edge.
+    @MainActor private static func lit(_ image: UIImage, fromX: Double = 0) -> Int {
         guard let cg = image.cgImage else { return 0 }
         var bytes = [UInt8](repeating: 0, count: cg.width * cg.height * 4)
         let drawn = bytes.withUnsafeMutableBytes { buffer -> Bool in
@@ -683,8 +686,11 @@ enum SmokeRunner {
             return true
         }
         guard drawn else { return 0 }
+        let start: Int = Int((Double(cg.width) * fromX).rounded(.down))
         var count = 0
         for i in stride(from: 0, to: bytes.count, by: 4) {
+            let column: Int = (i / 4) % cg.width
+            guard column >= start else { continue }
             let red = Int(bytes[i])
             let green = Int(bytes[i + 1])
             let blue = Int(bytes[i + 2])
