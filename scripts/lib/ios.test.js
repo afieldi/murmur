@@ -9,6 +9,7 @@ import {
   compareVersions,
   copySharedJson,
   displayFaceRule,
+  readDisplayFace,
   exportOptionsPlist,
   fillJourneyPage,
   findOnPath,
@@ -243,5 +244,38 @@ describe('the Journey page (IOS-018)', () => {
     expect(() => fillJourneyPage('<script>/*SCRIPT*/</script>', '', 'x')).toThrow(/TOKENS/)
     expect(() => fillJourneyPage('<style>/*TOKENS*/</style><script>/*SCRIPT*/</script>', '', 'x')).toThrow(/FONT/)
     expect(() => fillJourneyPage(template + '/*SCRIPT*/', '', 'x')).toThrow(/SCRIPT/)
+  })
+})
+
+describe('the display face for the page (IOS-019)', () => {
+  const dirs = []
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
+  })
+  const fonts = (face) => {
+    const dir = mkdtempSync(join(tmpdir(), 'murmur-face-'))
+    dirs.push(dir)
+    if (face) writeFileSync(join(dir, 'bricolage-grotesque-display.woff2'), face)
+    writeFileSync(join(dir, 'OFL.txt'), 'SIL OPEN FONT LICENSE')
+    return dir
+  }
+  const whole = () => {
+    const bytes = Buffer.alloc(16)
+    bytes.write('wOF2', 0, 'latin1')
+    bytes.writeUInt32BE(16, 8)
+    return bytes
+  }
+
+  it('reads a whole face and its license', () => {
+    const face = readDisplayFace(fonts(whole()))
+    expect(face.rule).toContain('font-family: "murmur display"')
+    expect(face.license).toMatch(/OFL\.txt$/)
+  })
+
+  it('goes without a missing or broken face, unless a release needs one', () => {
+    expect(readDisplayFace(fonts(null))).toBeNull()
+    expect(readDisplayFace(fonts(whole().subarray(0, 12)))).toBeNull()
+    expect(() => readDisplayFace(fonts(null), { require: true })).toThrow(/display face/)
+    expect(() => readDisplayFace(fonts(whole().subarray(0, 12)), { require: true })).toThrow(/display face/)
   })
 })

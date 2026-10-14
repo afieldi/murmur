@@ -137,6 +137,16 @@ struct PaintingVectors: Decodable {
         }
     }
 
+    /// A day key is ASCII digits only, as desktop's /^\d{4}-\d{2}-\d{2}$/ reads it.
+    @Test func aDayKeyIsAsciiDigits() {
+        #expect(Paintings.isDayKey("2026-10-13"))
+        #expect(!Paintings.isDayKey("\u{0662}\u{0660}\u{0662}\u{0666}-\u{0661}\u{0660}-\u{0661}\u{0663}"))
+        #expect(!Paintings.isDayKey("2026-10-1"))
+        #expect(!Paintings.isDayKey("2026-10-133"))
+        #expect(!Paintings.isDayKey("2026/10/13"))
+        #expect(!Paintings.isDayKey(""))
+    }
+
     /// Days across a month, a year, and a leap day, as desktop shifts them.
     @Test func daysShiftAcrossTheCalendar() {
         #expect(Paintings.shiftDay("2026-01-31", 1) == "2026-02-01")

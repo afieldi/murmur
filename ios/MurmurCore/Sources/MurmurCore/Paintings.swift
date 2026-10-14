@@ -148,8 +148,17 @@ public enum Paintings {
     static let typicalWindowDays = 28
     static let typicalMinDays = 3
 
+    /// Whether a string is a day key: yyyy-MM-dd in ASCII digits, as
+    /// desktop's /^\d{4}-\d{2}-\d{2}$/ reads it. Checked by hand; a regular
+    /// expression here was most of a sync's time over a year of takes.
     public static func isDayKey(_ day: String) -> Bool {
-        day.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil
+        let units = Array(day.utf8)
+        guard units.count == 10 else { return false }
+        for (index, unit) in units.enumerated() {
+            let ok = index == 4 || index == 7 ? unit == UInt8(ascii: "-") : (UInt8(ascii: "0")...UInt8(ascii: "9")).contains(unit)
+            if !ok { return false }
+        }
+        return true
     }
 
     /// The brushwork tier a belt paints at.

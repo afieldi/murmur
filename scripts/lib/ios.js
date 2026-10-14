@@ -3,8 +3,9 @@
 // simulator, the tools on PATH, the shared rules copy, and the app's
 // SMOKE_RESULT line. Pure where it can be, so desktop CI tests it on
 // every platform without Xcode.
-const { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } = require('node:fs')
+const { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync } = require('node:fs')
 const { basename, delimiter, join } = require('node:path')
+const { DISPLAY_FACE_FILE, isWholeWoff2 } = require('./display-face')
 
 const SMOKE_SIMULATOR = 'murmur smoke'
 const MIN_IOS = 26
@@ -219,6 +220,20 @@ function fillJourneyPage(template, tokens, script, font = '') {
   return template.replace('/*TOKENS*/', () => tokens).replace('/*FONT*/', () => font).replace('/*SCRIPT*/', () => script)
 }
 
+/**
+ * The display face for the page (IOS-019): its rule and its license file,
+ * or null when the face is missing or not a whole woff2 (the cards then
+ * set their titles in a condensed system face). A release requires it.
+ */
+function readDisplayFace(fonts, { require: needed = false } = {}) {
+  const face = join(fonts, DISPLAY_FACE_FILE)
+  const license = join(fonts, 'OFL.txt')
+  const bytes = existsSync(face) && existsSync(license) ? readFileSync(face) : null
+  if (bytes && isWholeWoff2(bytes)) return { rule: displayFaceRule(bytes), license }
+  if (needed) throw new Error('the display face is missing or broken: run node scripts/fetch-display-face.js --require')
+  return null
+}
+
 /** The display face's @font-face rule (IOS-019), the woff2 inlined, so the
  *  page loads no file for it: the family, the weight, and the condensed
  *  widths desktop fetches. */
@@ -246,5 +261,6 @@ module.exports = {
   keyFileProblem,
   journeyScript,
   fillJourneyPage,
-  displayFaceRule
+  displayFaceRule,
+  readDisplayFace
 }

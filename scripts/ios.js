@@ -9,18 +9,17 @@
 //   node scripts/ios.js release    archives for the App Store and checks it; --upload sends it to TestFlight
 // Only the ios: commands need Xcode; npm install and the desktop gates never do.
 const { execFileSync, spawnSync } = require('node:child_process')
-const { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } = require('node:fs')
+const { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } = require('node:fs')
 const { dirname, join } = require('node:path')
-const { DISPLAY_FACE_FILE } = require('./lib/display-face')
 const { loadBrush } = require('./lib/enso')
 const { iosIconSet } = require('./lib/ios-icon')
 const { colorSetJson, parseRootTokens, toSwift } = require('./lib/ios-tokens')
 const {
   SIM_SIGNING,
   altoolFailure,
-  displayFaceRule,
   fillJourneyPage,
   journeyScript,
+  readDisplayFace,
   buildNumber,
   copySharedJson,
   exportOptionsPlist,
@@ -72,17 +71,12 @@ async function buildJourneyPage({ requireFont = false } = {}) {
   })
   const script = journeyScript(out)
   const tokens = readFileSync(join(root, 'src', 'renderer', 'tokens.css'), 'utf8')
-  const fonts = join(root, 'src', 'renderer', 'public', 'fonts')
-  const face = join(fonts, DISPLAY_FACE_FILE)
-  const license = join(fonts, 'OFL.txt')
-  const hasFace = existsSync(face) && existsSync(license)
-  if (requireFont && !hasFace) throw new Error('the display face is missing: run node scripts/fetch-display-face.js --require')
-  const font = hasFace ? displayFaceRule(readFileSync(face)) : ''
-  const page = fillJourneyPage(readFileSync(join(iosDir, 'Web', 'journey.html'), 'utf8'), tokens, script, font)
+  const face = readDisplayFace(join(root, 'src', 'renderer', 'public', 'fonts'), { require: requireFont })
+  const page = fillJourneyPage(readFileSync(join(iosDir, 'Web', 'journey.html'), 'utf8'), tokens, script, face?.rule ?? '')
   mkdirSync(join(generated, 'web'), { recursive: true })
   writeFileSync(join(generated, 'web', 'journey.html'), page)
   const shipped = join(generated, 'web', 'OFL.txt')
-  if (hasFace) copyFileSync(license, shipped)
+  if (face) copyFileSync(face.license, shipped)
   else rmSync(shipped, { force: true })
 }
 

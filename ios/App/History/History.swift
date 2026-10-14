@@ -129,6 +129,16 @@ struct HistoryStore: Sendable {
     }
 }
 
+/// What happened to the takes, for what they made (IOS-019).
+enum HistoryChange {
+    /// A take landed: every take now kept.
+    case added([HistoryEntry])
+    /// One take was deleted: it, and every take still kept.
+    case deleted(HistoryEntry, remaining: [HistoryEntry])
+    /// Clear all.
+    case cleared
+}
+
 /// The history the app shows: the store, read once and kept current.
 @Observable @MainActor final class History {
     private(set) var entries: [HistoryEntry]
@@ -136,14 +146,14 @@ struct HistoryStore: Sendable {
     /// Forgets deleted words wherever else they wait: the given words, or
     /// all with nil.
     @ObservationIgnored private let forget: @MainActor (Set<String>?) -> Void
-    /// Keeps what the takes made (the painting a day, IOS-019): told after
-    /// a take lands and before takes are deleted, so what they painted stays.
-    @ObservationIgnored private let keep: @MainActor ([HistoryEntry]) -> Void
+    /// Tells what the takes made (the painting a day, IOS-019) when takes
+    /// land, one is deleted, or all are cleared.
+    @ObservationIgnored private let changed: @MainActor (HistoryChange) -> Void
 
-    init(store: HistoryStore, forget: @escaping @MainActor (Set<String>?) -> Void = { _ in }, keep: @escaping @MainActor ([HistoryEntry]) -> Void = { _ in }) {
+    init(store: HistoryStore, forget: @escaping @MainActor (Set<String>?) -> Void = { _ in }, changed: @escaping @MainActor (HistoryChange) -> Void = { _ in }) {
         self.store = store
         self.forget = forget
-        self.keep = keep
+        self.changed = changed
         entries = store.list()
     }
 
@@ -152,22 +162,24 @@ struct HistoryStore: Sendable {
     func add(_ entry: HistoryEntry) {
         try? store.append(entry)
         entries.insert(entry, at: 0)
-        keep(entries)
+        changed(.added(entries))
     }
 
     func delete(_ id: UUID) {
-        keep(entries)
-        let words = entries.first { $0.id == id }?.words
+        let gone = entries.first { $0.id == id }
         try? store.remove(id)
         entries = store.list()
-        if let words { forget([words]) }
+        if let gone {
+            forget([gone.words])
+            changed(.deleted(gone, remaining: entries))
+        }
     }
 
     func clear() {
-        keep(entries)
         try? store.clear()
         entries = []
         forget(nil)
+        changed(.cleared)
     }
 }
 
@@ -181,8 +193,8 @@ extension History {
         let history = History(store: .standard) { words in
             TakeModel.live()?.forget(words)
             Mailbox.shared?.forget(words)
-        } keep: { entries in
-            PaintingStore.live()?.sync(entries)
+        } changed: { change in
+            PaintingStore.live()?.apply(change)
         }
         // Takes kept before the painting a day paint their days too.
         PaintingStore.live()?.sync(history.entries)

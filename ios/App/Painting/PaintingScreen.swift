@@ -64,6 +64,13 @@ enum PaintingDays {
     }
 
     static func today() -> String { HistoryEntry.dayKey(.now) }
+
+    /// The strip: up to six earlier days from the four weeks before today,
+    /// as desktop's window shows them.
+    static func strip(_ book: PaintingBook, today: String) -> [String] {
+        let since = Paintings.shiftDay(today, -28)
+        return Array(book.keys.filter { $0 < today && $0 >= since }.sorted().suffix(6))
+    }
 }
 
 /// The strokes the screen last showed for a day, kept across launches as
@@ -173,7 +180,7 @@ struct PaintingScreen: View {
     var body: some View {
         let today = PaintingDays.today()
         let record = store.book[today]
-        let past = store.book.keys.filter { $0 < today }.sorted().suffix(6)
+        let past = PaintingDays.strip(store.book, today: today)
         let week = Paintings.weekOf(today).filter { store.book[$0] != nil }.count
         List {
             Section {
@@ -210,7 +217,7 @@ struct PaintingScreen: View {
                 Section {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(alignment: .top, spacing: 12) {
-                            ForEach(Array(past), id: \.self) { day in
+                            ForEach(past, id: \.self) { day in
                                 if let kept = store.book[day] {
                                     PastPainting(day: day, today: today, record: kept, image: strip[day]) {
                                         viewing = ViewedDay(day: day, record: kept)
@@ -231,7 +238,7 @@ struct PaintingScreen: View {
                     SectionTitle(PaintingCopy.past)
                 }
                 .listRowBackground(Tokens.panel)
-                .task(id: Array(past).map { store.book[$0] }) {
+                .task(id: past.map { store.book[$0] }) {
                     for day in past {
                         guard let kept = store.book[day] else { continue }
                         if let image = try? await JourneyPainter.shared.picture(.painting(kept, width: 120, height: 90), scale: scale).image {

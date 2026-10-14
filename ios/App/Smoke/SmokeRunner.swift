@@ -557,9 +557,13 @@ enum SmokeRunner {
         let folder = FileManager.default.temporaryDirectory.appending(path: "smoke-paintings-\(UUID().uuidString)", directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: folder) }
         let store = PaintingStore(file: folder.appending(path: "paintings.json"), ladder: ladder)
-        let start = Date.now.addingTimeInterval(-3 * 86_400)
+        // Three days of takes at noon, in UTC, so no hour of the day and no
+        // clock change splits a day.
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC") ?? .gmt
+        let noon = utc.date(bySettingHour: 12, minute: 0, second: 0, of: Date.now.addingTimeInterval(-3 * 86_400)) ?? Date.now
         let takes = (0..<12).map { i in
-            HistoryEntry(at: start.addingTimeInterval(Double(i / 4) * 86_400 + Double(i % 4) * 900), durationMs: 20_000, words: Array(repeating: "word", count: 40 + i * 5).joined(separator: " "))
+            HistoryEntry(at: noon.addingTimeInterval(Double(i / 4) * 86_400 + Double(i % 4) * 900), durationMs: 20_000, words: Array(repeating: "word", count: 40 + i * 5).joined(separator: " "), calendar: utc)
         }
         store.sync(takes)
         guard store.book.count == 3, let day = store.book.keys.sorted().last, let record = store.book[day] else { return "the book has \(store.book.count) days, not 3" }

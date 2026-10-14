@@ -51,21 +51,74 @@ import UIKit
         #expect(store.book == Paintings.sync([:], events: takes.map(\.paintingEvent), install: store.install, ladder: try ladder()))
     }
 
-    /// Deleting takes, or clearing them all, keeps what they painted, as
-    /// desktop's book outlives its log.
-    @Test func deletedTakesKeepTheirPainting() throws {
+    /// A painting is made from its takes, as on desktop: deleting a take
+    /// takes its stroke away, and the next take paints it again.
+    @Test func aDeletedTakeTakesItsStroke() throws {
         let historyFile = FileManager.default.temporaryDirectory.appending(path: "paintings-history-\(UUID().uuidString).jsonl")
         defer { try? FileManager.default.removeItem(at: historyFile) }
         let store = PaintingStore(file: scratch(), ladder: try ladder())
-        let history = History(store: HistoryStore(file: historyFile), keep: { store.sync($0) })
-        for take in try paintingTakes([(0, 3)]) { history.add(take) }
+        let history = History(store: HistoryStore(file: historyFile), changed: { store.apply($0) })
+        let takes = try paintingTakes([(0, 5)])
+        for take in takes.prefix(4) { history.add(take) }
         let day = try #require(store.book.keys.first)
+        #expect(store.book[day]?.words.count == 4)
+        let newest = try #require(history.entries.first)
+        history.delete(newest.id)
         #expect(store.book[day]?.words.count == 3)
-        let first = try #require(history.entries.first)
-        history.delete(first.id)
-        #expect(store.book[day]?.words.count == 3)
+        history.add(takes[4])
+        #expect(store.book[day]?.words.count == 4)
+    }
+
+    /// Deleting a day's last take takes its painting away.
+    @Test func aDaysLastTakeTakesItsPainting() throws {
+        let historyFile = FileManager.default.temporaryDirectory.appending(path: "paintings-history-\(UUID().uuidString).jsonl")
+        defer { try? FileManager.default.removeItem(at: historyFile) }
+        let store = PaintingStore(file: scratch(), ladder: try ladder())
+        let history = History(store: HistoryStore(file: historyFile), changed: { store.apply($0) })
+        for take in try paintingTakes([(0, 2), (1, 1)]) { history.add(take) }
+        #expect(store.book.count == 2)
+        let newest = try #require(history.entries.first)
+        history.delete(newest.id)
+        #expect(store.book.count == 1)
+    }
+
+    /// Clear all clears the paintings too, as desktop's does; the book keeps
+    /// its own seed.
+    @Test func clearAllClearsThePaintings() throws {
+        let historyFile = FileManager.default.temporaryDirectory.appending(path: "paintings-history-\(UUID().uuidString).jsonl")
+        defer { try? FileManager.default.removeItem(at: historyFile) }
+        let file = scratch()
+        let store = PaintingStore(file: file, ladder: try ladder())
+        let history = History(store: HistoryStore(file: historyFile), changed: { store.apply($0) })
+        for take in try paintingTakes([(0, 2), (1, 1)]) { history.add(take) }
         history.clear()
-        #expect(store.book[day]?.words.count == 3)
+        #expect(store.book.isEmpty)
+        let again = PaintingStore(file: file, ladder: try ladder())
+        #expect(again.book.isEmpty && again.install == store.install)
+    }
+
+    /// A book that cannot be read is kept aside, as desktop keeps it, so a
+    /// rebuild from the takes never overwrites it.
+    @Test func aBookThatCannotBeReadIsKeptAside() throws {
+        let file = scratch()
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        try "not a book".write(to: file, atomically: true, encoding: .utf8)
+        let store = PaintingStore(file: file, ladder: try ladder())
+        store.sync(try paintingTakes([(0, 1)]))
+        let kept = file.deletingLastPathComponent().appending(path: "paintings.json.bad")
+        #expect(try String(contentsOf: kept, encoding: .utf8) == "not a book")
+        #expect(PaintingStore(file: file, ladder: try ladder()).book.count == 1)
+    }
+
+    /// A seed that cannot be read gets a new one; its days stand.
+    @Test func aBadSeedKeepsTheDays() throws {
+        let file = scratch()
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        try #"{"install": -5, "days": {"2026-10-01": {"subject": "moon", "seed": 5, "target": 6, "tier": 0, "level": 1, "words": [12]}}}"#.write(to: file, atomically: true, encoding: .utf8)
+        let store = PaintingStore(file: file, ladder: try ladder())
+        #expect(store.book.keys.sorted() == ["2026-10-01"])
     }
 
     /// A day that cannot be read is left out; the rest of the book stands.
@@ -194,6 +247,16 @@ func pageHasDisplayFace() -> Bool {
         #expect(PaintingCopy.stripCaption(record) == "2 of 6")
     }
 
+    /// The strip shows up to six earlier days from the four weeks before
+    /// today, as desktop's window does.
+    @Test func theStripReachesBackFourWeeks() {
+        let record = PaintingRecord(subject: .moon, seed: 1, target: 6, tier: 0, level: 1, rank: nil, hour: nil, words: [1])
+        let days = [-40, -30, -28, -20, -9, -3, -2, -1, 0].map { Paintings.shiftDay("2026-10-13", $0) }
+        let book = Dictionary(uniqueKeysWithValues: days.map { ($0, record) })
+        #expect(PaintingDays.strip(book, today: "2026-10-13") == ["2026-09-15", "2026-09-23", "2026-10-04", "2026-10-10", "2026-10-11", "2026-10-12"])
+        #expect(PaintingDays.strip([:], today: "2026-10-13").isEmpty)
+    }
+
     /// The strip names the last week's days by weekday, older ones by date.
     @Test func theStripNamesItsDays() {
         #expect(PaintingCopy.stripDay("2026-10-12", today: "2026-10-13") == "Mon")
@@ -223,6 +286,9 @@ func pageHasDisplayFace() -> Bool {
         let book = try book()
         let last = try #require(book.keys.sorted().last)
         let record = try #require(book[last])
+        // The share paints with the app's own painter; a shared CI runner can
+        // take far longer than a phone to start it.
+        try await JourneyPainter.shared.waitUntilReady(seconds: 90)
         let share = PaintingShare(name: PaintingCopy.cardName(last), artwork: .card(day: last, record: record, longestMs: nil))
         let data = try await share.png()
         #expect(UIImage(data: data)?.size == CGSize(width: 1080, height: 1350))
