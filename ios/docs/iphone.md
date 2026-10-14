@@ -282,6 +282,33 @@ Open the Journey from Home and tap Share card. murmur paints a card from your la
 
 Tap Save card and the share sheet opens. Save Image puts it in Photos; the first time, iPhone asks to let murmur add to your photos, and murmur never looks at your library. Or send it anywhere the share sheet reaches. The card is painted on your iPhone, and nothing is sent anywhere unless you send it. VoiceOver reads the card's rank, words, days on the mat, and level.
 
+## How does murmur count time back on iPhone?
+
+Time back is the time you did not spend typing: for every take, the minutes typing its words would have taken with your thumbs, minus the minutes you spoke. They add up into today, this month, and lifetime, shown on Home under Back today and in Your numbers.
+
+The formula for one take is `words / typing speed - minutes spoken`, the same as on the Mac. On iPhone the speed is thumbs on glass: murmur starts at 36 words a minute, the average typing speed on phones across 37,370 people in the largest study of mobile typing (Palin, Feit, Kim, Kristensson, and Oulasvirta, "How do People Type on Mobile Devices?", MobileHCI 2019; checked 2026-10-13). The Mac starts at 40, for a keyboard. At 36, a 400-word take spoken in two minutes is about eleven minutes of typing minus two of speaking: about nine minutes back.
+
+The speed is yours to set: in murmur, tap the gear, then Time back and recap, then Typing speed, anywhere from 10 to 200 words a minute. Nothing is stored per take, so a new speed counts every day again, past ones included. A take where you spoke longer than typing its words would have taken counts against the day, but a day never shows below zero.
+
+Home also sets today against your typical day: one gold brush stroke, as long as today's time back is against the middle day of the four weeks before today, with a dotted line for the rest of a typical day. It needs three days with takes in those four weeks, and says so until then.
+
+## What do my numbers show on iPhone?
+
+On Home, tap Your numbers under Back today. It shows, as the Mac's analytics do and from the same math:
+
+- **This month:** minutes dictated, words, takes, time back, and the estimated cost at the rates murmur knows for your models, assuming the cleanup pass runs. Your provider bills you directly; murmur never sees it.
+- **The last 14 days** as brush dabs, one for each day, as tall as its words against your biggest day, today in gold.
+- **The activity wall,** getting active: a blot for every day you dictated, deeper paint for more words, a column a week from Sunday, since your first take or a year back, whichever is earlier. Swipe it sideways for earlier months.
+- **Lifetime:** minutes, words, takes, average words a minute, time back, and the estimated cost.
+
+Your iPhone counts the takes it keeps. VoiceOver reads each number, every day of the fourteen, and the wall's total and busiest day.
+
+## How do I get a daily recap on iPhone?
+
+In murmur, tap the gear, then Time back and recap, and turn on Daily recap. murmur asks to send notifications only then; if you say no, the recap stays off and the screen says where to turn notifications on. Pick the time it arrives (5:30 PM until you change it). Each day at that time one notification reads your day: "4 takes, 12 minutes, 1,240 words today. 19 minutes back." A day with no takes gets a quiet one. Send one now shows how it reads right away.
+
+The recap's words are set when your last take of the day lands, so a take after the recap time counts toward tomorrow's day only if it is tomorrow. murmur keeps the coming week's recaps ready, so they still arrive on days you do not open it. Turn Daily recap off and none arrive.
+
 ## How does the painting a day work on iPhone?
 
 The same way as on the Mac, painted by the same code. Each day gets one ink painting, and every take you dictate that day adds its next stroke. Tap the painting row on Home to open today's painting; the newest stroke paints itself in.

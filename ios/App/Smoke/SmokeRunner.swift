@@ -54,6 +54,7 @@ enum SmokeRunner {
             ("paintingDay", checkPaintingDay),
             ("look", checkLook),
             ("shareCard", checkShareCard),
+            ("analytics", checkAnalytics),
             ("sharedJson", { try checkSharedJson(expected: request.sharedCount) })
         ]
         var results: [String: Bool] = [:]
@@ -698,6 +699,52 @@ enum SmokeRunner {
             if lift > 136 { count += 1 }
         }
         return count
+    }
+
+    /// Your numbers (IOS-022): a seeded history (in UTC, so no clock change
+    /// moves a take) gives the time back thumbs earn (100 words in a minute
+    /// at 36 words a minute is 1.8 minutes back), a typical day once three
+    /// days have takes, the month and lifetime, the wall, and a recap plan
+    /// that says today's takes; the page paints the fourteen days.
+    static func checkAnalytics() throws {
+        if let failure = onMain({ await analyticsFailure() }) { throw SmokeFailure(failure) }
+    }
+
+    @MainActor private static func analyticsFailure() async -> String? {
+        guard let rules = NumbersRules.live else { return "the catalog did not load" }
+        guard let defaults = UserDefaults(suiteName: "murmur.smoke.numbers.\(UUID().uuidString)") else { return "no scratch defaults" }
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC") ?? .gmt
+        let noon = utc.date(bySettingHour: 12, minute: 0, second: 0, of: .now) ?? .now
+        let today = HistoryEntry.dayKey(noon, calendar: utc)
+        func take(_ days: Int, _ words: Int, _ seconds: Int) -> HistoryEntry {
+            HistoryEntry(at: noon.addingTimeInterval(Double(days) * 86_400), durationMs: seconds * 1000, words: Array(repeating: "word", count: words).joined(separator: " "), calendar: utc)
+        }
+        let entries = [take(0, 100, 60), take(-1, 360, 120), take(-2, 720, 300), take(-3, 180, 60), take(-40, 50, 10)]
+        let settings = NumbersSettings.load(defaults)
+        guard settings.typingWpm == TimeBack.thumbWpm else { return "the typing speed starts at \(settings.typingWpm), not \(TimeBack.thumbWpm)" }
+        let summary = Numbers.summary(entries, rules: rules, settings: settings, today: today, defaults: defaults)
+        guard summary.today.minutesBack == 1.8 else { return "100 words in a minute gave \(summary.today.minutesBack) minutes back, not 1.8" }
+        guard summary.typicalBack == 8 else { return "the typical day is \(String(describing: summary.typicalBack)), not 8" }
+        guard summary.lifetime.sessions == 5, summary.lifetime.words == 1410, summary.days.count == 14 else { return "the lifetime or the chart is off" }
+        let wall = Analytics.heatmap(Numbers.usage(entries), today: today, year: nil)
+        guard wall.days.last?.day == today, wall.totalWords == 1410 else { return "the wall ends on \(wall.days.last?.day ?? "nothing") with \(wall.totalWords) words" }
+        var on = settings
+        on.recapOn = true
+        let morning = utc.date(bySettingHour: 6, minute: 0, second: 0, of: noon) ?? noon
+        let plan = RecapPlan.plan(entries, rules: rules, settings: on, now: morning, calendar: utc, locale: Locale(identifier: "en_US"), defaults: defaults)
+        guard plan.items.count == RecapPlan.days, plan.items.first?.body == "1 take, 1 minute, 100 words today. 2 minutes back." else {
+            return "the recap plan reads \(plan.items.first?.body ?? "nothing")"
+        }
+        let painter = JourneyPainter()
+        do {
+            try await painter.waitUntilReady(seconds: 30)
+        } catch {
+            return "the painter page never said it was ready"
+        }
+        let days = summary.days.map { HeatDay(day: $0.day, words: $0.words) }
+        guard let dabs = try? await painter.picture(.dabs(days: days, width: 300), scale: 2), inked(dabs.image) > 200 else { return "the page painted no dabs" }
+        return nil
     }
 
     /// Runs main-actor work to the end from the smoke's synchronous start
