@@ -41,11 +41,13 @@ struct TakeScreen: View {
 /// Start a take, and stop it: red to record, amber while live.
 struct TakeButton: View {
     let model: TakeModel
+    /// New note's button starts note takes (IOS-023).
+    var purpose: TakeModel.Purpose = .words
     @ScaledMetric(relativeTo: .largeTitle) private var size: CGFloat = 72
 
     var body: some View {
         Button {
-            Task { await model.toggle() }
+            Task { await model.toggle(as: purpose) }
         } label: {
             VStack(spacing: 12) {
                 Image(systemName: model.isRecording ? "stop.circle" : "record.circle")
@@ -265,7 +267,8 @@ extension TakeModel {
             connections: ConnectionStore(), cleanup: CleanupStore(), ring: KeychainKeyRing(), send: { try await session.data(for: $0) },
             copy: { UIPasteboard.general.string = $0 }, keepAlive: BackgroundTime.hold,
             record: { History.live().add($0) },
-            note: { ActivityLog.standard.write($0) }
+            note: { ActivityLog.standard.write($0) },
+            keepNote: { Notes.live()?.save($0, at: $1) }
         )
         shared = model
         return model

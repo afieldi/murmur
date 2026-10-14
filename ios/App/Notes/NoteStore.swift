@@ -5,11 +5,13 @@
 // your own, such as an Obsidian vault, as desktop lets you. A picked
 // folder is reached through the access iOS gave when you picked it, and
 // every read and write is coordinated with the app or iCloud that also
-// keeps it. Writes are atomic, so a note is either all there or not at all.
+// keeps it. Writes are atomic, so a note is either all there or not at all,
+// and an append adds bytes, as desktop's does: a file murmur cannot read is
+// never replaced, and bytes it cannot read as text stay as they were.
 import Foundation
 import MurmurCore
 
-struct NoteStore: NoteFolder {
+struct NoteStore: NoteFolder, Equatable {
     let root: URL
     /// A folder you picked, kept by another app or iCloud.
     var picked = false
@@ -21,15 +23,16 @@ struct NoteStore: NoteFolder {
 
     func read(_ relative: String) -> String? {
         guard let url = url(relative) else { return nil }
-        return reachable { coordinated(reading: url) }.flatMap { $0 }.map { String(decoding: $0, as: UTF8.self) }
+        // Text that is not UTF-8 reads as nothing, so nothing rewrites it.
+        return reachable { coordinated(reading: url) }.flatMap { $0 }.flatMap { String(data: $0, encoding: .utf8) }
     }
 
     func append(_ relative: String, _ text: String) throws {
-        try write(relative, merging: true) { (($0.flatMap { String(decoding: $0, as: UTF8.self) }) ?? "") + text }
+        try write(relative, merging: true) { $0 + Data(text.utf8) }
     }
 
     func replace(_ relative: String, _ text: String) throws {
-        try write(relative, merging: false) { _ in text }
+        try write(relative, merging: false) { _ in Data(text.utf8) }
     }
 
     /// The inbox days there are, newest first, as paths inside the folder.
@@ -47,24 +50,38 @@ struct NoteStore: NoteFolder {
         return parts.reduce(root) { $0.appending(path: String($1)) }
     }
 
-    private func write(_ relative: String, merging: Bool, _ next: (Data?) -> String) throws {
+    private func write(_ relative: String, merging: Bool, _ next: (Data) -> Data) throws {
         guard !lost, let url = url(relative) else { throw CocoaError(.fileWriteNoPermission) }
         let scoped = picked && root.startAccessingSecurityScopedResource()
         defer { if scoped { root.stopAccessingSecurityScopedResource() } }
+        // A picked folder that was deleted or moved is never made again.
+        var isFolder: ObjCBool = false
+        if picked, !FileManager.default.fileExists(atPath: root.path(percentEncoded: false), isDirectory: &isFolder) || !isFolder.boolValue {
+            throw CocoaError(.fileNoSuchFile)
+        }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         var failure: Error?
         var coordination: NSError?
         NSFileCoordinator().coordinate(writingItemAt: url, options: merging ? .forMerging : .forReplacing, error: &coordination) { url in
             do {
-                let current = merging ? (try? Data(contentsOf: url)) : nil
-                let text = next(current)
-                try Data(text.utf8).write(to: url, options: picked ? [.atomic] : [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+                let current = merging ? try Self.existing(url) : Data()
+                try next(current).write(to: url, options: picked ? [.atomic] : [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
             } catch {
                 failure = error
             }
         }
         if let error = coordination ?? failure { throw error }
         if !picked { try excludeFromBackup() }
+    }
+
+    /// A file's bytes, empty when there is no file yet; any other failure
+    /// to read throws, so the file is never replaced by the new text alone.
+    private static func existing(_ url: URL) throws -> Data {
+        do {
+            return try Data(contentsOf: url)
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+            return Data()
+        }
     }
 
     private func coordinated(reading url: URL) -> Data? {

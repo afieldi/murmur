@@ -1,24 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // New note (ios/prd.json IOS-023): one button to talk, as on Dictate, and
-// the words kept as a note instead of offered to copy. The take still
-// lands in your takes on Home, as every take does.
+// the words kept as a note instead of offered to copy. The take model
+// keeps the note, only for a take started here, so a keyboard take that
+// lands while this screen is open is never filed. The take still lands in
+// your takes on Home, as every take does.
 import MurmurCore
 import SwiftUI
-
-enum NoteTake {
-    struct Kept: Equatable {
-        let words: String
-        /// Where the note landed (inbox), or nil when it could not be saved.
-        let place: String?
-    }
-
-    /// A take that just came back as words is saved as a note; any other
-    /// change saves nothing, so words already on screen are never saved twice.
-    @MainActor static func keep(from old: TakeModel.State, to new: TakeModel.State, notes: Notes, at when: Date = .now) -> Kept? {
-        guard old == .transcribing, case .words(let words) = new else { return nil }
-        return Kept(words: words, place: notes.save(words, at: when))
-    }
-}
 
 struct NoteTakeRoute: View {
     /// Opened by the control, the Action Button, or the icon: listen at once.
@@ -49,19 +36,21 @@ struct NoteTakeScreen: View {
     let model: TakeModel
     let notes: Notes
     var startNow = false
-    @State private var kept: NoteTake.Kept?
-    @State private var started = false
+    @State private var opener = NoteOpener.shared
+    /// The last open from the icon, the control, or Shortcuts this screen
+    /// started listening for.
+    @State private var handled: Int?
 
     var body: some View {
         List {
             Section {
-                TakeButton(model: model)
+                TakeButton(model: model, purpose: .note)
             } footer: {
                 Text(NotesCopy.newNoteHint).foregroundStyle(Tokens.textDim)
             }
             .listRowBackground(Tokens.panel)
 
-            if let kept {
+            if let kept = model.kept {
                 Section {
                     Text(kept.words)
                         .textSelection(.enabled)
@@ -86,17 +75,14 @@ struct NoteTakeScreen: View {
         .navigationTitle(NotesCopy.newNote)
         .navigationBarTitleDisplayMode(.inline)
         .sensoryFeedback(.impact(weight: .light), trigger: model.isRecording)
-        .onChange(of: model.state) { old, new in
-            if new.isRecording { kept = nil }
-            if let saved = NoteTake.keep(from: old, to: new, notes: notes) { kept = saved }
+        .task(id: startNow ? opener.request : nil) {
+            // Once for each open, so a second press of the Action Button
+            // listens again, and never over a take already running.
+            guard startNow, handled != opener.request else { return }
+            handled = opener.request
+            if !model.isRecording, !model.isBusy { await model.start(as: .note) }
         }
-        .task {
-            // Once per visit, and never over a take already running.
-            guard startNow, !started else { return }
-            started = true
-            if !model.isRecording, !model.isBusy { await model.toggle() }
-        }
-        .onDisappear { model.cancel() }
+        .onDisappear { model.cancel(ifFor: .note) }
     }
 }
 

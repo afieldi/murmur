@@ -13,6 +13,13 @@ struct NewNoteIntent: AppIntent {
     static let description = IntentDescription("Opens murmur listening for a note. The words are kept in today's inbox instead of typed.")
     static let supportedModes: IntentModes = .foreground
 
+    #if compiler(>=6.4)
+    /// iOS 27 may run a control's intent in the widget extension, where
+    /// NoteControl does nothing: murmur's runs only in murmur.
+    @available(iOS 27.0, *)
+    static var allowedExecutionTargets: IntentExecutionTargets { .main }
+    #endif
+
     @MainActor
     func perform() async throws -> some IntentResult {
         NoteControl.open()

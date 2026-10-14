@@ -16,14 +16,27 @@ struct NotesRoute: View {
     }
 }
 
+/// The files the Notes screen lists, read together away from the main
+/// thread: a coordinated read of a file in iCloud can wait on a download.
+struct NotesFiles: Equatable, Sendable {
+    var tasks: String?
+    var ideas: String?
+    var days: [String]
+
+    @concurrent nonisolated static func load(_ folder: NoteStore, rules: SorterRules) async -> NotesFiles {
+        NotesFiles(tasks: folder.read(rules.layout.tasks), ideas: folder.read(rules.layout.ideas), days: folder.inboxDays(rules: rules))
+    }
+
+    @concurrent nonisolated static func read(_ folder: NoteStore, _ relative: String) async -> String? {
+        folder.read(relative)
+    }
+}
+
 struct NotesScreen: View {
     let notes: Notes
+    @State private var files: NotesFiles?
 
     var body: some View {
-        // Read on every change the notes make: a sort, a save, an action.
-        let _ = notes.revision
-        let tasks = notes.folder.read(notes.rules.layout.tasks)
-        let ideas = notes.folder.read(notes.rules.layout.ideas)
         List {
             if notes.folder.lost {
                 Section {
@@ -84,23 +97,29 @@ struct NotesScreen: View {
                 .listRowBackground(Tokens.panel)
             }
 
-            FileSection(title: NotesCopy.tasks, file: notes.rules.layout.tasks, text: tasks, empty: NotesCopy.noTasks)
-            FileSection(title: NotesCopy.ideas, file: notes.rules.layout.ideas, text: ideas, empty: NotesCopy.noIdeas)
+            if let files {
+                FileSection(title: NotesCopy.tasks, file: notes.rules.layout.tasks, text: files.tasks, empty: NotesCopy.noTasks)
+                FileSection(title: NotesCopy.ideas, file: notes.rules.layout.ideas, text: files.ideas, empty: NotesCopy.noIdeas)
 
-            let days = notes.folder.inboxDays(rules: notes.rules)
-            Section {
-                if days.isEmpty {
-                    Text(NotesCopy.noNotes).foregroundStyle(Tokens.textDim)
-                }
-                ForEach(days, id: \.self) { day in
-                    NavigationLink(Receipt.placeName(day)) {
-                        NoteFileScreen(title: Receipt.placeName(day), text: notes.folder.read(day) ?? "")
+                Section {
+                    if files.days.isEmpty {
+                        Text(NotesCopy.noNotes).foregroundStyle(Tokens.textDim)
                     }
+                    ForEach(files.days, id: \.self) { day in
+                        NavigationLink(Receipt.placeName(day)) {
+                            NoteFileScreen(title: Receipt.placeName(day), relative: day, folder: notes.folder)
+                        }
+                    }
+                } header: {
+                    SectionTitle(NotesCopy.inbox)
                 }
-            } header: {
-                SectionTitle(NotesCopy.inbox)
+                .listRowBackground(Tokens.panel)
             }
-            .listRowBackground(Tokens.panel)
+        }
+        // Read again on every change the notes make: a sort, a save, an
+        // action, a new folder.
+        .task(id: notes.revision) {
+            files = await NotesFiles.load(notes.folder, rules: notes.rules)
         }
         .scrollContentBackground(.hidden)
         .background(Tokens.ink)
@@ -138,11 +157,14 @@ struct HeldRow: View {
             HStack(spacing: 20) {
                 if NotesCopy.canTick(line) {
                     Button(NotesCopy.tickIt) { Task { await notes.tick(line.id) } }
+                        .frame(minHeight: 44)
                 }
                 if line.label != .note {
                     Button(NotesCopy.fileIt) { Task { await notes.file(line.id) } }
+                        .frame(minHeight: 44)
                 }
                 Button(NotesCopy.skip) { Task { await notes.skip(line.id) } }
+                    .frame(minHeight: 44)
             }
             .buttonStyle(.borderless)
             .foregroundStyle(Tokens.brand)
@@ -152,7 +174,8 @@ struct HeldRow: View {
     }
 }
 
-/// The tasks or ideas file as a list, with Share.
+/// The tasks or ideas file as a list, with Share. A lead line ("I need to
+/// buy:") stays above the items under it.
 struct FileSection: View {
     let title: String
     let file: String
@@ -160,22 +183,20 @@ struct FileSection: View {
     let empty: String
 
     var body: some View {
-        let items = text.map(Todo.listItems) ?? []
+        let items = text.map(Todo.listRows) ?? []
         Section {
             if items.isEmpty {
                 Text(empty).foregroundStyle(Tokens.textDim)
             }
             ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                Label {
+                if item.lead {
                     Text(item.text)
-                        .strikethrough(item.done)
-                        .foregroundStyle(item.done ? Tokens.textDim : Tokens.text)
-                } icon: {
-                    Image(systemName: item.checkbox ? (item.done ? "checkmark.square" : "square") : "circle.fill")
-                        .imageScale(item.checkbox ? .medium : .small)
-                        .foregroundStyle(Tokens.textDim)
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.leading, item.nested ? 28 : 0)
+                } else {
+                    row(item)
+                        .padding(.leading, item.nested ? 28 : 0)
                 }
-                .accessibilityLabel(item.checkbox ? "\(item.text), \(item.done ? "done" : "open")" : item.text)
             }
         } header: {
             HStack {
@@ -193,16 +214,31 @@ struct FileSection: View {
         }
         .listRowBackground(Tokens.panel)
     }
+
+    private func row(_ item: ListRow) -> some View {
+        Label {
+            Text(item.text)
+                .strikethrough(item.done)
+                .foregroundStyle(item.done ? Tokens.textDim : Tokens.text)
+        } icon: {
+            Image(systemName: item.checkbox ? (item.done ? "checkmark.square" : "square") : "circle.fill")
+                .imageScale(item.checkbox ? .medium : .small)
+                .foregroundStyle(Tokens.textDim)
+        }
+        .accessibilityLabel(item.checkbox ? "\(item.text), \(item.done ? "done" : "open")" : item.text)
+    }
 }
 
 /// One file's text, as murmur wrote it, with Share.
 struct NoteFileScreen: View {
     let title: String
-    let text: String
+    let relative: String
+    let folder: NoteStore
+    @State private var text: String?
 
     var body: some View {
         ScrollView {
-            Text(text)
+            Text(text ?? "")
                 .font(.system(.body, design: .monospaced))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -214,9 +250,12 @@ struct NoteFileScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                ShareLink(item: text, subject: Text(title))
+                if let text {
+                    ShareLink(item: text, subject: Text(title))
+                }
             }
         }
+        .task { text = await NotesFiles.read(folder, relative) ?? "" }
     }
 }
 

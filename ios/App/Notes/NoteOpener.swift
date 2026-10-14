@@ -11,8 +11,12 @@ import UIKit
     static let shared = NoteOpener()
     /// New note is on screen because one of these asked for it.
     var showing = false
+    /// Counts the opens, so New note listens again on each, even when it
+    /// is already on screen.
+    private(set) var request = 0
 
     func open() {
+        request += 1
         showing = true
     }
 }

@@ -162,6 +162,7 @@ final class ScriptedChat: @unchecked Sendable {
         let notes = notes(sort: false, counts: counts)
         notes.save("Call the dentist.", at: at)
         let vault = NoteStore(root: root.appending(path: "vault", directoryHint: .isDirectory), picked: true)
+        try FileManager.default.createDirectory(at: vault.root, withIntermediateDirectories: true)
         let before = notes.revision
         await notes.use(vault)
         #expect(notes.revision > before)
@@ -169,5 +170,66 @@ final class ScriptedChat: @unchecked Sendable {
         notes.save("Email Bob.", at: at)
         #expect(vault.read("murmur/inbox/2026-09-18.md") == "## 10:32\n\nEmail Bob.\n\n")
         #expect(folder.read("murmur/inbox/2026-09-18.md") == "## 10:32\n\nCall the dentist.\n\n")
+    }
+
+    @MainActor final class Switch {
+        var on = true
+    }
+
+    /// With sorting turned off, Sort again sends nothing: a note's words
+    /// leave the phone for sorting only while sorting is on.
+    @Test func sortAgainSendsNothingWithSortingOff() async throws {
+        let sorting = Switch()
+        let chat = ScriptedChat([.content("{\"1\":\"task\"}")])
+        let connected = Switch()
+        connected.on = false
+        let notes = Notes(
+            folder: folder, rules: rules, stateFile: stateFile, sortOn: { sorting.on }, ask: { connected.on ? chat.ask : nil },
+            timeZone: { [utc] in utc }
+        )
+        notes.save("Call the dentist.", at: at)
+        await notes.settle()
+        #expect(notes.canSortAgain)
+        sorting.on = false
+        connected.on = true
+        #expect(!notes.canSortAgain)
+        await notes.sortAgain()
+        #expect(chat.asked == 0)
+    }
+
+    /// Sort again offers only the newest note's lines, never an older note's
+    /// while a newer one is on screen.
+    @Test func sortAgainIsOnlyForTheNewestNote() async throws {
+        let sorting = Switch()
+        let notes = Notes(folder: folder, rules: rules, stateFile: stateFile, sortOn: { sorting.on }, ask: { nil }, timeZone: { [utc] in utc })
+        notes.save("Call the dentist.", at: at)
+        await notes.settle()
+        sorting.on = false
+        notes.save("Email Bob.", at: at)
+        sorting.on = true
+        #expect(!notes.canSortAgain)
+    }
+
+    /// A folder that comes back after murmur found it lost is used again.
+    @Test func aFolderMurmurCanReachAgainIsUsedAgain() async throws {
+        let counts = Counts()
+        let lost = NoteStore(root: root.appending(path: "vault", directoryHint: .isDirectory), picked: true, lost: true)
+        let notes = Notes(folder: lost, rules: rules, stateFile: stateFile, sortOn: { false }, ask: { nil }, remind: { counts.reminded += 1 }, timeZone: { [utc] in utc })
+        await notes.recheck(lost)
+        #expect(counts.reminded == 0)
+        let found = NoteStore(root: lost.root, picked: true)
+        await notes.recheck(found)
+        #expect(!notes.folder.lost)
+        #expect(counts.reminded == 1)
+    }
+
+    /// The Notes screen's files are read away from the main thread, so an
+    /// iCloud vault downloading a file never holds the screen.
+    @Test func theScreensFilesAreReadInOneGo() async throws {
+        try folder.replace("murmur/todo.md", "- [ ] Call the dentist.\n")
+        try folder.replace("murmur/inbox/2026-09-18.md", "## 10:32\n\nCall the dentist.\n\n")
+        try folder.replace("murmur/inbox/2026-09-17.md", "## 09:00\n\nEmail Bob.\n\n")
+        let files = await NotesFiles.load(folder, rules: rules)
+        #expect(files == NotesFiles(tasks: "- [ ] Call the dentist.\n", ideas: nil, days: ["murmur/inbox/2026-09-18.md", "murmur/inbox/2026-09-17.md"]))
     }
 }

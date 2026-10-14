@@ -58,9 +58,13 @@ struct ContentView: View {
             // A day or more away: the coming days' recaps are laid down again.
             let entries = history.entries
             Task { await RecapNotifications.refresh(entries) }
-            // The coming days' task reminders too (IOS-023).
+            // The notes folder as it resolves now, and the coming days' task
+            // reminders too (IOS-023).
             if let notes = Notes.live() {
-                Task { await TaskReminders.refresh(folder: notes.folder, rules: notes.rules) }
+                Task {
+                    await notes.recheck(NotesFolderChoice().store())
+                    await TaskReminders.refresh(folder: notes.folder, rules: notes.rules)
+                }
             }
         }
         .onOpenURL { url in

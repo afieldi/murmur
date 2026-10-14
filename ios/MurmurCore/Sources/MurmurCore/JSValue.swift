@@ -83,8 +83,13 @@ public struct JSObject: Equatable, Sendable {
 }
 
 private struct Reader {
+    /// Deeper than any sort reply nests (three levels at most); a reply
+    /// nested past it reads as no JSON instead of running out of stack.
+    static let maxDepth = 64
+
     let units: [UInt16]
     var at = 0
+    var depth = 0
 
     var atEnd: Bool { at >= units.count }
 
@@ -94,6 +99,12 @@ private struct Reader {
 
     mutating func value() -> JSValue? {
         guard at < units.count else { return nil }
+        if units[at] == 0x7B || units[at] == 0x5B {
+            guard depth < Self.maxDepth else { return nil }
+            depth += 1
+            defer { depth -= 1 }
+            return units[at] == 0x7B ? object() : array()
+        }
         switch units[at] {
         case 0x7B: return object()
         case 0x5B: return array()

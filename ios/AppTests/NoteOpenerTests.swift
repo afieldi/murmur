@@ -20,6 +20,17 @@ import UIKit
         #expect(!NoteOpener.shared.showing)
     }
 
+    /// A second press of the Action Button while New note is still on screen
+    /// asks it to listen again.
+    @Test func eachOpenAsksAgain() {
+        let before = NoteOpener.shared.request
+        NoteOpener.shared.open()
+        NoteOpener.shared.open()
+        #expect(NoteOpener.shared.request == before + 2)
+        #expect(NoteOpener.shared.showing)
+        NoteOpener.shared.showing = false
+    }
+
     /// The control, the Action Button, and Shortcuts run the intent in murmur.
     @Test func theNewNoteIntentOpensNewNote() async throws {
         NoteOpener.shared.showing = false

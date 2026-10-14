@@ -81,6 +81,7 @@ import Testing
         if #available(iOS 27.0, *) {
             #expect(StartSessionIntent.allowedExecutionTargets == .main)
             #expect(EndSessionIntent.allowedExecutionTargets == .main)
+            #expect(NewNoteIntent.allowedExecutionTargets == .main)
         }
     }
     #endif

@@ -91,7 +91,11 @@ struct NotesStateFile: Sendable {
     }
 
     var held: [HeldLine] { state.memory.held }
-    var canSortAgain: Bool { !sorting && !state.memory.pending.isEmpty }
+    /// Sort again is for the newest note's unsettled lines, and only while
+    /// sorting is on: off, a note's words never leave the phone for sorting.
+    var canSortAgain: Bool {
+        !sorting && !state.memory.pending.isEmpty && state.newest?.id == state.memory.input?.id && sortOn()
+    }
 
     /// Saves a note to today's inbox. Returns the word for the keyboard's
     /// receipt (inbox), or nil when the note could not be written, so the
@@ -115,6 +119,7 @@ struct NotesStateFile: Sendable {
 
     /// Sends the newest note's unsettled lines again.
     func sortAgain() async {
+        guard canSortAgain else { return }
         queue { notes in await notes.run { memory, ask in await NoteSort.sortAgain(memory: memory, folder: notes.folder, rules: notes.rules, ask: ask) } }
         await last?.value
     }
@@ -133,6 +138,13 @@ struct NotesStateFile: Sendable {
         folder = next
         revision += 1
         await remind()
+    }
+
+    /// Takes the folder as it resolves now, when it differs: a vault that
+    /// came back, or one that went away while murmur was in the background.
+    func recheck(_ resolved: NoteStore) async {
+        guard resolved != folder else { return }
+        await use(resolved)
     }
 
     /// Waits for the sort running now, if any.

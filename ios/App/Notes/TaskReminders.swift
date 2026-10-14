@@ -4,8 +4,9 @@
 // reading the tasks file when each one is due. An iPhone app cannot wake
 // to read a file, so the reminders are laid down ahead with the file as it
 // stands, and laid down again whenever murmur changes it: a note sorted, a
-// box ticked, a setting changed, a return to murmur. Only murmur writes
-// the file on this iPhone, so what a reminder says is what the file says.
+// box ticked, a setting changed, a return to murmur. In a folder you picked,
+// Obsidian or a Mac may change the file too; reminders catch up the next
+// time murmur opens.
 import Foundation
 import MurmurCore
 import UserNotifications

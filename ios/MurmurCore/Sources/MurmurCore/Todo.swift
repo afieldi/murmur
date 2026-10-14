@@ -14,6 +14,25 @@ public struct ListItem: Equatable, Sendable {
     public let checkbox: Bool
 }
 
+/// One line of a tasks or ideas list as the iPhone shows it (IOS-023).
+public struct ListRow: Equatable, Sendable {
+    public let text: String
+    public let done: Bool
+    public let checkbox: Bool
+    /// A line ending in a colon that introduces the items under it.
+    public let lead: Bool
+    /// Indented under another line.
+    public let nested: Bool
+
+    public init(text: String, done: Bool, checkbox: Bool, lead: Bool, nested: Bool) {
+        self.text = text
+        self.done = done
+        self.checkbox = checkbox
+        self.lead = lead
+        self.nested = nested
+    }
+}
+
 public enum Todo {
     /// Every checkbox line, in file order, fences and empty boxes skipped.
     public static func items(_ text: String) -> [ListItem] {
@@ -66,6 +85,34 @@ public enum Todo {
             }
         }
         return items
+    }
+
+    /// The list as the iPhone shows it (IOS-023): listItems' items, with
+    /// the lead lines it leaves out kept as rows of their own, and each line
+    /// marked nested when it is indented under another.
+    public static func listRows(_ text: String) -> [ListRow] {
+        var rows: [ListRow] = []
+        var fenced = false
+        let all = lines(text)
+        for (index, line) in all.enumerated() {
+            if Sorter.test(fence, line) {
+                fenced.toggle()
+                continue
+            }
+            if fenced { continue }
+            let nested = trimStart(line).utf16.count < line.utf16.count
+            if let box = checkboxParts(line) {
+                let itemText = JS.trim(JS.replace(box.text, trailingLink, with: ""))
+                if !itemText.isEmpty { rows.append(ListRow(text: itemText, done: box.mark != " ", checkbox: true, lead: false, nested: nested)) }
+                continue
+            }
+            if capture(headingLine, line) != nil { continue }
+            if let bullet = capture(bulletLine, line) {
+                let itemText = JS.trim(JS.replace(bullet, trailingLink, with: ""))
+                if !itemText.isEmpty { rows.append(ListRow(text: itemText, done: false, checkbox: false, lead: isLeadLine(line, all, index), nested: nested)) }
+            }
+        }
+        return rows
     }
 
     /// Tick the nth checkbox, counted as items(_:) counts: the box's space

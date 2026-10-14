@@ -22,7 +22,6 @@ enum NotesCopy {
     static let noIdeas = "No ideas yet. Say one in a note and a sort files it here."
     static let noNotes = "No notes yet."
     static let howTo = "Tap New note and talk, or press and hold the pill on the murmur keyboard and tap Note: your next take is kept here instead of typed."
-    static let noted = "Noted to inbox"
     static let notSaved = "murmur could not save that note. Your words are in your takes on Home."
     /// What Send one now says when a reminder would stay quiet.
     static let nothingOpen = "Nothing open right now, so a reminder would stay quiet."

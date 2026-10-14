@@ -8,6 +8,13 @@
 import Foundation
 import MurmurCore
 
+/// A note take's words and where they landed, or no place when the note
+/// could not be saved (IOS-023).
+struct KeptNote: Equatable, Sendable {
+    let words: String
+    let place: String?
+}
+
 /// The shared rules a take runs on, read once from the app bundle.
 struct TakeRules: Sendable {
     let gate: SpeechGateSpec
@@ -32,6 +39,13 @@ struct TakeRules: Sendable {
         case micFailed
     }
 
+    /// What a take is for (IOS-023): words to show and copy, or a note to
+    /// keep. Only New note starts a note take; the keyboard and Dictate
+    /// share this model and their takes are never kept as notes.
+    enum Purpose: Sendable {
+        case words, note
+    }
+
     /// Two taps closer together than this are one double tap.
     static let doubleTap: TimeInterval = 0.5
 
@@ -42,8 +56,12 @@ struct TakeRules: Sendable {
     /// The waiting take whose Discard now asks delete audio?
     private(set) var armed: String?
     private(set) var message: String?
+    /// The note the last note take kept, until the next take starts.
+    private(set) var kept: KeptNote?
 
     @ObservationIgnored private var starting = false
+    /// What the take recording now is for.
+    @ObservationIgnored private var purpose = Purpose.words
     @ObservationIgnored private var armedAt = Date.distantPast
     @ObservationIgnored private let microphone: any Microphone
     @ObservationIgnored private let store: WaitingStore
@@ -61,6 +79,9 @@ struct TakeRules: Sendable {
     @ObservationIgnored private let record: @MainActor (HistoryEntry) -> Void
     /// Notes what happened to each take in the activity log (IOS-014).
     @ObservationIgnored private let note: @MainActor (ActivityEvent) -> Void
+    /// Saves a note take's words, spoken at the given time; returns where
+    /// they landed, or nil when they could not be saved (IOS-023).
+    @ObservationIgnored private let keepNote: @MainActor (String, Date) -> String?
 
     init(
         microphone: any Microphone, store: WaitingStore, rules: TakeRules, catalog: ProviderCatalog,
@@ -68,7 +89,8 @@ struct TakeRules: Sendable {
         copy: @escaping @MainActor (String) -> Void, now: @escaping @MainActor () -> Date = { .now },
         keepAlive: @escaping @MainActor () -> @MainActor () -> Void = { {} },
         record: @escaping @MainActor (HistoryEntry) -> Void = { _ in },
-        note: @escaping @MainActor (ActivityEvent) -> Void = { _ in }
+        note: @escaping @MainActor (ActivityEvent) -> Void = { _ in },
+        keepNote: @escaping @MainActor (String, Date) -> String? = { _, _ in nil }
     ) {
         self.microphone = microphone
         self.store = store
@@ -83,6 +105,7 @@ struct TakeRules: Sendable {
         self.keepAlive = keepAlive
         self.record = record
         self.note = note
+        self.keepNote = keepNote
         waiting = store.list()
     }
 
@@ -100,11 +123,11 @@ struct TakeRules: Sendable {
         state == .transcribing || !retrying.isEmpty
     }
 
-    func toggle() async {
-        if isRecording { await stop() } else { await start() }
+    func toggle(as purpose: Purpose = .words) async {
+        if isRecording { await stop() } else { await start(as: purpose) }
     }
 
-    func start() async {
+    func start(as purpose: Purpose = .words) async {
         guard !starting, !isRecording, !isBusy else { return }
         starting = true
         defer { starting = false }
@@ -117,6 +140,8 @@ struct TakeRules: Sendable {
         }
         do {
             try microphone.start()
+            self.purpose = purpose
+            kept = nil
             state = .recording(since: now())
         } catch {
             state = .micFailed
@@ -126,6 +151,8 @@ struct TakeRules: Sendable {
 
     func stop() async {
         guard case .recording(let since) = state else { return }
+        let purpose = self.purpose
+        self.purpose = .words
         // Asked before the microphone lets go: when a session has just ended,
         // the microphone was all that kept murmur running in the background.
         let release = keepAlive()
@@ -145,6 +172,8 @@ struct TakeRules: Sendable {
         case .success(let words):
             state = words.map(State.words) ?? .heardNothing(sent: true)
             if let words {
+                // A note take is kept once, here, under the time it was spoken.
+                if purpose == .note { kept = KeptNote(words: words, place: keepNote(words, since)) }
                 let entry = HistoryEntry(at: since, durationMs: length, words: words)
                 record(entry)
                 note(.words(count: entry.wordCount, retried: false))
@@ -171,9 +200,17 @@ struct TakeRules: Sendable {
     /// and the activity log notes it (IOS-014).
     func cancel() {
         guard case .recording(let since) = state else { return }
+        purpose = .words
         _ = microphone.stop()
         state = .idle
         note(.cancelled(durationMs: Int(now().timeIntervalSince(since) * 1000)))
+    }
+
+    /// Drops the take only when it was started for this purpose: leaving
+    /// New note never drops a keyboard take (IOS-023).
+    func cancel(ifFor purpose: Purpose) {
+        guard isRecording, self.purpose == purpose else { return }
+        cancel()
     }
 
     /// Runs the waiting takes one at a time through today's provider, in
