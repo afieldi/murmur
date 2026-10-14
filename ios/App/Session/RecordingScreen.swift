@@ -23,7 +23,7 @@ struct RecordingScreen: View {
                     .frame(minHeight: 44)
                 Spacer()
             } else {
-                PillCanvas(style: look.style, stage: model.isRecording ? .recording : .idle, level: { model.level })
+                PillCanvas(style: look.style, stage: model.isRecording ? .recording : .idle, level: { model.level }, palette: look.palette)
                     .frame(maxWidth: 320)
                     .frame(height: 120)
                     .accessibilityHidden(true)

@@ -47,6 +47,11 @@ enum BundledRules {
         )
     }
 
+    /// The waveform styles and accents (IOS-020).
+    static func cosmetics() throws -> CosmeticsFile {
+        try shared().decode(CosmeticsFile.self, from: "cosmetics.json")
+    }
+
     static func catalog() throws -> ProviderCatalog {
         try shared().decode(ProviderCatalog.self, from: "provider-catalog.json")
     }

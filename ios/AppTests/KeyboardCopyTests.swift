@@ -12,8 +12,4 @@ import Testing
         }
         #expect(KeyboardCopy.fullAccess.contains("never connects to the internet"))
     }
-
-    @Test func theLooksAreNamedPlainly() {
-        #expect(PillStyle.allCases.map(KeyboardCopy.name) == ["Bars", "Speckle", "Pulse", "Ink dabs", "Ink flecks", "Ink rings", "Ink ribbon"])
-    }
 }

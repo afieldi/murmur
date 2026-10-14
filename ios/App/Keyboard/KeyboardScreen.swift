@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // The Keyboard screen (ios/prd.json IOS-008): how to add the murmur
 // keyboard and turn on Full Access, why it needs it, a box to try it in,
-// and the pill's look (IOS-010). A stand-in until first run (IOS-011)
-// walks you through it.
+// and the way to the pill's look (IOS-010, the Look screen since IOS-020).
+// A stand-in until first run (IOS-011) walks you through it.
 import SwiftUI
 import UIKit
 
@@ -36,15 +36,19 @@ struct KeyboardScreen: View {
             .listRowBackground(Tokens.panel)
 
             Section {
-                HStack(spacing: 12) {
-                    ForEach(PillStyle.allCases, id: \.self) { style in
-                        LookTile(style: style, chosen: look.style == style) {
-                            look = PillLook(style: style)
-                            look.write()
-                        }
+                NavigationLink {
+                    LookScreen()
+                } label: {
+                    HStack(spacing: 14) {
+                        PillCanvas(style: look.style, stage: .recording, level: DemoVoice.level, palette: look.palette)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .frame(width: 112, height: 36)
+                            .background(Capsule().fill(Tokens.panelLift))
+                            .accessibilityHidden(true)
+                        Text("Look")
                     }
                 }
-                .padding(.vertical, 6)
             } header: {
                 SectionTitle("The pill")
             } footer: {
@@ -68,36 +72,8 @@ struct KeyboardScreen: View {
         .tint(Tokens.brand)
         .navigationTitle("Keyboard")
         .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
-/// One look for the pill, live: the style follows a voice, as it will
-/// follow yours.
-struct LookTile: View {
-    let style: PillStyle
-    let chosen: Bool
-    let choose: () -> Void
-
-    var body: some View {
-        Button(action: choose) {
-            VStack(spacing: 8) {
-                PillCanvas(style: style, stage: .recording, level: DemoVoice.level)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .frame(height: 44)
-                    .background(Capsule().fill(Tokens.panelLift))
-                Text(KeyboardCopy.name(style))
-                    .font(.subheadline.weight(chosen ? .semibold : .regular))
-                    .foregroundStyle(chosen ? Tokens.brand : Tokens.text)
-            }
-            .padding(10)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .background(RoundedRectangle(cornerRadius: 14).stroke(chosen ? Tokens.brand : Tokens.panelEdge, lineWidth: chosen ? 1.5 : 1))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(KeyboardCopy.name(style))
-        .accessibilityAddTraits(chosen ? .isSelected : [])
+        // Back from the Look screen, the row shows the new choice.
+        .onAppear { look = PillLook.read() }
     }
 }
 
@@ -117,18 +93,6 @@ enum KeyboardCopy {
     static let tryFooter = "Tap the pill, speak, and tap it again. Your words land where the cursor is."
 
     static let lookFooter = "How the pill looks in the keyboard and when murmur opens to record."
-
-    static func name(_ style: PillStyle) -> String {
-        switch style {
-        case .bars: "Bars"
-        case .speckle: "Speckle"
-        case .pulse: "Pulse"
-        case .dabs: "Ink dabs"
-        case .flecks: "Ink flecks"
-        case .rings: "Ink rings"
-        case .ribbon: "Ink ribbon"
-        }
-    }
 }
 
 #if DEBUG

@@ -64,7 +64,7 @@ final class KeyboardViewController: UIInputViewController {
         // Tells first run the keyboard is added with Full Access (IOS-011);
         // without Full Access it cannot write, which says the same.
         if hasFullAccess { KeyboardReport(fullAccess: true, at: .now).write() }
-        pad.wave.style = PillLook.read().style
+        applyLook()
         waiting = Pad.Waiting.load(from: memory)
         // A take that opened murmur is taken over by the keyboard you come
         // back to, and lands in its field.
@@ -105,6 +105,16 @@ final class KeyboardViewController: UIInputViewController {
 
     @objc private func pillDown() {
         haptic.prepare()
+        // A look chosen in murmur while the keyboard stayed up reaches the
+        // pill before the take it starts.
+        applyLook()
+    }
+
+    /// The pill's style and accent, from the app group (IOS-020).
+    private func applyLook() {
+        let look = PillLook.read()
+        pad.wave.style = look.style
+        pad.wave.palette = look.palette
     }
 
     @objc private func tapPill() {

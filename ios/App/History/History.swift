@@ -195,9 +195,12 @@ extension History {
             Mailbox.shared?.forget(words)
         } changed: { change in
             PaintingStore.live()?.apply(change)
+            Looks.refresh(change.kept)
         }
         // Takes kept before the painting a day paint their days too.
         PaintingStore.live()?.sync(history.entries)
+        // A look chosen before its accent's color moved paints the new one.
+        Looks.refresh(history.entries)
         shared = history
         return history
     }
