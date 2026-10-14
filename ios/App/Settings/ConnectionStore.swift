@@ -56,6 +56,11 @@ enum BundledRules {
         try shared().decode(ProviderCatalog.self, from: "provider-catalog.json")
     }
 
+    /// The note sorter's prompts, numbers, and file layout (IOS-023).
+    static func sorter() throws -> SorterRules {
+        try shared().decode(SorterRules.self, from: "sorter.json")
+    }
+
     /// The speech gate's numbers, the phrases models invent on silence, the
     /// formatter's rules, and polish's prompt and checks.
     static func takeRules() throws -> TakeRules {
