@@ -156,10 +156,11 @@ struct RecapPlan: Equatable {
 }
 
 extension RecapPlan {
-    /// How a notification shows while murmur is open: a recap as a banner
-    /// with its sound, anything else as iOS would.
+    /// How a notification shows while murmur is open: a recap or a task
+    /// reminder (IOS-023) as a banner with its sound, anything else as iOS
+    /// would.
     static func presentation(for id: String) -> UNNotificationPresentationOptions {
-        id.hasPrefix(prefix) ? [.banner, .list, .sound] : []
+        id.hasPrefix(prefix) || id.hasPrefix(ReminderPlan.prefix) ? [.banner, .list, .sound] : []
     }
 }
 
