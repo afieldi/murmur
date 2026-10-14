@@ -110,8 +110,10 @@ import UIKit
             let frame = PillFrame(style: style, stage: stage, levels: test.loud, time: time, still: false, palette: palette)
             let bytes = test.pixels(frame)
             var bluish = 0
-            for i in stride(from: 0, to: bytes.count, by: 4) where Int(bytes[i + 2]) - Int(bytes[i]) > 25 {
-                bluish += 1
+            for i in stride(from: 0, to: bytes.count, by: 4) {
+                let red = Int(bytes[i])
+                let blue = Int(bytes[i + 2])
+                if blue - red > 25 { bluish += 1 }
             }
             #expect(bluish > 0, "\(stage)")
             #expect(test.paint(frame).amber == 0, "\(stage)")
@@ -125,8 +127,17 @@ import UIKit
         let test = PillTests()
         for stage in [PillStage.idle, .recording, .processing, .inserted, .noSpeech, .error] {
             let bytes = test.pixels(PillFrame(style: style, stage: stage, levels: test.loud, time: 0, still: true))
-            // Any paint at all on the ink, however faint.
-            let painted = stride(from: 0, to: bytes.count, by: 4).filter { Int(bytes[$0]) + Int(bytes[$0 + 1]) + Int(bytes[$0 + 2]) > 46 + 48 }.count
+            // Any paint at all on the ink (15, 14, 17), however faint. Each
+            // step is its own typed value: Swift 6.3 (CI) gives up type
+            // checking the sum as one expression.
+            var painted = 0
+            for i in stride(from: 0, to: bytes.count, by: 4) {
+                let red = Int(bytes[i])
+                let green = Int(bytes[i + 1])
+                let blue = Int(bytes[i + 2])
+                let sum: Int = red + green + blue
+                if sum > 94 { painted += 1 }
+            }
             #expect(painted > 20, "\(stage)")
         }
     }
