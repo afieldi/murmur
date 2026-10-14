@@ -213,6 +213,8 @@ enum JourneyArtwork: Hashable, Sendable {
     case words(JourneyStanding, width: Double, height: Double)
     case tallies(JourneyStanding, width: Double, height: Double)
     case stamp(id: String, got: Bool, seed: Int, size: Double)
+    /// The belt share card, at desktop's 840 by 440 points (IOS-021).
+    case share(days: [DayTotal], rank: String, level: Int)
 
     var fields: [String: Any] {
         switch self {
@@ -234,6 +236,9 @@ enum JourneyArtwork: Hashable, Sendable {
             return ["kind": "tallies", "standing": standing.fields, "width": width, "height": height]
         case let .stamp(id, got, seed, size):
             return ["kind": "stamp", "id": id, "got": got, "seed": seed, "size": size]
+        case let .share(days, rank, level):
+            let painted = days.map { ["day": $0.day, "words": $0.words, "sessions": $0.sessions] as [String: Any] }
+            return ["kind": "share", "days": painted, "rank": rank, "level": level]
         }
     }
 }

@@ -38,6 +38,13 @@ struct JourneyScreen: View {
                 }
                 .padding(.vertical, 8)
                 .accessibilityElement(children: .combine)
+                NavigationLink {
+                    ShareCardScreen(history: history, rules: rules)
+                } label: {
+                    Text(ShareCardCopy.row)
+                        .foregroundStyle(Tokens.brand)
+                        .frame(minHeight: 44)
+                }
             }
             .listRowBackground(Tokens.panel)
 
