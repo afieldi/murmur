@@ -81,7 +81,7 @@ extension HistoryChange {
 enum LookCopy {
     static let waveFooter = "How the pill draws your voice, in the keyboard and when murmur opens to record. Each tile is the real pill, moving to a made-up voice; locked styles show the belt that earns them."
 
-    static let accentFooter = "The paint the pill draws with while you speak. It dries to a darker shade of itself when the brush lifts; signal amber dries to gold."
+    static let accentFooter = "The paint the pill draws with while you speak. It dries to a darker shade of itself when the brush lifts; signal amber dries to gold. Every style and accent is earned by practice, never bought, and changes only how the pill looks."
 
     /// A name from shared/cosmetics.json, in sentence case.
     static func name(_ item: CosmeticItem) -> String {

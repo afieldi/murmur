@@ -149,6 +149,7 @@ import Testing
         #expect(LookCopy.styleValue(dabs, inUse: false, unlocked: true) == "Earned at white belt")
         #expect(LookCopy.accentValue(ember, unlocked: false) == "Locked, hold a dictation past five minutes")
         #expect(LookCopy.accentValue(ember, unlocked: true).isEmpty)
+        #expect(LookCopy.accentFooter.contains("earned by practice, never bought, and changes only how the pill looks"))
         for line in [LookCopy.waveFooter, LookCopy.accentFooter] {
             #expect(!line.contains("Murmur") && !line.contains("\u{2014}") && !line.contains(" - "))
         }

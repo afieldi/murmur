@@ -264,6 +264,24 @@ With Reduce Motion on (Settings, Accessibility, Motion), every painting appears 
 
 The paintings are made on your iPhone by a small page inside murmur that can load nothing else and reach nothing on the internet.
 
+## What can I earn on iPhone?
+
+Everything murmur gives for practice is earned by dictating and never bought, and none of it changes what murmur does: your words, cleanup, and the keyboard work the same at every belt. On iPhone you earn:
+
+- **Belts, stripes, and levels,** from the words and days you dictate (see How do belts work on iPhone?).
+- **Fourteen achievements,** inked as stamps on the Journey: your first take; three, seven, thirty, and a hundred days in a row; a thousand, five thousand, and ten thousand words in one day; a hundred and a thousand takes; a take past five minutes; dictating between midnight and four; dictating before six in the morning; and coming back after a week away. A new one shows on the Journey the next time you open it; the iPhone sends no notification for it.
+- **Waveform styles** for the pill: pulse and ink dabs at white belt, ink flecks at blue, ink rings at purple, and the ink ribbon at brown (see How do I change the waveform on iPhone?).
+- **Accent colors** for the pill: your belt color and each belt's own color with that belt, and ember red, moonlight, and dawn with the take past five minutes, dictating after midnight, and dictating before six (see How do I change the pill's color on iPhone?).
+- **Your belt card,** painted from your last 30 days (see How do I share my belt card on iPhone?), and **a painting a day.**
+
+Locked styles and accents stay on the Look screen with what earns them, and locked achievements on the Journey. The Mac's window themes, like morning mist at blue belt, color the Mac's settings window; the iPhone keeps murmur's night studio look. Your iPhone counts only the takes it keeps; one Journey across your devices comes with the murmur account.
+
+## How do I share my belt card on iPhone?
+
+Open the Journey from Home and tap Share card. murmur paints a card from your last 30 days, the same card the Mac paints from the same days: one brush stroke for each day you dictated, longer for more words and heavier for more takes, with your three biggest days in ember, over your painted belt, your rank, its title, your words and days on the mat for those 30 days, and your level.
+
+Tap Save card and the share sheet opens. Save Image puts it in Photos; the first time, iPhone asks to let murmur add to your photos, and murmur never looks at your library. Or send it anywhere the share sheet reaches. The card is painted on your iPhone, and nothing is sent anywhere unless you send it. VoiceOver reads the card's rank, words, days on the mat, and level.
+
 ## How does the painting a day work on iPhone?
 
 The same way as on the Mac, painted by the same code. Each day gets one ink painting, and every take you dictate that day adds its next stroke. Tap the painting row on Home to open today's painting; the newest stroke paints itself in.

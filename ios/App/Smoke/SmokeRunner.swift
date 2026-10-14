@@ -53,6 +53,7 @@ enum SmokeRunner {
             ("journeyPage", checkJourneyPage),
             ("paintingDay", checkPaintingDay),
             ("look", checkLook),
+            ("shareCard", checkShareCard),
             ("sharedJson", { try checkSharedJson(expected: request.sharedCount) })
         ]
         var results: [String: Bool] = [:]
@@ -639,6 +640,58 @@ enum SmokeRunner {
             guard inked(image) > 100 else { return "\(style.rawValue) painted nothing" }
         }
         return nil
+    }
+
+    /// The belt share card (IOS-021): a seeded month (in UTC, so no clock
+    /// change moves a take) is totaled as desktop totals it, and the painter
+    /// page paints desktop's card from it at 1680 by 880, not blank.
+    static func checkShareCard() throws {
+        if let failure = onMain({ await shareCardFailure() }) { throw SmokeFailure(failure) }
+    }
+
+    @MainActor private static func shareCardFailure() async -> String? {
+        guard let rules = JourneyRules.live else { return "the ladder did not load" }
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC") ?? .gmt
+        let today = HistoryEntry.dayKey(.now, calendar: utc)
+        let takes = (0..<12).map { i in
+            HistoryEntry(at: Date.now.addingTimeInterval(Double(-i * 2) * 86_400), durationMs: 30_000, words: Array(repeating: "word", count: 60 + i * 40).joined(separator: " "), calendar: utc)
+        }
+        let card = ShareCard.from(takes, rules: rules, today: today)
+        guard card.days.count == 30, card.days.last?.day == today, card.activeDays == 12, card.words == takes.reduce(0, { $0 + $1.wordCount }) else {
+            return "the month totaled \(card.activeDays) days and \(card.words) words"
+        }
+        let painter = JourneyPainter()
+        do {
+            try await painter.waitUntilReady(seconds: 30)
+        } catch {
+            return "the painter page never said it was ready"
+        }
+        guard let png = try? await painter.png(card.artwork, scale: 2), let image = UIImage(data: png.data) else { return "the page painted no card" }
+        guard image.size == CGSize(width: 1680, height: 880) else { return "the card is \(image.size), not 1680 by 880" }
+        guard lit(image) > 20_000 else { return "the card is blank" }
+        return nil
+    }
+
+    /// How many pixels stand clear of the ink: paint and words.
+    @MainActor private static func lit(_ image: UIImage) -> Int {
+        guard let cg = image.cgImage else { return 0 }
+        var bytes = [UInt8](repeating: 0, count: cg.width * cg.height * 4)
+        let drawn = bytes.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(data: buffer.baseAddress, width: cg.width, height: cg.height, bitsPerComponent: 8, bytesPerRow: cg.width * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            context.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
+            return true
+        }
+        guard drawn else { return 0 }
+        var count = 0
+        for i in stride(from: 0, to: bytes.count, by: 4) {
+            let red = Int(bytes[i])
+            let green = Int(bytes[i + 1])
+            let blue = Int(bytes[i + 2])
+            let lift: Int = red + green + blue
+            if lift > 136 { count += 1 }
+        }
+        return count
     }
 
     /// Runs main-actor work to the end from the smoke's synchronous start
