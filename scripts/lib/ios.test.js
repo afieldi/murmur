@@ -8,6 +8,7 @@ import {
   buildNumber,
   compareVersions,
   copySharedJson,
+  deviceProblem,
   displayFaceRule,
   readDisplayFace,
   exportOptionsPlist,
@@ -207,6 +208,16 @@ describe('the release (IOS-015)', () => {
     expect(altoolFailure('UPLOAD FAILED with 1 error')).toBe('UPLOAD FAILED with 1 error')
     expect(altoolFailure(JSON.stringify({ 'success-message': "No errors uploading 'murmur.ipa'", 'product-errors': [] }))).toBeNull()
     expect(altoolFailure("No errors uploading 'murmur.ipa'")).toBeNull()
+  })
+
+  it('refuses an app that runs on iPad without turning every way, as Apple does (90474)', () => {
+    const all = ['UIInterfaceOrientationPortrait', 'UIInterfaceOrientationPortraitUpsideDown', 'UIInterfaceOrientationLandscapeLeft', 'UIInterfaceOrientationLandscapeRight']
+    const portrait = ['UIInterfaceOrientationPortrait']
+    expect(deviceProblem({ UIDeviceFamily: [1], UISupportedInterfaceOrientations: portrait })).toBeNull()
+    expect(deviceProblem({ UIDeviceFamily: [1, 2], UISupportedInterfaceOrientations: portrait })).toContain('iPad')
+    expect(deviceProblem({ UIDeviceFamily: [1, 2], UISupportedInterfaceOrientations: all })).toBeNull()
+    expect(deviceProblem({ UIDeviceFamily: [1, 2], UISupportedInterfaceOrientations: portrait, 'UISupportedInterfaceOrientations~ipad': all })).toBeNull()
+    expect(deviceProblem({ UIDeviceFamily: [2], 'UISupportedInterfaceOrientations~ipad': portrait })).toContain('iPad')
   })
 
   it('needs the key file named for its id, where altool looks for it', () => {

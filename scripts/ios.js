@@ -22,6 +22,7 @@ const {
   readDisplayFace,
   buildNumber,
   copySharedJson,
+  deviceProblem,
   exportOptionsPlist,
   findOnPath,
   keyFileProblem,
@@ -297,6 +298,9 @@ async function release() {
     const got = plistValue(shipped, key)
     if (got !== want) throw new Error(`the ipa's ${key} is ${got}, not ${want}`)
   }
+  const info = JSON.parse(execFileSync('plutil', ['-convert', 'json', '-o', '-', join(shipped, 'Info.plist')], { encoding: 'utf8' }))
+  const devices = deviceProblem(info)
+  if (devices) throw new Error(devices)
   const group = plistValue(shipped, 'MurmurAppGroup')
   const plugins = join(shipped, 'PlugIns')
   const extensions = readdirSync(plugins).filter((name) => name.endsWith('.appex')).map((name) => join(plugins, name))

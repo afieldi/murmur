@@ -14,7 +14,7 @@ How a build gets from this repo to TestFlight (ios/prd.json IOS-015). Desktop ha
 - The Apple Distribution certificate for Eze Media LLC (team 4B55ZVBVKN) in the login keychain.
 - The App Store Connect record murmur voice dictation for `com.lbwalton.murmur.ios`, with its internal TestFlight group murmur team (IOS-004).
 
-Signing uses the API key with automatic provisioning: the first archive creates the App Store profiles for the app and each extension. `--xcode-account` signs with the account signed in to Xcode instead, which works only from a Terminal that can read the login keychain. Xcode writes the key's id and path into `ios/build`, so never share that folder.
+Signing uses the API key with automatic provisioning: the first archive creates the App Store profiles for the app and each extension. The archive also needs each target's development profile, which the API key cannot make: when a new extension is added, open `ios/murmur.xcodeproj` in Xcode once, signed in as the Eze Media LLC account, and look at the new target under Signing & Capabilities. Xcode makes its profile there (learned with the widgets extension, 2026-10-14). The command line does not see Xcode 27's signed-in account, so `--xcode-account` fails with No Accounts from a Terminal too. `--xcode-account` signs with the account signed in to Xcode instead, which works only from a Terminal that can read the login keychain. Xcode writes the key's id and path into `ios/build`, so never share that folder.
 
 ## Archive, check, and upload
 
@@ -22,6 +22,7 @@ Signing uses the API key with automatic provisioning: the first archive creates 
 2. **Dry run.** `npm run ios:release` generates the project, archives murmur for the App Store, exports the signed ipa into `ios/build/release/<version>-<build>/export/`, and checks the ipa itself. Nothing is sent. The checks:
    - the version, the build number, and the commit;
    - export compliance set (below);
+   - iPhone only, or, once iPad comes (IOS-027), every orientation on iPad, which Apple requires (error 90474);
    - the app and every extension carrying the same build;
    - each signed for the App Store: no test devices, no debugging, entitled to the app group.
 3. **Upload, only after LaBroi says yes.** `npm run ios:release -- --upload` does all of that, then has Apple validate the ipa, then uploads it. It refuses uncommitted changes and shallow clones, so the build number always names the commit that shipped. The `--` matters: without it npm keeps the flag, and the release stops instead of guessing. A failure altool reports stops the release even when altool exits 0, as newer versions can.

@@ -193,6 +193,23 @@ function altoolFailure(output) {
   return error ? error.trim() : null
 }
 
+const ALL_ORIENTATIONS = [
+  'UIInterfaceOrientationPortrait',
+  'UIInterfaceOrientationPortraitUpsideDown',
+  'UIInterfaceOrientationLandscapeLeft',
+  'UIInterfaceOrientationLandscapeRight'
+]
+
+/** Why Apple would refuse the app's devices, or null, from its Info.plist:
+ *  an app that runs on iPad must turn every way there, for multitasking
+ *  (App Store Connect error 90474, met on the first upload, 2026-10-14). */
+function deviceProblem(info) {
+  if (!(info.UIDeviceFamily ?? []).includes(2)) return null
+  const turns = info['UISupportedInterfaceOrientations~ipad'] ?? info.UISupportedInterfaceOrientations ?? []
+  const missing = ALL_ORIENTATIONS.filter((o) => !turns.includes(o))
+  return missing.length === 0 ? null : `the app runs on iPad but does not turn every way there (missing ${missing.join(', ')}); Apple refuses that`
+}
+
 /** Why altool would not find the key file, or null: it looks for
  *  AuthKey_<id>.p8 in its own folders or API_PRIVATE_KEYS_DIR. */
 function keyFileProblem(keyPath, keyId) {
@@ -261,6 +278,7 @@ module.exports = {
   releaseOptions,
   releaseBlocker,
   altoolFailure,
+  deviceProblem,
   keyFileProblem,
   journeyScript,
   fillJourneyPage,
