@@ -9,7 +9,8 @@
 // Words land at the cursor once, or wait as Insert last when you left the
 // field before they arrived. The pill is drawn from the take's stage and
 // the loudness the app writes to the app group (IOS-010), with a light tap
-// when a take starts and when it stops.
+// when a take starts and when it stops. Note in the pill's menu makes the
+// next take a note, saved in murmur instead of typed (IOS-023).
 import UIKit
 
 final class KeyboardViewController: UIInputViewController {
@@ -28,6 +29,11 @@ final class KeyboardViewController: UIInputViewController {
     /// Brings the pill back to rest after it shows how a take ended.
     private var rest: Timer?
     private let haptic = UIImpactFeedbackGenerator(style: .light)
+    /// The next take is a note, kept across keyboards until it starts.
+    private var noteNext: Bool {
+        get { memory.bool(forKey: "noteNext") }
+        set { memory.set(newValue, forKey: "noteNext") }
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -135,7 +141,9 @@ final class KeyboardViewController: UIInputViewController {
             rest?.invalidate()
             // The last take's ending gives way to the new take at once.
             pad.setStage(.idle)
-            mailbox.ask(take)
+            let note = noteNext
+            noteNext = false
+            mailbox.ask(take, note: note)
             pad.insertLast.isHidden = true
             phase = nil
             if SessionState.read().isOn() {
@@ -146,18 +154,18 @@ final class KeyboardViewController: UIInputViewController {
                 // murmur was closed, so open it with the same take. A late
                 // answer to the start and the link are one take.
                 expectAnswer(within: 2) { [weak self] in
-                    self?.openMurmur(take)
+                    self?.openMurmur(take, note: note)
                 }
             } else {
-                openMurmur(take)
+                openMurmur(take, note: note)
             }
         }
     }
 
     /// Opens murmur with the take's link; murmur starts the session and the
     /// take, and you swipe back.
-    private func openMurmur(_ take: UUID) {
-        Mailbox.shared?.ask(take)
+    private func openMurmur(_ take: UUID, note: Bool) {
+        Mailbox.shared?.ask(take, note: note)
         guard let url = TakeLink.url(for: take), let scene = view.window?.windowScene else {
             end(Pad.openRefused)
             return
@@ -231,22 +239,29 @@ final class KeyboardViewController: UIInputViewController {
         pad.returnKey.accessibilityLabel = title
     }
 
-    /// A long press on the pill holds End session while one runs.
-    private func setSessionMenu() {
-        guard SessionState.read().isOn() else {
-            pad.pill.menu = nil
-            return
+    /// A long press on the pill holds Note (IOS-023), and End session while
+    /// one runs.
+    private func setPillMenu() {
+        let armed = noteNext
+        var items: [UIMenuElement] = [
+            UIAction(title: armed ? Pad.typeMenu : Pad.noteMenu, image: UIImage(systemName: armed ? "keyboard" : "note.text")) { [weak self] _ in
+                guard let self else { return }
+                self.noteNext = !armed
+                if self.waiting == nil { self.pad.status.text = self.noteNext ? Pad.noteNext : Pad.idleHint }
+                self.setPillMenu()
+            }
+        ]
+        if SessionState.read().isOn() {
+            items.append(UIAction(title: "End session", image: UIImage(systemName: "stop.circle")) { _ in Signal.end.post() })
         }
-        pad.pill.menu = UIMenu(children: [
-            UIAction(title: "End session", image: UIImage(systemName: "stop.circle")) { _ in Signal.end.post() }
-        ])
+        pad.pill.menu = UIMenu(children: items)
     }
 
     /// Reads the mailbox and does what the newest entry asks, only while
     /// this keyboard is on screen.
     private func refresh() {
         guard visible, hasFullAccess, let mailbox = Mailbox.shared else { return }
-        setSessionMenu()
+        setPillMenu()
         let entry = mailbox.read()
         if let entry, entry.take == waiting?.take, entry.phase != phase {
             phase = entry.phase
@@ -257,7 +272,7 @@ final class KeyboardViewController: UIInputViewController {
         if let stage = Pad.stage(waiting: waiting != nil, phase: phase, ending: rest?.isValid == true) {
             // A keyboard that comes back with no take rests its pill, and the
             // old stage's line goes with it.
-            if stage == .idle, waiting == nil, pad.wave.stage != .idle { pad.status.text = Pad.idleHint }
+            if stage == .idle, waiting == nil, pad.wave.stage != .idle { pad.status.text = noteNext ? Pad.noteNext : Pad.idleHint }
             pad.setStage(stage)
         }
         let sameField = waiting?.sameField(as: textDocumentProxy.documentIdentifier) ?? false
@@ -273,6 +288,7 @@ final class KeyboardViewController: UIInputViewController {
             pad.status.text = line
             if phase == .nothing { end(line, showing: .noSpeech) }
             if phase == .failed { end(line, showing: .error) }
+            if phase == .noted { end(line, showing: .inserted) }
         case .none:
             break
         }
@@ -288,7 +304,7 @@ final class KeyboardViewController: UIInputViewController {
         phase = nil
         noAnswer?.invalidate()
         pad.setStage(stage)
-        pad.status.text = line ?? Pad.idleHint
+        pad.status.text = line ?? (noteNext ? Pad.noteNext : Pad.idleHint)
         rest?.invalidate()
         guard stage != .idle else { return }
         rest = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: false) { [weak self] _ in

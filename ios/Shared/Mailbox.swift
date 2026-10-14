@@ -11,6 +11,8 @@ import Foundation
 struct MailboxEntry: Codable, Equatable, Sendable {
     enum Phase: String, Codable, Sendable {
         case listening, working, ready, nothing, failed
+        /// Kept as a note instead of typed (IOS-023): the receipt says where.
+        case noted
     }
 
     /// What the keyboard did with the words (IOS-014), for the activity log.
@@ -29,6 +31,14 @@ struct MailboxEntry: Codable, Equatable, Sendable {
     let at: Date
     /// Nil until the keyboard types or offers the words.
     var typed: Typed? = nil
+    /// Where a note landed, for the keyboard's receipt (IOS-023): inbox.
+    var noted: String? = nil
+}
+
+/// A keyboard's ask for a take: its id, and whether to keep it as a note.
+struct TakeAsk: Equatable, Sendable {
+    let take: UUID
+    let note: Bool
 }
 
 struct Mailbox: Sendable {
@@ -47,6 +57,8 @@ struct Mailbox: Sendable {
     private struct Request: Codable {
         let take: UUID
         let at: Date
+        /// Missing in an ask from a keyboard before notes: a take to type.
+        var note: Bool? = nil
     }
 
     func read() -> MailboxEntry? {
@@ -110,27 +122,27 @@ struct Mailbox: Sendable {
     }
 
     /// The keyboard asks for a take with its own id, just before it signals
-    /// start.
-    func ask(_ take: UUID, at: Date = .now) {
+    /// start; note keeps it as a note instead of typing it (IOS-023).
+    func ask(_ take: UUID, note: Bool = false, at: Date = .now) {
         coordinate(requestFile, writing: true) { url in
-            try? JSONEncoder().encode(Request(take: take, at: at)).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            try? JSONEncoder().encode(Request(take: take, at: at, note: note)).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         }
     }
 
     /// The take the keyboard asked for, once, and only while the ask is
     /// fresh: a start that waited (murmur was not running) is dropped
     /// instead of recording a take no keyboard is waiting on.
-    func answer(within seconds: TimeInterval, now: Date = .now) -> UUID? {
-        var take: UUID?
+    func answer(within seconds: TimeInterval, now: Date = .now) -> TakeAsk? {
+        var ask: TakeAsk?
         coordinate(requestFile, writing: true) { url in
             defer { try? FileManager.default.removeItem(at: url) }
             guard let data = try? Data(contentsOf: url),
                   let request = try? JSONDecoder().decode(Request.self, from: data),
                   abs(now.timeIntervalSince(request.at)) <= seconds
             else { return }
-            take = request.take
+            ask = TakeAsk(take: request.take, note: request.note ?? false)
         }
-        return take
+        return ask
     }
 
     private func coordinate(_ url: URL, writing: Bool, _ body: (URL) -> Void) {

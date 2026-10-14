@@ -143,7 +143,7 @@ extension PillStage {
         switch phase {
         case .listening?: self = .recording
         case .working?: self = .processing
-        case .ready?: self = .inserted
+        case .ready?, .noted?: self = .inserted
         case .nothing?: self = .noSpeech
         case .failed?: self = .error
         case nil: self = .idle

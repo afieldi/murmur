@@ -80,8 +80,21 @@ import Testing
 
     @Test func anAskIsAnsweredOnce() {
         mailbox.ask(take, at: at)
-        #expect(mailbox.answer(within: 3, now: at.addingTimeInterval(1)) == take)
+        #expect(mailbox.answer(within: 3, now: at.addingTimeInterval(1)) == TakeAsk(take: take, note: false))
         #expect(mailbox.answer(within: 3, now: at.addingTimeInterval(1)) == nil)
+    }
+
+    /// Note in the pill's menu (IOS-023): the ask says to keep the take as a note.
+    @Test func aNoteAskIsAnsweredAsANote() {
+        mailbox.ask(take, note: true, at: at)
+        #expect(mailbox.answer(within: 3, now: at.addingTimeInterval(1)) == TakeAsk(take: take, note: true))
+    }
+
+    /// An ask left by a keyboard from before notes reads as a take to type.
+    @Test func anAskWithoutNoteIsATakeToType() throws {
+        let old = Data("{\"take\":\"\(take.uuidString)\",\"at\":\(at.timeIntervalSinceReferenceDate)}".utf8)
+        try old.write(to: mailbox.requestFile)
+        #expect(mailbox.answer(within: 3, now: at.addingTimeInterval(1)) == TakeAsk(take: take, note: false))
     }
 
     /// An ask that waited too long, sent while murmur was not running, is

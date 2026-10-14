@@ -5,7 +5,8 @@
 // it goes through the mailbox. Only a take the keyboard started goes to
 // the mailbox, so a take made on the Dictate screen never turns up in
 // another app. While a keyboard take records, its loudness goes to the
-// level file for the keyboard's pill (IOS-010).
+// level file for the keyboard's pill (IOS-010). A take the keyboard asked
+// to keep as a note is saved to the notes instead of typed (IOS-023).
 import Foundation
 import Observation
 
@@ -27,22 +28,29 @@ import Observation
     private let levels: LevelFile
     /// Where what the keyboard did with each take is noted (IOS-014).
     private let log: ActivityLog?
+    /// Saves a note's words; the word for the receipt, or nil when it could
+    /// not be saved (IOS-023).
+    private let keepNote: @MainActor (String, Date) -> String?
     private var listener: SignalListener?
     /// The take the keyboard asked for, until it ends.
     private var take: UUID?
     /// A cancel heard while the take was still starting.
     private var cancelled = false
+    /// The take is to be kept as a note.
+    private var note = false
     private var startedAt = Date.distantPast
 
     init(
         model: TakeModel, mailbox: Mailbox, limit: TimeInterval = KeyboardBridge.takeLimit, levels: LevelFile = .shared,
-        log: ActivityLog? = nil, announce: @escaping @MainActor (Signal) -> Void = { $0.post() }
+        log: ActivityLog? = nil, announce: @escaping @MainActor (Signal) -> Void = { $0.post() },
+        keepNote: @escaping @MainActor (String, Date) -> String? = { _, _ in nil }
     ) {
         self.model = model
         self.mailbox = mailbox
         self.limit = limit
         self.levels = levels
         self.log = log
+        self.keepNote = keepNote
         self.announce = announce
     }
 
@@ -57,8 +65,8 @@ import Observation
     func hear(_ signal: Signal) {
         switch signal {
         case .start:
-            guard let id = mailbox.answer(within: Self.askLife) else { return }
-            begin(id)
+            guard let ask = mailbox.answer(within: Self.askLife) else { return }
+            begin(ask.take, note: ask.note)
         case .stop:
             guard take != nil, model.isRecording else { return }
             Task { await model.stop() }
@@ -84,12 +92,12 @@ import Observation
             cancelled = false
             return true
         }
-        guard asked == id else { return false }
-        return begin(id)
+        guard let asked, asked.take == id else { return false }
+        return begin(id, note: asked.note)
     }
 
     @discardableResult
-    private func begin(_ id: UUID) -> Bool {
+    private func begin(_ id: UUID, note: Bool) -> Bool {
         guard take == nil, !model.isRecording, !model.isBusy else {
             announce(.busy)
             return false
@@ -98,6 +106,7 @@ import Observation
         // with its words first.
         log?.noteKeyboard(mailbox.read())
         take = id
+        self.note = note
         startedAt = .now
         cancelled = false
         // Written here, not read from the model, whose state may still
@@ -161,7 +170,14 @@ import Observation
         switch model.state {
         case .recording: write(.listening)
         case .transcribing: write(.working)
-        case .words(let text): write(.ready, words: text, ends: true)
+        case .words(let text):
+            // A note that could not be saved is typed instead: the words are
+            // never lost.
+            if note, let place = keepNote(text, startedAt) {
+                write(.noted, noted: place, ends: true)
+            } else {
+                write(.ready, words: text, ends: true)
+            }
         case .heardNothing: write(.nothing, ends: true)
         case .failed, .micOff, .micFailed: write(.failed, ends: true)
         // Idle again after the take began: it was cancelled.
@@ -169,9 +185,9 @@ import Observation
         }
     }
 
-    private func write(_ phase: MailboxEntry.Phase, words: String? = nil, ends: Bool = false) {
+    private func write(_ phase: MailboxEntry.Phase, words: String? = nil, noted: String? = nil, ends: Bool = false) {
         guard let take else { return }
-        mailbox.write(MailboxEntry(take: take, phase: phase, words: words, at: startedAt))
+        mailbox.write(MailboxEntry(take: take, phase: phase, words: words, at: startedAt, noted: noted))
         announce(.changed)
         if ends { self.take = nil }
     }
@@ -185,7 +201,9 @@ extension KeyboardBridge {
     static func live() -> KeyboardBridge? {
         if let shared { return shared }
         guard let model = TakeModel.live(), let mailbox = Mailbox.shared else { return nil }
-        let bridge = KeyboardBridge(model: model, mailbox: mailbox, log: .standard)
+        let bridge = KeyboardBridge(model: model, mailbox: mailbox, log: .standard, keepNote: { words, at in
+            Notes.live()?.save(words, at: at)
+        })
         bridge.listen()
         shared = bridge
         return bridge

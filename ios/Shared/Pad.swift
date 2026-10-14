@@ -28,6 +28,15 @@ enum Pad {
     /// Under the pill at rest (IOS-010): the pill itself carries no words.
     static let idleHint = "Tap the pill to talk"
     static let openRefused = "Open murmur to start"
+    /// After Note in the pill's menu (IOS-023), until the take starts.
+    static let noteNext = "Next take is a note"
+    static let noteMenu = "Note"
+    static let typeMenu = "Type the next take"
+
+    /// The note receipt (IOS-023): where the note landed.
+    static func noted(_ place: String?) -> String {
+        "Noted to \(place ?? "inbox")"
+    }
 
     /// mine is the take this keyboard asked for, nil when it is not waiting
     /// on one; sameField is whether the cursor is still in the field the take
@@ -49,6 +58,8 @@ enum Pad {
             return .status("Heard nothing")
         case .failed where ours:
             return .status("That take did not work. Open murmur to see why.")
+        case .noted where ours:
+            return .status(noted(entry.noted))
         default:
             return .none
         }
