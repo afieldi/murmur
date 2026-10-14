@@ -21,6 +21,8 @@ struct HomeScreen: View {
     var paintings: PaintingStore? = PaintingStore.live()
     /// The rates and catalog the numbers use; nil only if the app's own files could not be read.
     var numbers: NumbersRules? = NumbersRules.live
+    /// The notes (IOS-023); nil only if the app's own files could not be read.
+    var notes: Notes? = Notes.live()
     let resume: (Setup.Step) -> Void
     @State private var copied: UUID?
     @State private var askingClear = false
@@ -40,6 +42,24 @@ struct HomeScreen: View {
                     } label: {
                         Label(HomeCopy.waiting(model.waiting.count), systemImage: "arrow.clockwise")
                             .foregroundStyle(Tokens.brand)
+                    }
+                }
+                .listRowBackground(Tokens.panel)
+            }
+            // Notes sit near the top: an iPhone has no hotkey, so New note
+            // is one tap from Home (LaBroi, 2026-10-14).
+            if let notes {
+                Section {
+                    NavigationLink {
+                        NoteTakeRoute()
+                    } label: {
+                        Label(NotesCopy.newNote, systemImage: "square.and.pencil")
+                            .foregroundStyle(Tokens.brand)
+                    }
+                    NavigationLink {
+                        NotesScreen(notes: notes)
+                    } label: {
+                        NotesRow(notes: notes)
                     }
                 }
                 .listRowBackground(Tokens.panel)

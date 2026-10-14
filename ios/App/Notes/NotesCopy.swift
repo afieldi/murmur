@@ -7,6 +7,7 @@ import MurmurCore
 enum NotesCopy {
     static let title = "Notes"
     static let newNote = "New note"
+    static let newNoteHint = "Talk, then tap stop. Your words are kept as a note in today's inbox, not typed."
     static let newest = "Newest note"
     static let held = "Held for you"
     static let tasks = "Tasks"
