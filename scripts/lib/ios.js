@@ -238,7 +238,10 @@ function readDisplayFace(fonts, { require: needed = false } = {}) {
  *  page loads no file for it: the family, the weight, and the condensed
  *  widths desktop fetches. */
 function displayFaceRule(woff2) {
-  return `@font-face { font-family: "murmur display"; src: url(data:font/woff2;base64,${woff2.toString('base64')}) format("woff2"); font-weight: 800; font-stretch: 75% 85%; font-display: block; }`
+  // Desktop sets its card titles condensed (75%) with the canvas's
+  // fontStretch, which WebKit's canvas lacks; registered at 75% alone, the
+  // face is set at desktop's width there too (IOS-021).
+  return `@font-face { font-family: "murmur display"; src: url(data:font/woff2;base64,${woff2.toString('base64')}) format("woff2"); font-weight: 800; font-stretch: 75%; font-display: block; }`
 }
 
 module.exports = {

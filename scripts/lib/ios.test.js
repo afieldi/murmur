@@ -236,7 +236,9 @@ describe('the Journey page (IOS-018)', () => {
     expect(rule).toContain('font-family: "murmur display"')
     expect(rule).toContain(`url(data:font/woff2;base64,${Buffer.from('wOF2 face').toString('base64')}) format("woff2")`)
     expect(rule).toContain('font-weight: 800')
-    expect(rule).toContain('font-stretch: 75% 85%')
+    // Condensed as desktop sets its titles, even where the canvas cannot
+    // condense (WebKit, IOS-021).
+    expect(rule).toContain('font-stretch: 75%;')
   })
 
   it('refuses a script that could close its own tag, and a page without its marks', () => {

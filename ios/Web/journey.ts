@@ -8,7 +8,9 @@
 // day (IOS-019) paints here too, with desktop's painting engine, subjects,
 // and light (settings/painting.ts, paintSubjects.ts, paintLight.ts): the
 // day's painting, its newest stroke painting in, and the saved card and
-// week scroll, whose words are part of the picture, as on desktop.
+// week scroll, whose words are part of the picture, as on desktop. The belt
+// share card (IOS-021) is desktop's too (settings/cardPaint.ts): the last
+// thirty days as strokes, the rank in the display face.
 import cosmetics from '../../shared/cosmetics.json'
 import ranks from '../../shared/ranks.json'
 import { animateScene, paintScene, type Surface } from '../../src/renderer/brush'
@@ -29,6 +31,7 @@ import {
 import type { PaintingBook, PaintingRecord } from '../../src/shared/painting'
 import type { ProgressReport, RankSpec } from '../../src/shared/ranks'
 import { CARD, SCROLL, paintPainting } from '../../src/renderer/settings/painting'
+import { CARD_H, CARD_W, type CardDay, paintShareCard } from '../../src/renderer/settings/cardPaint'
 import { cardFonts, dayColors, drawDayCard, drawWeekScroll, lightOf, planFor, progressOf, sealOf } from '../../src/renderer/settings/paintingDay'
 
 const LADDER = (ranks as { ranks: RankSpec[] }).ranks
@@ -51,6 +54,7 @@ export type PictureRequest =
   | { kind: 'words'; width: number; height: number; scale: number; standing: Standing }
   | { kind: 'tallies'; width: number; height: number; scale: number; standing: Standing }
   | { kind: 'stamp'; size: number; scale: number; id: string; got: boolean; seed: number }
+  | { kind: 'share'; scale: number; days: CardDay[]; rank: string; level: number }
 
 export interface Picture {
   png: string
@@ -178,6 +182,13 @@ export async function picture(req: PictureRequest): Promise<Picture> {
     case 'stamp': {
       const { el, ctx } = canvas(req.size, req.size, req.scale)
       paintStamp(ctx, req.size, req.id, req.got, req.seed, colors, token('--font-body', 'sans-serif'))
+      return { png: el.toDataURL('image/png') }
+    }
+    case 'share': {
+      const fonts = cardFonts(await displayFace())
+      const { el, ctx } = canvas(CARD_W, CARD_H, req.scale)
+      // No founder on the iPhone yet: practice is the rank (IOS-029 joins them).
+      paintShareCard(ctx, { days: req.days, rank: rank(req.rank) ?? LADDER[0], level: req.level, founder: false }, colors, fonts)
       return { png: el.toDataURL('image/png') }
     }
   }
