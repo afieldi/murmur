@@ -9,7 +9,7 @@ import UserNotifications
 
 struct TimeBackScreen: View {
     let history: History
-    @State private var settings = NumbersSettings.load()
+    @State private var settings = NumbersSettingsStore.shared.settings
     @State private var time = Date.now
     @State private var denied = false
     @State private var asking = false
@@ -44,7 +44,7 @@ struct TimeBackScreen: View {
                 }
                 if denied {
                     Text(NumbersCopy.denied)
-                        .foregroundStyle(Tokens.textDim)
+                        .foregroundStyle(Tokens.red)
                     if let url = URL(string: UIApplication.openSettingsURLString) {
                         Link(NumbersCopy.openSettings, destination: url)
                             .buttonStyle(RowAction())
@@ -64,7 +64,7 @@ struct TimeBackScreen: View {
         .navigationTitle(NumbersCopy.screen)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            settings = NumbersSettings.load()
+            settings = NumbersSettingsStore.shared.settings
             time = Self.date(hour: settings.recapHour, minute: settings.recapMinute)
         }
         .task {
@@ -72,14 +72,14 @@ struct TimeBackScreen: View {
             denied = settings.recapOn && status == .denied
         }
         .onChange(of: settings.typingWpm) {
-            settings.save()
+            NumbersSettingsStore.shared.set(settings)
             replan()
         }
         .onChange(of: time) {
             let parts = Calendar.current.dateComponents([.hour, .minute], from: time)
             settings.recapHour = parts.hour ?? 17
             settings.recapMinute = parts.minute ?? 30
-            settings.save()
+            NumbersSettingsStore.shared.set(settings)
             replan()
         }
         .onChange(of: settings.recapOn) { _, on in
@@ -106,7 +106,7 @@ struct TimeBackScreen: View {
         } else {
             denied = false
         }
-        settings.save()
+        NumbersSettingsStore.shared.set(settings)
         replan()
     }
 
@@ -119,3 +119,12 @@ struct TimeBackScreen: View {
         Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: .now) ?? .now
     }
 }
+
+#if DEBUG
+#Preview("Time back and recap") {
+    NavigationStack {
+        TimeBackScreen(history: History(store: HistoryStore(file: FileManager.default.temporaryDirectory.appending(path: "time-back-preview-\(UUID().uuidString).jsonl"))))
+    }
+    .preferredColorScheme(.dark)
+}
+#endif

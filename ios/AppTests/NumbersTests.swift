@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import Foundation
 import MurmurCore
+import Observation
 import Testing
 import UIKit
+import UserNotifications
 @testable import murmur
 
 /// Your numbers, time back, and the recap (IOS-022).
@@ -95,6 +97,119 @@ import UIKit
         #expect(RecapPlan.plan(entries, rules: try rules(), settings: off, now: morning, calendar: Self.utc, defaults: defaults).items.isEmpty)
     }
 
+    /// A notification center that answers slowly, so layings-down overlap
+    /// the way a take, a return to murmur, and a settings change can.
+    final class SlowCenter: RecapCenter {
+        var pending: [String: String] = [:]
+        var allowed = true
+
+        func pendingIDs() async -> [String] {
+            await Task.yield()
+            return Array(pending.keys)
+        }
+
+        func remove(_ ids: [String]) {
+            for id in ids { pending[id] = nil }
+        }
+
+        func isAllowed() async -> Bool {
+            await Task.yield()
+            return allowed
+        }
+
+        func add(_ item: RecapPlan.Item, title: String) async {
+            await Task.yield()
+            pending[item.id] = item.body
+        }
+    }
+
+    /// Turning the recap off while it is still being laid down leaves none
+    /// pending: the last change made wins.
+    @Test func aRecapTurnedOffStaysOff() async throws {
+        let defaults = try scratch()
+        let entries = [take(noon(0), words: 100, seconds: 60)]
+        var settings = NumbersSettings(typingWpm: 36, recapOn: true, recapHour: 23, recapMinute: 59)
+        settings.save(defaults)
+        let center = SlowCenter()
+        let on = Task { await RecapNotifications.refresh(entries, defaults: defaults, center: center) }
+        await Task.yield()
+        settings.recapOn = false
+        settings.save(defaults)
+        await RecapNotifications.refresh(entries, defaults: defaults, center: center)
+        await on.value
+        #expect(center.pending.isEmpty)
+    }
+
+    /// Laying the week down again keeps one week, leaves Send one now's
+    /// recap to arrive, and with notifications refused leaves none.
+    @Test func layingDownAgainKeepsOneWeek() async throws {
+        let defaults = try scratch()
+        let entries = [take(noon(0), words: 100, seconds: 60)]
+        NumbersSettings(typingWpm: 36, recapOn: true, recapHour: 23, recapMinute: 59).save(defaults)
+        let center = SlowCenter()
+        center.pending[RecapPlan.now] = "now"
+        await RecapNotifications.refresh(entries, defaults: defaults, center: center)
+        let first = Set(center.pending.keys)
+        await RecapNotifications.refresh(entries, defaults: defaults, center: center)
+        #expect(Set(center.pending.keys) == first)
+        #expect(first.contains(RecapPlan.now) && first.count >= RecapPlan.days)
+        center.allowed = false
+        await RecapNotifications.refresh(entries, defaults: defaults, center: center)
+        #expect(Set(center.pending.keys) == [RecapPlan.now])
+    }
+
+    /// Set when an observed value says it changed.
+    final class Told: @unchecked Sendable {
+        var yes = false
+    }
+
+    /// A speed set in Time back and recap reaches Back today: the settings
+    /// the screens read tell them when they change, and are kept.
+    @Test func aNewSpeedReachesBackToday() throws {
+        let defaults = try scratch()
+        let store = NumbersSettingsStore(defaults: defaults)
+        let told = Told()
+        withObservationTracking {
+            _ = store.settings
+        } onChange: {
+            told.yes = true
+        }
+        var faster = store.settings
+        faster.typingWpm = 60
+        store.set(faster)
+        #expect(told.yes)
+        #expect(store.settings.typingWpm == 60 && NumbersSettings.load(defaults).typingWpm == 60)
+    }
+
+    /// A recap that arrives while murmur is open still shows, so Send one
+    /// now is seen without leaving murmur; anything else shows as iOS would.
+    @Test func aRecapShowsWhileMurmurIsOpen() {
+        let shown: UNNotificationPresentationOptions = [.banner, .list, .sound]
+        #expect(RecapPlan.presentation(for: RecapPlan.now) == shown)
+        #expect(RecapPlan.presentation(for: RecapPlan.prefix + "2026-10-14") == shown)
+        #expect(RecapPlan.presentation(for: "something.else").isEmpty)
+        #expect(UNUserNotificationCenter.current().delegate is RecapPresenter)
+    }
+
+    /// An iPhone set to the Buddhist, Japanese, or Persian calendar gets its
+    /// recap at the time picked on the day the takes are kept under, with
+    /// the trigger in its own calendar's terms.
+    @Test(arguments: [Calendar.Identifier.buddhist, .japanese, .persian])
+    func theRecapArrivesOnEveryCalendar(_ id: Calendar.Identifier) throws {
+        let defaults = try scratch()
+        var calendar = Calendar(identifier: id)
+        calendar.timeZone = Self.utc.timeZone
+        let on = NumbersSettings(typingWpm: 36, recapOn: true, recapHour: 17, recapMinute: 30)
+        let morning = Self.utc.date(bySettingHour: 9, minute: 0, second: 0, of: noon(0)) ?? .now
+        let plan = RecapPlan.plan([take(noon(0), words: 100, seconds: 60)], rules: try rules(), settings: on, now: morning, calendar: calendar, defaults: defaults)
+        let first = try #require(plan.items.first)
+        let expected = try #require(Self.utc.date(bySettingHour: 17, minute: 30, second: 0, of: morning))
+        #expect(plan.items.count == 7)
+        #expect(first.day == HistoryEntry.dayKey(morning, calendar: Self.utc))
+        #expect(first.fire.date == expected)
+        #expect(first.fire.calendar?.identifier == id)
+    }
+
     /// The page paints the dabs, the wall, its legend, and the stroke at
     /// desktop's sizes, and none of them blank.
     @Test func theMarksArePainted() async throws {
@@ -106,9 +221,14 @@ import UIKit
         let wall = try await painter.picture(.wall(days: wallDays), scale: 2).image
         let pad = WallStrip.pad(wallDays.first?.day)
         let columns = (wallDays.count + pad + 6) / 7
-        #expect(wall.size == CGSize(width: Double(columns) * 14 - 3 + 4, height: 7 * 14 - 3 + 4))
+        // Desktop's step of 14, less 3 for the last gap, plus 2 of bleed a side.
+        let wallWidth: Double = Double(columns) * 14 + 1
+        let wallHeight: Double = 99
+        #expect(wall.size == CGSize(width: wallWidth, height: wallHeight))
         let legend = try await painter.picture(.legend, scale: 2).image
-        #expect(legend.size == CGSize(width: 5 * 14 - 3 + 4, height: 11 + 4))
+        let legendWidth: Double = 71
+        let legendHeight: Double = 15
+        #expect(legend.size == CGSize(width: legendWidth, height: legendHeight))
         let stroke = try await painter.picture(.stroke(share: 0.6, day: "2026-10-13", width: 300), scale: 2).image
         #expect(stroke.size == CGSize(width: 300, height: 24))
         for image in [dabs, wall, legend, stroke] {

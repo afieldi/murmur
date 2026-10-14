@@ -6,6 +6,7 @@
 // notification at the time you pick, off until you turn it on.
 import Foundation
 import MurmurCore
+import Observation
 import UserNotifications
 
 /// Time back and recap choices, kept on this iPhone.
@@ -39,6 +40,26 @@ struct NumbersSettings: Equatable {
         defaults.set(recapOn, forKey: Self.recapKey)
         defaults.set(recapHour, forKey: Self.hourKey)
         defaults.set(recapMinute, forKey: Self.minuteKey)
+    }
+}
+
+/// The time back and recap choices as the screens read them: Time back and
+/// recap sets them here, and Back today and Your numbers redraw when they
+/// change.
+@MainActor @Observable final class NumbersSettingsStore {
+    static let shared = NumbersSettingsStore()
+    private let defaults: UserDefaults
+    private(set) var settings: NumbersSettings
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        settings = NumbersSettings.load(defaults)
+    }
+
+    /// Keeps new choices, as they are stored (the speed held to its band).
+    func set(_ new: NumbersSettings) {
+        new.save(defaults)
+        settings = NumbersSettings.load(defaults)
     }
 }
 
@@ -100,6 +121,8 @@ struct RecapPlan: Equatable {
     }
 
     static let prefix = "murmur.recap."
+    /// Send one now's recap, which laying the week down leaves to arrive.
+    static let now = prefix + "now"
     /// How many days ahead are kept pending.
     static let days = 7
 
@@ -110,13 +133,21 @@ struct RecapPlan: Equatable {
         guard settings.recapOn else { return RecapPlan(items: []) }
         let today = HistoryEntry.dayKey(now, calendar: calendar)
         let summary = Numbers.summary(entries, rules: rules, settings: settings, today: today, defaults: defaults)
+        // Day keys are Gregorian whatever calendar the iPhone shows, so the
+        // moment is found in Gregorian and the trigger is put in the
+        // iPhone's own calendar's terms (a Buddhist year 2026 is 1483).
+        var gregorian = Calendar(identifier: .gregorian)
+        gregorian.timeZone = calendar.timeZone
         var items: [Item] = []
         for offset in 0..<days {
             let day = Paintings.shiftDay(today, offset)
             let parts = day.split(separator: "-").compactMap { Int($0) }
             guard parts.count == 3 else { continue }
-            let fire = DateComponents(calendar: calendar, timeZone: calendar.timeZone, year: parts[0], month: parts[1], day: parts[2], hour: settings.recapHour, minute: settings.recapMinute)
-            guard let at = calendar.date(from: fire), at > now else { continue }
+            let moment = DateComponents(year: parts[0], month: parts[1], day: parts[2], hour: settings.recapHour, minute: settings.recapMinute)
+            guard let at = gregorian.date(from: moment), at > now else { continue }
+            var fire = calendar.dateComponents([.era, .year, .month, .day, .hour, .minute], from: at)
+            fire.calendar = calendar
+            fire.timeZone = calendar.timeZone
             let body = offset == 0 ? Recap.body(RecapSummary(summary.today), locale: locale) : RecapWords.iPhone.quiet
             items.append(Item(id: prefix + day, day: day, fire: fire, body: body))
         }
@@ -124,31 +155,96 @@ struct RecapPlan: Equatable {
     }
 }
 
-/// The notifications themselves, through the system's notification center.
-@MainActor enum RecapNotifications {
-    static let title = "murmur recap"
+extension RecapPlan {
+    /// How a notification shows while murmur is open: a recap as a banner
+    /// with its sound, anything else as iOS would.
+    static func presentation(for id: String) -> UNNotificationPresentationOptions {
+        id.hasPrefix(prefix) ? [.banner, .list, .sound] : []
+    }
+}
 
-    /// Lays the plan down: every pending recap replaced, none with the recap off.
-    static func apply(_ plan: RecapPlan, center: UNUserNotificationCenter = .current()) async {
-        let pending = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(RecapPlan.prefix) }
-        center.removePendingNotificationRequests(withIdentifiers: pending)
-        guard !plan.items.isEmpty else { return }
-        let settings = await center.notificationSettings()
-        guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
-        for item in plan.items {
-            let content = UNMutableNotificationContent()
-            content.title = title
-            content.body = item.body
-            content.sound = .default
-            let trigger = UNCalendarNotificationTrigger(dateMatching: item.fire, repeats: false)
-            try? await center.add(UNNotificationRequest(identifier: item.id, content: content, trigger: trigger))
-        }
+/// Shows a recap that arrives while murmur is open; without it iOS keeps
+/// it silent. The app holds it for its whole life, since the notification
+/// center holds its delegate weakly.
+final class RecapPresenter: NSObject, UNUserNotificationCenterDelegate {
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        RecapPlan.presentation(for: notification.request.identifier)
+    }
+}
+
+/// Where the recap's notifications are laid down: the system's notification
+/// center, or a stand-in in tests.
+@MainActor protocol RecapCenter: AnyObject {
+    func pendingIDs() async -> [String]
+    func remove(_ ids: [String])
+    /// True when notifications may arrive.
+    func isAllowed() async -> Bool
+    func add(_ item: RecapPlan.Item, title: String) async
+}
+
+/// The system's notification center, as the recap uses it.
+@MainActor final class SystemRecapCenter: RecapCenter {
+    static let shared = SystemRecapCenter()
+    private let center = UNUserNotificationCenter.current()
+
+    func pendingIDs() async -> [String] {
+        await center.pendingNotificationRequests().map(\.identifier)
     }
 
-    /// Plans the recap again from the takes kept now.
-    static func refresh(_ entries: [HistoryEntry]) async {
-        guard let rules = NumbersRules.live else { return }
-        await apply(RecapPlan.plan(entries, rules: rules, settings: .load()))
+    func remove(_ ids: [String]) {
+        center.removePendingNotificationRequests(withIdentifiers: ids)
+    }
+
+    func isAllowed() async -> Bool {
+        let status = await center.notificationSettings().authorizationStatus
+        return status == .authorized || status == .provisional
+    }
+
+    func add(_ item: RecapPlan.Item, title: String) async {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = item.body
+        content.sound = .default
+        let trigger = UNCalendarNotificationTrigger(dateMatching: item.fire, repeats: false)
+        try? await center.add(UNNotificationRequest(identifier: item.id, content: content, trigger: trigger))
+    }
+}
+
+/// The notifications themselves.
+@MainActor enum RecapNotifications {
+    static let title = "murmur recap"
+    /// The last laying-down asked for; each waits for the one before.
+    private static var last: Task<Void, Never>?
+
+    /// Lays the plan down: its recaps added first (a pending id is
+    /// replaced), then every other pending day removed, so the week is
+    /// never empty in between. With the recap off or notifications refused,
+    /// every pending day goes. Send one now's recap is left to arrive.
+    static func apply(_ plan: RecapPlan, center: any RecapCenter) async {
+        var kept = Set<String>()
+        if !plan.items.isEmpty, await center.isAllowed() {
+            for item in plan.items {
+                await center.add(item, title: title)
+                kept.insert(item.id)
+            }
+        }
+        let stale = await center.pendingIDs().filter { $0.hasPrefix(RecapPlan.prefix) && $0 != RecapPlan.now && !kept.contains($0) }
+        center.remove(stale)
+    }
+
+    /// Plans the recap again from the takes kept now. Takes, returns to
+    /// murmur, and settings changes can ask at once, so each waits its turn
+    /// and reads the settings only then: the last change made wins.
+    static func refresh(_ entries: [HistoryEntry], defaults: UserDefaults = .standard, center: (any RecapCenter)? = nil) async {
+        let before = last
+        let step = Task {
+            await before?.value
+            guard let rules = NumbersRules.live else { return }
+            let plan = RecapPlan.plan(entries, rules: rules, settings: .load(defaults), defaults: defaults)
+            await apply(plan, center: center ?? SystemRecapCenter.shared)
+        }
+        last = step
+        await step.value
     }
 
     /// Asks once, when the recap is turned on: true when it may arrive.
@@ -165,7 +261,7 @@ struct RecapPlan: Equatable {
         content.body = Recap.body(RecapSummary(summary.today))
         content.sound = .default
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 2, repeats: false)
-        try? await center.add(UNNotificationRequest(identifier: RecapPlan.prefix + "now", content: content, trigger: trigger))
+        try? await center.add(UNNotificationRequest(identifier: RecapPlan.now, content: content, trigger: trigger))
     }
 }
 

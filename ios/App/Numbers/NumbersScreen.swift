@@ -25,7 +25,6 @@ struct NumbersScreen: View {
     let history: History
     let rules: NumbersRules
     @Environment(\.displayScale) private var scale
-    @State private var settings = NumbersSettings.load()
     @State private var width: Double = 0
     @State private var dabs: UIImage?
     @State private var wallImage: UIImage?
@@ -34,7 +33,7 @@ struct NumbersScreen: View {
     private let stats = [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)]
 
     var body: some View {
-        let summary = Numbers.summary(history.entries, rules: rules, settings: settings)
+        let summary = Numbers.summary(history.entries, rules: rules, settings: NumbersSettingsStore.shared.settings)
         let wall = Analytics.heatmap(Numbers.usage(history.entries), today: HistoryEntry.dayKey(.now), year: nil)
         List {
             if history.entries.isEmpty {
@@ -81,9 +80,14 @@ struct NumbersScreen: View {
                                 Text(String(day.day.suffix(2)))
                                     .font(.system(.caption2, design: .monospaced))
                                     .foregroundStyle(Tokens.textDim)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
                                     .frame(maxWidth: .infinity)
                             }
                         }
+                        // Each number sits under its dab, so it grows only as
+                        // far as the column allows; VoiceOver reads every day.
+                        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
                     }
                     .onGeometryChange(for: Double.self) { $0.size.width } action: { width = $0 }
                     .accessibilityElement(children: .ignore)
@@ -149,7 +153,6 @@ struct NumbersScreen: View {
         .foregroundStyle(Tokens.text)
         .navigationTitle(NumbersCopy.title)
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { settings = NumbersSettings.load() }
     }
 
     private struct DabsKey: Hashable {
@@ -198,7 +201,8 @@ struct WallStrip: View {
         let height = 7 * Self.step - 3 + 2 * Self.bleed
         HStack(alignment: .top, spacing: 6) {
             VStack(alignment: .trailing, spacing: 0) {
-                Color.clear.frame(width: 0, height: 14)
+                // As tall as the month row, so the day names stay on their rows.
+                Text(" ").hidden().frame(width: 0)
                 ForEach(0..<7, id: \.self) { row in
                     Text(row == 1 ? "mon" : row == 3 ? "wed" : row == 5 ? "fri" : "")
                         .frame(height: Self.step)
@@ -210,7 +214,7 @@ struct WallStrip: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
                         ZStack(alignment: .topLeading) {
-                            Color.clear.frame(width: width, height: 14)
+                            Text(" ").hidden().frame(width: width)
                             ForEach(Self.months(wall, pad: pad), id: \.column) { label in
                                 Text(label.name)
                                     .offset(x: Self.bleed + Double(label.column) * Self.step)
@@ -235,6 +239,9 @@ struct WallStrip: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        // The labels sit on the painted grid, so they grow only as far as it
+        // allows, as the Journey's road does; VoiceOver reads the wall whole.
+        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
     }
 
     /// Blank cells before the first day, so weeks start on Sunday.
@@ -267,8 +274,7 @@ struct BackToday: View {
     @State private var stroke: UIImage?
 
     var body: some View {
-        let settings = NumbersSettings.load()
-        let summary = Numbers.summary(history.entries, rules: rules, settings: settings)
+        let summary = Numbers.summary(history.entries, rules: rules, settings: NumbersSettingsStore.shared.settings)
         let today = HistoryEntry.dayKey(.now)
         Section {
             VStack(alignment: .leading, spacing: 8) {
@@ -316,3 +322,42 @@ struct BackToday: View {
         let scale: CGFloat
     }
 }
+
+#if DEBUG
+/// A made-up stretch of takes for the previews, a few days quiet.
+@MainActor private func previewHistory(days: Int) -> History {
+    let store = HistoryStore(file: FileManager.default.temporaryDirectory.appending(path: "numbers-preview-\(UUID().uuidString).jsonl"))
+    for i in 0..<days where i % 4 != 3 {
+        let words = 60 + (i * 97) % 500
+        let seconds = 20 + (i * 13) % 90
+        let at = Date.now.addingTimeInterval(Double(-i) * 86_400)
+        try? store.append(HistoryEntry(at: at, durationMs: seconds * 1000, words: Array(repeating: "word", count: words).joined(separator: " ")))
+    }
+    return History(store: store)
+}
+
+#Preview("Your numbers") {
+    NavigationStack {
+        if let rules = NumbersRules.live { NumbersScreen(history: previewHistory(days: 60), rules: rules) }
+    }
+    .preferredColorScheme(.dark)
+}
+
+#Preview("No numbers yet") {
+    NavigationStack {
+        if let rules = NumbersRules.live { NumbersScreen(history: previewHistory(days: 0), rules: rules) }
+    }
+    .preferredColorScheme(.dark)
+}
+
+#Preview("Back today") {
+    NavigationStack {
+        if let rules = NumbersRules.live {
+            List { BackToday(history: previewHistory(days: 30), rules: rules) }
+                .scrollContentBackground(.hidden)
+                .background(Tokens.ink)
+        }
+    }
+    .preferredColorScheme(.dark)
+}
+#endif

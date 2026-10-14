@@ -286,7 +286,7 @@ Tap Save card and the share sheet opens. Save Image puts it in Photos; the first
 
 Time back is the time you did not spend typing: for every take, the minutes typing its words would have taken with your thumbs, minus the minutes you spoke. They add up into today, this month, and lifetime, shown on Home under Back today and in Your numbers.
 
-The formula for one take is `words / typing speed - minutes spoken`, the same as on the Mac. On iPhone the speed is thumbs on glass: murmur starts at 36 words a minute, the average typing speed on phones across 37,370 people in the largest study of mobile typing (Palin, Feit, Kim, Kristensson, and Oulasvirta, "How do People Type on Mobile Devices?", MobileHCI 2019; checked 2026-10-13). The Mac starts at 40, for a keyboard. At 36, a 400-word take spoken in two minutes is about eleven minutes of typing minus two of speaking: about nine minutes back.
+The formula for one take is `words / typing speed - minutes spoken`, the same as on the Mac. On iPhone the speed is thumbs on glass: murmur starts at 36 words a minute, the average typing speed on phones across 37,370 people in a study of mobile typing (Palin, Feit, Kim, Kristensson, and Oulasvirta, "How do People Type on Mobile Devices?", MobileHCI 2019; checked 2026-10-13). The Mac starts at 40, for a keyboard. At 36, a 400-word take spoken in two minutes is about eleven minutes of typing minus two of speaking: about nine minutes back.
 
 The speed is yours to set: in murmur, tap the gear, then Time back and recap, then Typing speed, anywhere from 10 to 200 words a minute. Nothing is stored per take, so a new speed counts every day again, past ones included. A take where you spoke longer than typing its words would have taken counts against the day, but a day never shows below zero.
 
@@ -305,9 +305,9 @@ Your iPhone counts the takes it keeps. VoiceOver reads each number, every day of
 
 ## How do I get a daily recap on iPhone?
 
-In murmur, tap the gear, then Time back and recap, and turn on Daily recap. murmur asks to send notifications only then; if you say no, the recap stays off and the screen says where to turn notifications on. Pick the time it arrives (5:30 PM until you change it). Each day at that time one notification reads your day: "4 takes, 12 minutes, 1,240 words today. 19 minutes back." A day with no takes gets a quiet one. Send one now shows how it reads right away.
+In murmur, tap the gear, then Time back and recap, and turn on Daily recap. murmur asks to send notifications only then; if you say no, the recap stays off and the screen says where to turn notifications on. Pick the time it arrives (5:30 PM until you change it). Each day at that time one notification reads your day: "4 takes, 12 minutes, 1,240 words today. 22 minutes back." A day with no takes gets a quiet one. Send one now shows how it reads right away, even with murmur open.
 
-The recap's words are set when your last take of the day lands, so a take after the recap time counts toward tomorrow's day only if it is tomorrow. murmur keeps the coming week's recaps ready, so they still arrive on days you do not open it. Turn Daily recap off and none arrive.
+The recap's words are set as each take lands, so today's recap says your day up to its time; a take after the recap time shows in Your numbers, not in that day's recap. murmur keeps the coming week's recaps ready, so they still arrive on days you do not open it; after a week away they pause until you open murmur or dictate again. Turn Daily recap off and none arrive.
 
 ## How does the painting a day work on iPhone?
 
