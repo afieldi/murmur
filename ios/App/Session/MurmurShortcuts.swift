@@ -18,5 +18,11 @@ struct MurmurShortcuts: AppShortcutsProvider {
             shortTitle: "End murmur",
             systemImageName: "stop.circle"
         )
+        AppShortcut(
+            intent: NewNoteIntent(),
+            phrases: ["New \(.applicationName) note"],
+            shortTitle: "New note",
+            systemImageName: "square.and.pencil"
+        )
     }
 }

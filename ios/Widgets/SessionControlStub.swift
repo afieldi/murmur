@@ -6,3 +6,8 @@ enum SessionControl {
     static func start() async -> SessionStart { .unavailable }
     static func end() async {}
 }
+
+/// New note opens murmur, so iOS runs its intent there (Live/NoteIntent.swift).
+@MainActor enum NoteControl {
+    static func open() {}
+}

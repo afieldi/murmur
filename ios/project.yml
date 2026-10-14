@@ -70,6 +70,11 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: $(MURMUR_BUNDLE_ID)
             CFBundleURLSchemes: [$(MURMUR_BUNDLE_ID)]
+        # New note on a press and hold of murmur's icon (IOS-023).
+        UIApplicationShortcutItems:
+          - UIApplicationShortcutItemType: $(MURMUR_BUNDLE_ID).note
+            UIApplicationShortcutItemTitle: New note
+            UIApplicationShortcutItemIconSymbolName: square.and.pencil
         NSMicrophoneUsageDescription: murmur listens only while you dictate and sends what you say to the provider you chose.
         NSPhotoLibraryAddUsageDescription: murmur adds the cards you choose to save, your paintings and your belt card, to your photos, and never looks at your library.
         # The session's Live Activity (IOS-016).

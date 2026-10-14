@@ -13,6 +13,7 @@ import WidgetKit
 struct MurmurWidgets: WidgetBundle {
     var body: some Widget {
         SessionControlWidget()
+        NoteControlWidget()
         SessionLiveActivity()
     }
 }
@@ -29,6 +30,21 @@ struct SessionControlWidget: ControlWidget {
         }
         .displayName(LocalizedStringResource(stringLiteral: SessionWidgetCopy.control))
         .description(LocalizedStringResource(stringLiteral: SessionWidgetCopy.controlDescription))
+    }
+}
+
+/// One tap opens murmur on New note, listening (IOS-023).
+struct NoteControlWidget: ControlWidget {
+    static let kind = "note"
+
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: Self.kind) {
+            ControlWidgetButton(action: NewNoteIntent()) {
+                Label(SessionWidgetCopy.noteControl, systemImage: "square.and.pencil")
+            }
+        }
+        .displayName(LocalizedStringResource(stringLiteral: SessionWidgetCopy.noteControl))
+        .description(LocalizedStringResource(stringLiteral: SessionWidgetCopy.noteControlDescription))
     }
 }
 

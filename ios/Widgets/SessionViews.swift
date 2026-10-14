@@ -102,4 +102,6 @@ enum SessionWidgetCopy {
     static let control = "Start murmur"
     static let controlDescription = "Starts a session, so a tap on the murmur keyboard's pill starts a take at once."
     static let endLabel = "End the murmur session"
+    static let noteControl = "New note"
+    static let noteControlDescription = "Opens murmur listening for a note, kept in today's inbox instead of typed."
 }

@@ -8,6 +8,8 @@ import UserNotifications
 struct MurmurApp: App {
     /// Shows recaps that arrive while murmur is open (IOS-022).
     private let recaps = RecapPresenter()
+    /// New note from a press and hold on murmur's icon (IOS-023).
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     init() {
         if let request = SmokeRequest(arguments: ProcessInfo.processInfo.arguments) {

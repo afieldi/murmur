@@ -7,6 +7,7 @@ import SwiftUI
 /// opens murmur.
 struct ContentView: View {
     @State private var opener = TakeOpener.shared
+    @State private var noteOpener = NoteOpener.shared
     @State private var setup = Setup.live()
     @State private var history = History.live()
     @State private var firstRun: Setup.Step?
@@ -36,6 +37,9 @@ struct ContentView: View {
                 }
                 .fullScreenCover(item: $firstRun) { step in
                     FirstRunScreen(setup: setup, step: step)
+                }
+                .navigationDestination(isPresented: $noteOpener.showing) {
+                    NoteTakeRoute(startNow: true)
                 }
         }
         .tint(Tokens.brand)
