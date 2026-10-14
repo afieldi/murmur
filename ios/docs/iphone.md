@@ -141,25 +141,45 @@ Some, because the microphone stays on while a session runs. murmur does no work 
 
 That means iOS did not let the keyboard open murmur. Check that Allow Full Access is on for murmur in Settings, then General, Keyboard, Keyboards. If it is, open murmur yourself and tap Start session at the top of the home screen. Then go back to your app and tap the pill: it starts a take right there while the session runs.
 
-## How do I change how the pill looks on iPhone?
+## How do I change the waveform on iPhone?
 
-In murmur, tap the gear at the top right, then Keyboard, and pick Bars or Speckle under The pill. Each tile is the real pill moving to a made-up voice; your microphone is never used for the tiles. The look you pick is outlined in gold. The screen murmur opens to uses it from your next take, and the keyboard the next time it appears.
+In murmur, tap the gear at the top right, then Look, and tap a waveform. The Keyboard screen links to the same place, under The pill. The waveform in use is outlined in gold and says In use. Each tile is the real pill moving to a made-up voice; your microphone is never used for the tiles. The keyboard draws your pick from your next take, and the screen murmur opens to draws it the next time it records.
 
-- **Bars** is the classic equalizer.
-- **Speckle** is a dust field that drifts when quiet and vibrates with your speech.
+There are seven waveforms, the same as on the Mac. Two are free, and belts earn the rest, from the takes this iPhone keeps:
+
+- **Bars** is the classic equalizer. Free.
+- **Speckle** is a dust field that vibrates with your speech. Free.
+- **Pulse** sends rings out from a steady dot as you speak. White belt.
+- **Ink dabs** paints a brush dab for each moment of your voice. White belt.
+- **Ink flecks** is specks of paint that jitter with your voice and throw drops when you are loud. Blue belt.
+- **Ink rings** sends brushed rings out from the dot. Purple belt.
+- **Ink ribbon** is one continuous stroke that swells with your voice. Brown belt.
+
+A locked waveform stays on the screen, dimmed, with the belt that earns it; VoiceOver reads it as locked and says how to earn it. A waveform you picked stays yours if Clear all later takes its belt away, as on the Mac.
+
+## How do I change the pill's color on iPhone?
+
+On the same Look screen, pick an accent under Accent. Every accent paints wet while you speak and dries when you stop: signal amber, the original, dries to gold, and every other accent dries to a darker shade of itself.
+
+- **Signal amber** is free.
+- **Your belt color** follows your rank, so it changes as you earn belts. White belt.
+- **White belt, blue belt, purple belt, brown belt, and black belt** each come with that belt, and the coral and red belts with their degrees.
+- **Ember red** comes with a dictation past five minutes, **moonlight** with dictating between midnight and four, and **dawn** with dictating before six in the morning.
+
+A locked accent shows what earns it. If an accent you picked is locked again (after Clear all), the pill paints signal amber until you earn it back, as on the Mac.
 
 ## What does the pill show on iPhone?
 
 The pill in the keyboard shows where your take is. The screen murmur opens to shows the same pill while it records.
 
 - **At rest**, it is small, grey, and still. It never shows amber at rest, even while a session keeps the microphone ready.
-- **Recording**, it is wet amber at your voice's level, cooling toward gold as each moment ages.
+- **Recording**, it is wet amber at your voice's level, cooling toward gold as each moment ages. With another accent, it is wet in that color, cooling toward a darker shade of it.
 - **Working**, the paint dries to gold with one sheen, and a softer sheen every 2 seconds if it takes a while, so a long wait never looks frozen.
 - **Words added**, it sinks flat.
 - **Heard nothing**, it is a dry grey scrape.
 - **Failed**, it is plain red. Open murmur to see why and retry.
 
-Your iPhone gives a light tap when a take starts and when it stops. With Reduce Motion on (Settings, then Accessibility, then Motion), each stage is a still picture. VoiceOver reads the pill as a button with its stage: Start dictation, Recording, Working, Words added, Heard nothing, or Failed, retry in murmur.
+Every waveform follows these stages; an error is always plain red, never paint. Your iPhone gives a light tap when a take starts and when it stops. With Reduce Motion on (Settings, then Accessibility, then Motion), each stage is a still picture, and so is every tile on the Look screen. VoiceOver reads the pill as a button with its stage: Start dictation, Recording, Working, Words added, Heard nothing, or Failed, retry in murmur.
 
 ## How do I set up murmur on iPhone?
 

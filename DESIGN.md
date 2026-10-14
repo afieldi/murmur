@@ -103,6 +103,8 @@ One orchestrated moment beats scattered effects: the hero paints in once, a prom
 
 The default accent is signal amber drying to brand gold; a custom accent dries to a darker shade of itself. In the bare look the paint is laid down once per frame with the ink edge, then faded before the canvas edge.
 
+On iPhone (IOS-020), `ios/Shared/Ink.swift` paints dabs, flecks, rings, ribbon, and pulse in the keyboard and the app with MurmurCore's `Brush`, a Swift port of `brush.ts` held to it by `shared/brush-vectors.json`. It runs this table in points as desktop runs it in CSS pixels, with desktop's per frame updates at 60 a second whatever the screen's rate, and pulse follows the table too (cream at rest, red for an error), as the iPhone's pill does in every style. Only the pill look exists on iPhone; the keyboard gives the pill a fixed home.
+
 ## Design QA
 
 - `MURMUR_INK_SHOTS=<dir> npm run smoke` saves every ink style in every look, plus drying and error, from the hermetic smoke run.

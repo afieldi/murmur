@@ -52,6 +52,7 @@ enum SmokeRunner {
             ("achievements", checkAchievements),
             ("journeyPage", checkJourneyPage),
             ("paintingDay", checkPaintingDay),
+            ("look", checkLook),
             ("sharedJson", { try checkSharedJson(expected: request.sharedCount) })
         ]
         var results: [String: Bool] = [:]
@@ -592,6 +593,49 @@ enum SmokeRunner {
         }
         guard drawn else { return 0 }
         return stride(from: 3, to: bytes.count, by: 4).reduce(0) { $0 + (bytes[$1] > 20 ? 1 : 0) }
+    }
+
+    /// The look (IOS-020): every style and accent in shared/cosmetics.json
+    /// is set in the app group as the Look screen sets it, for a seeded
+    /// purple belt, and read back as the keyboard reads it, with the paint
+    /// the keyboard draws: unlocked accents in their own color, locked ones
+    /// in signal amber. Every style paints its recording stage.
+    static func checkLook() throws {
+        if let failure = onMain({ lookFailure() }) { throw SmokeFailure(failure) }
+    }
+
+    @MainActor private static func lookFailure() -> String? {
+        guard let container = AppGroup.containerURL else { return "no container for \(AppGroup.identifier)" }
+        guard let rules = LookRules.live else { return "the cosmetics did not load" }
+        let file = container.appending(path: "smoke-pill-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: file) }
+        let start = Date.now.addingTimeInterval(-45 * 86_400)
+        let takes = (0..<45).map { i in
+            HistoryEntry(at: start.addingTimeInterval(Double(i) * 86_400), durationMs: 60_000, words: Array(repeating: "word", count: 1700).joined(separator: " "))
+        }
+        let standing = rules.standing(takes)
+        guard standing.progress.rank.belt == "purple" else { return "the seeded takes reached \(standing.progress.rank.id), not purple" }
+        let amber = rules.cosmetics.accents.first { $0.unlock == nil }?.color
+        for item in rules.cosmetics.overlayStyles {
+            guard let style = PillStyle(rawValue: item.id) else { return "no pill style for \(item.id)" }
+            for accent in rules.cosmetics.accents {
+                let look = standing.resolved(PillLook(style: style, accent: accent.id))
+                let expected = standing.unlocked(accent) ? accent.color ?? rules.cosmetics.beltColors["purple"] : amber
+                guard look.color == expected else { return "\(accent.id) resolved to \(look.color ?? "nothing"), not \(expected ?? "nothing")" }
+                look.write(to: file)
+                let read = PillLook.read(from: file)
+                guard read == look else { return "\(style.rawValue) with \(accent.id) read back as \(read)" }
+                guard read.palette == PillPalette(accent: expected.flatMap(RGBA.init(hex:))) else { return "\(accent.id) gave the keyboard the wrong paint" }
+            }
+            let frame = PillFrame(style: style, stage: .recording, levels: DemoVoice.levels, time: 0.5, still: false, palette: PillLook(style: style, color: rules.cosmetics.beltColors["purple"]).palette)
+            let size = CGSize(width: 180, height: 28)
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 2
+            format.opaque = false
+            let image = UIGraphicsImageRenderer(size: size, format: format).image { Pill.paint(frame, in: CGRect(origin: .zero, size: size), context: $0.cgContext) }
+            guard inked(image) > 100 else { return "\(style.rawValue) painted nothing" }
+        }
+        return nil
     }
 
     /// Runs main-actor work to the end from the smoke's synchronous start
