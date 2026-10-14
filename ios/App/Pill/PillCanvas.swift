@@ -8,6 +8,7 @@ struct PillCanvas: UIViewRepresentable {
     var stage: PillStage
     /// Reads how loud the take is now, while recording.
     var level: (@MainActor () -> Float)?
+    var palette: PillPalette = .standard
 
     func makeUIView(context: Context) -> PillView {
         PillView()
@@ -15,6 +16,7 @@ struct PillCanvas: UIViewRepresentable {
 
     func updateUIView(_ view: PillView, context: Context) {
         view.style = style
+        view.palette = palette
         view.level = level
         view.show(stage)
     }
@@ -31,27 +33,6 @@ extension PillStage {
         case .heardNothing: self = .noSpeech
         case .failed, .micOff, .micFailed: self = .error
         }
-    }
-}
-
-/// A voice for the pill where there is none to hear: the Look tiles, the
-/// previews, and the capture script.
-enum DemoVoice {
-    // Each step is its own typed value: Swift 6.3 (CI) gives up type
-    // checking these as one expression.
-    @MainActor static func level() -> Float {
-        let t: Double = CACurrentMediaTime()
-        let swing: Double = abs(sin(t * 3.7))
-        let shape: Double = 0.55 + 0.45 * sin(t * 1.1)
-        return Float(0.08 + 0.82 * swing * shape)
-    }
-
-    /// A take's worth of levels, the same every time.
-    static let levels: [Float] = (0..<Pill.barCount).map { (i: Int) -> Float in
-        let x = Double(i)
-        let swing: Double = abs(sin(x * 0.62))
-        let shape: Double = 0.55 + 0.45 * cos(x * 0.21)
-        return Float(0.15 + 0.75 * swing * shape)
     }
 }
 

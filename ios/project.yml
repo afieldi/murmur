@@ -124,8 +124,11 @@ targets:
       - path: Widgets
       - path: Live
       - path: Shared/Pill.swift
+      - path: Shared/Ink.swift
       - path: Shared/AppGroup.swift
       - path: Generated/Tokens.swift
+    dependencies:
+      - package: MurmurCore
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(MURMUR_BUNDLE_ID).widgets

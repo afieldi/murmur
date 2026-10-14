@@ -14,6 +14,6 @@ import Testing
     }
 
     @Test func theLooksAreNamedPlainly() {
-        #expect(PillStyle.allCases.map(KeyboardCopy.name) == ["Bars", "Speckle"])
+        #expect(PillStyle.allCases.map(KeyboardCopy.name) == ["Bars", "Speckle", "Pulse", "Ink dabs", "Ink flecks", "Ink rings", "Ink ribbon"])
     }
 }

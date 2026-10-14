@@ -44,6 +44,10 @@ import UIKit
             guard max(r, g, b) >= 40, r > 0 else { continue }
             let green = g / r, blue = b / r
             if green < 0.45 { paint.red += 1 }
+            // Fainter paint's 8 bit ratio wobbles across the line between
+            // amber and gold (the ink's faintest bristles), so only clear
+            // paint is told apart by hue (IOS-020).
+            else if max(r, g, b) < 64, green < 0.88 { continue }
             else if green >= 0.58, green <= 0.705, blue < 0.4 { paint.amber += 1 }
             else if green > 0.715, green <= 0.82, blue < 0.4 { paint.gold += 1 }
             else if green > 0.88 { paint.neutral += 1 }
@@ -144,9 +148,36 @@ import UIKit
 
     @Test func theLookIsRememberedForTheKeyboard() {
         let file = FileManager.default.temporaryDirectory.appending(path: "pill-\(UUID().uuidString).json")
-        #expect(PillLook.read(from: file).style == .bars)
-        PillLook(style: .speckle).write(to: file)
-        #expect(PillLook.read(from: file).style == .speckle)
+        #expect(PillLook.read(from: file) == PillLook(style: .bars, accent: "amber", color: nil))
+        let blue = RGBA(r: 0.36, g: 0.51, b: 0.85)
+        let look = PillLook(style: .ribbon, accent: "belt", color: blue.hex)
+        look.write(to: file)
+        #expect(PillLook.read(from: file) == look)
+        #expect(PillLook.read(from: file).palette == PillPalette(accent: RGBA(hex: blue.hex)))
+    }
+
+    /// A look written before the accents keeps its style; one with a style
+    /// this build does not draw keeps its accent.
+    @Test func anOlderOrNewerLookKeepsWhatItCan() throws {
+        let file = FileManager.default.temporaryDirectory.appending(path: "pill-\(UUID().uuidString).json")
+        try Data(#"{"style":"speckle"}"#.utf8).write(to: file)
+        #expect(PillLook.read(from: file) == PillLook(style: .speckle, accent: "amber", color: nil))
+        try Data(#"{"style":"sparkles","accent":"ember"}"#.utf8).write(to: file)
+        #expect(PillLook.read(from: file) == PillLook(style: .bars, accent: "ember", color: nil))
+        try Data("not json".utf8).write(to: file)
+        #expect(PillLook.read(from: file) == PillLook(style: .bars))
+    }
+
+    /// Signal amber, or no color, dries to brand gold; any other accent
+    /// dries to a darker shade of itself, as on desktop.
+    @Test func theAccentDriesAsOnDesktop() {
+        let blue = RGBA(r: 0.36, g: 0.51, b: 0.85)
+        #expect(PillPalette(accent: blue) == PillPalette(wet: blue, dry: blue.mix(.ink, 0.35)))
+        #expect(PillPalette(accent: nil) == .standard)
+        #expect(PillPalette(accent: .amber) == .standard)
+        #expect(PillPalette(accent: RGBA.amber.mix(.text, 0.004)) == .standard)
+        #expect(PillPalette(accent: RGBA.amber.mix(.text, 0.05)) != .standard)
+        #expect(PillLook(style: .bars, accent: "x", color: "not a color").palette == .standard)
     }
 
     @Test func theKeyboardFollowsTheMailbox() {

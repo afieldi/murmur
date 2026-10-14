@@ -122,6 +122,11 @@ enum KeyboardCopy {
         switch style {
         case .bars: "Bars"
         case .speckle: "Speckle"
+        case .pulse: "Pulse"
+        case .dabs: "Ink dabs"
+        case .flecks: "Ink flecks"
+        case .rings: "Ink rings"
+        case .ribbon: "Ink ribbon"
         }
     }
 }

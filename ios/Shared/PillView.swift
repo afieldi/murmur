@@ -7,7 +7,17 @@ import UIKit
 
 final class PillView: UIView {
     var style: PillStyle = .bars {
-        didSet { if style != oldValue { setNeedsDisplay() } }
+        didSet {
+            guard style != oldValue else { return }
+            scene = InkScene.paints(style) ? InkScene(style: style, stage: stage, at: clock) : nil
+            setNeedsDisplay()
+            run()
+        }
+    }
+
+    /// The accent's paint (IOS-020).
+    var palette: PillPalette = .standard {
+        didSet { if palette != oldValue { setNeedsDisplay() } }
     }
 
     /// Reads how loud the take is now, 0 to 1, while recording.
@@ -19,6 +29,11 @@ final class PillView: UIView {
     private var began = CACurrentMediaTime()
     private var link: CADisplayLink?
     private var still = UIAccessibility.isReduceMotionEnabled
+    /// The ink and pulse styles' scene, stepped as the display link ticks.
+    private var scene: InkScene?
+
+    /// The scene's clock, in milliseconds.
+    private var clock: Double { CACurrentMediaTime() * 1000 }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -42,10 +57,17 @@ final class PillView: UIView {
             levels = [Float](repeating: 0, count: Pill.barCount)
             smoothed = 0
         }
+        advance()
+        scene?.show(stage, palette: palette)
         self.stage = stage
         began = CACurrentMediaTime()
         setNeedsDisplay()
         run()
+    }
+
+    /// Steps the scene to now with the voice as it is.
+    private func advance() {
+        scene?.step(to: clock, level: Double(stage == .recording ? level?() ?? 0 : 0))
     }
 
     override func draw(_ rect: CGRect) {
@@ -55,7 +77,7 @@ final class PillView: UIView {
 
     /// The frame drawn now.
     var current: PillFrame {
-        PillFrame(style: style, stage: stage, levels: levels, time: CACurrentMediaTime() - began, still: still)
+        PillFrame(style: style, stage: stage, levels: levels, time: CACurrentMediaTime() - began, still: still, palette: palette, ink: scene)
     }
 
     override func didMoveToWindow() {
@@ -65,7 +87,8 @@ final class PillView: UIView {
 
     /// Runs the display link while the stage moves and the view is on screen.
     private func run() {
-        let moving = window != nil && Pill.moves(stage, at: CACurrentMediaTime() - began, still: still)
+        let moves = scene.map { $0.busy(still: still) } ?? Pill.moves(stage, at: CACurrentMediaTime() - began, still: still)
+        let moving = window != nil && moves
         if moving, link == nil {
             let link = CADisplayLink(target: Tick(self), selector: #selector(Tick.fire(_:)))
             link.preferredFrameRateRange = CAFrameRateRange(minimum: 20, maximum: 30, preferred: 30)
@@ -78,7 +101,9 @@ final class PillView: UIView {
     }
 
     fileprivate func tick() {
-        if stage == .recording, let level {
+        if scene != nil {
+            advance()
+        } else if stage == .recording, let level {
             smoothed += (level() - smoothed) * 0.35
             levels.removeFirst()
             levels.append(smoothed)

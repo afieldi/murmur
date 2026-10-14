@@ -16,9 +16,10 @@ enum PillStage: Equatable, Sendable {
     case idle, recording, processing, inserted, noSpeech, error
 }
 
-/// The free styles; the other five arrive with belts (IOS-020).
+/// The styles, in shared/cosmetics.json's order: two free, and five
+/// earned by belt (IOS-020).
 enum PillStyle: String, CaseIterable, Codable, Sendable {
-    case bars, speckle
+    case bars, speckle, pulse, dabs, flecks, rings, ribbon
 }
 
 /// One frame of the pill.
@@ -31,6 +32,11 @@ struct PillFrame {
     var time: TimeInterval
     /// Reduce Motion: each stage as a still frame.
     var still: Bool
+    /// The accent's wet and dry paint (IOS-020).
+    var palette: PillPalette = .standard
+    /// The ink and pulse styles' scene, stepped to now; nil paints a
+    /// scripted one, for shots and stills.
+    var ink: InkScene?
 }
 
 enum Pill {
@@ -72,6 +78,9 @@ enum Pill {
         switch frame.style {
         case .bars: paintBars(frame, in: rect, context: context)
         case .speckle: paintSpeckle(frame, in: rect, context: context)
+        case .pulse, .dabs, .flecks, .rings, .ribbon:
+            let scene = frame.ink.flatMap { frame.still ? nil : $0 } ?? InkScene.scripted(frame.style, frame.stage, at: frame.still ? InkScene.stillTime(frame.stage) : frame.time, palette: frame.palette, still: frame.still)
+            scene.paint(in: rect, context: context, palette: frame.palette)
         }
     }
 
@@ -108,13 +117,13 @@ enum Pill {
                 color = RGBA.cream22
             case .recording:
                 height = low + level * (high - low)
-                color = RGBA.amber.mix(RGBA.brand, age * 0.7)
+                color = frame.palette.wet.mix(frame.palette.dry, age * 0.7)
             case .processing:
                 height = low + level * (high - low)
-                color = RGBA.amber.mix(RGBA.brand, age * 0.7).mix(RGBA.brand, dried)
+                color = frame.palette.wet.mix(frame.palette.dry, age * 0.7).mix(frame.palette.dry, dried)
             case .inserted:
                 height = low + level * (high - low) * (1 - sunk)
-                color = RGBA.brand.mix(RGBA.cream22, sunk)
+                color = frame.palette.dry.mix(RGBA.cream22, sunk)
             case .noSpeech:
                 height = low * (0.7 + 0.6 * scrape.next())
                 color = RGBA.grey
@@ -188,14 +197,14 @@ enum Pill {
                 y += cos(t / 0.16 * dot.speed + dot.phase * 1.7) * jitter
                 radius *= 1 + energy * 0.8
                 if dot.warm {
-                    color = RGBA.amber
+                    color = frame.palette.wet
                     alpha = 0.55 + 0.45 * energy
                 } else {
                     alpha *= 0.4 + energy * 0.6
                 }
             case .processing:
                 if dot.warm {
-                    color = RGBA.amber.mix(RGBA.brand, dried)
+                    color = frame.palette.wet.mix(frame.palette.dry, dried)
                     alpha = 0.7
                 } else {
                     alpha *= 0.55
@@ -203,7 +212,7 @@ enum Pill {
             case .inserted:
                 y += (rect.midY - y) * sunk
                 alpha *= 0.55 * (1 - 0.5 * sunk)
-                color = RGBA.brand.mix(RGBA.text, sunk)
+                color = frame.palette.dry.mix(RGBA.text, sunk)
             case .noSpeech:
                 y = rect.midY + (y - rect.midY) * 0.15
                 alpha *= 0.6
@@ -320,9 +329,35 @@ struct Seeded {
 }
 
 /// The pill's look, chosen in murmur and read by the keyboard, in the app
-/// group beside the session's state.
+/// group beside the session's state: the style, the accent chosen, and the
+/// color that accent resolves to now, which the app keeps current as belts
+/// and achievements come (IOS-020). The keyboard never reads the history.
 struct PillLook: Codable, Equatable, Sendable {
     var style: PillStyle
+    /// The accent's id in shared/cosmetics.json.
+    var accent = "amber"
+    /// The accent's color as #rrggbb; nil is signal amber.
+    var color: String?
+
+    init(style: PillStyle, accent: String = "amber", color: String? = nil) {
+        self.style = style
+        self.accent = accent
+        self.color = color
+    }
+
+    /// Each field on its own, so a file from before the accents, or a
+    /// style this build does not know, keeps what it can.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        style = (try? container.decodeIfPresent(PillStyle.self, forKey: .style)) ?? .bars
+        accent = (try? container.decodeIfPresent(String.self, forKey: .accent)) ?? "amber"
+        color = try? container.decodeIfPresent(String.self, forKey: .color)
+    }
+
+    /// The paint the keyboard draws with.
+    var palette: PillPalette {
+        PillPalette(accent: color.flatMap(RGBA.init(hex:)))
+    }
 
     static var file: URL? {
         AppGroup.containerURL?.appending(path: "pill.json")
