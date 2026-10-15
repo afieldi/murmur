@@ -61,6 +61,11 @@ enum BundledRules {
         try shared().decode(SorterRules.self, from: "sorter.json")
     }
 
+    /// The transform's prompt, checks, and numbers (IOS-024).
+    static func transform() throws -> TransformRules {
+        try shared().decode(TransformRules.self, from: "transform.json")
+    }
+
     /// The speech gate's numbers, the phrases models invent on silence, the
     /// formatter's rules, and polish's prompt and checks.
     static func takeRules() throws -> TakeRules {

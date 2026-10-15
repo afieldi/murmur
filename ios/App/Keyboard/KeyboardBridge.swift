@@ -6,7 +6,10 @@
 // the mailbox, so a take made on the Dictate screen never turns up in
 // another app. While a keyboard take records, its loudness goes to the
 // level file for the keyboard's pill (IOS-010). A take the keyboard asked
-// to keep as a note is saved to the notes instead of typed (IOS-023).
+// to keep as a note is saved to the notes instead of typed (IOS-023). A
+// take that came with a selection is an instruction for it: once heard,
+// the rewrite goes to the keyboard with the original beside it, or the
+// line saying why the selection stays as it was (IOS-024).
 import Foundation
 import Observation
 
@@ -31,6 +34,11 @@ import Observation
     /// Saves a note's words; the word for the receipt, or nil when it could
     /// not be saved (IOS-023).
     private let keepNote: @MainActor (String, Date) -> String?
+    /// Rewrites a selection by a spoken instruction (IOS-024); nil when the
+    /// transform's rules did not load.
+    private let rewriter: Rewriter?
+    /// Holds background time; the closure it returns lets it go.
+    private let keepAlive: @MainActor () -> @MainActor () -> Void
     private var listener: SignalListener?
     /// The take the keyboard asked for, until it ends.
     private var take: UUID?
@@ -38,12 +46,18 @@ import Observation
     private var cancelled = false
     /// The take is to be kept as a note.
     private var note = false
+    /// The selection the take is an instruction for (IOS-024).
+    private var selection: String?
+    /// The rewrite is on its way: the model's later states are not this
+    /// take's.
+    private var rewriting = false
     private var startedAt = Date.distantPast
 
     init(
         model: TakeModel, mailbox: Mailbox, limit: TimeInterval = KeyboardBridge.takeLimit, levels: LevelFile = .shared,
         log: ActivityLog? = nil, announce: @escaping @MainActor (Signal) -> Void = { $0.post() },
-        keepNote: @escaping @MainActor (String, Date) -> String? = { _, _ in nil }
+        keepNote: @escaping @MainActor (String, Date) -> String? = { _, _ in nil }, rewriter: Rewriter? = nil,
+        keepAlive: @escaping @MainActor () -> @MainActor () -> Void = { {} }
     ) {
         self.model = model
         self.mailbox = mailbox
@@ -51,6 +65,8 @@ import Observation
         self.levels = levels
         self.log = log
         self.keepNote = keepNote
+        self.rewriter = rewriter
+        self.keepAlive = keepAlive
         self.announce = announce
     }
 
@@ -66,7 +82,7 @@ import Observation
         switch signal {
         case .start:
             guard let ask = mailbox.answer(within: Self.askLife) else { return }
-            begin(ask.take, note: ask.note)
+            begin(ask)
         case .stop:
             guard take != nil, model.isRecording else { return }
             Task { await model.stop() }
@@ -93,11 +109,11 @@ import Observation
             return true
         }
         guard let asked, asked.take == id else { return false }
-        return begin(id, note: asked.note)
+        return begin(asked)
     }
 
     @discardableResult
-    private func begin(_ id: UUID, note: Bool) -> Bool {
+    private func begin(_ ask: TakeAsk) -> Bool {
         guard take == nil, !model.isRecording, !model.isBusy else {
             announce(.busy)
             return false
@@ -105,14 +121,28 @@ import Observation
         // The last take's entry is about to go: note what the keyboard did
         // with its words first.
         log?.noteKeyboard(mailbox.read())
-        take = id
-        self.note = note
+        take = ask.take
+        note = ask.note
+        selection = ask.selection
+        rewriting = false
         startedAt = .now
         cancelled = false
+        // A selection that cannot be sent ends the take before anything is
+        // heard, so nothing is said for nothing.
+        if let selection {
+            guard let rewriter else {
+                write(.failed, line: TransformCopy.kept, ends: true)
+                return true
+            }
+            if let refusal = rewriter.refusal(selection) {
+                write(.failed, line: refusal, ends: true)
+                return true
+            }
+        }
         // Written here, not read from the model, whose state may still
         // be the last take's words.
         write(.listening)
-        Task { await settle(id) }
+        Task { await settle(ask.take) }
         return true
     }
 
@@ -120,7 +150,7 @@ import Observation
     /// here: the model's state may not change at all (denied twice), and
     /// following it alone would leave the take open forever.
     private func settle(_ id: UUID) async {
-        await model.start()
+        await model.start(as: selection == nil ? .words : .instruction)
         guard take == id else { return }
         if cancelled {
             model.cancel()
@@ -166,10 +196,13 @@ import Observation
     }
 
     private func publish() {
-        guard take != nil else { return }
+        guard take != nil, !rewriting else { return }
         switch model.state {
         case .recording: write(.listening)
         case .transcribing: write(.working)
+        case .words(let text) where selection != nil:
+            rewriting = true
+            Task { await rewrite(text) }
         case .words(let text):
             // A note that could not be saved is typed instead: the words are
             // never lost.
@@ -185,11 +218,32 @@ import Observation
         }
     }
 
-    private func write(_ phase: MailboxEntry.Phase, words: String? = nil, noted: String? = nil, ends: Bool = false) {
+    /// Rewrites the selection by the instruction just heard; the keyboard
+    /// gets the rewrite with the original beside it, or why the selection
+    /// stays as it was.
+    private func rewrite(_ instruction: String) async {
+        guard let id = take, let selection, let rewriter else { return }
+        let release = keepAlive()
+        defer { release() }
+        let outcome = await rewriter.rewrite(instruction, selection)
+        guard take == id else { return }
+        rewriting = false
+        switch outcome {
+        case .rewritten(let text): write(.ready, words: text, original: selection, ends: true)
+        case .kept(let line): write(.failed, line: line, ends: true)
+        }
+    }
+
+    private func write(
+        _ phase: MailboxEntry.Phase, words: String? = nil, noted: String? = nil, original: String? = nil, line: String? = nil, ends: Bool = false
+    ) {
         guard let take else { return }
-        mailbox.write(MailboxEntry(take: take, phase: phase, words: words, at: startedAt, noted: noted))
+        mailbox.write(MailboxEntry(take: take, phase: phase, words: words, at: startedAt, noted: noted, original: original, line: line))
         announce(.changed)
-        if ends { self.take = nil }
+        if ends {
+            self.take = nil
+            selection = nil
+        }
     }
 }
 
@@ -201,9 +255,11 @@ extension KeyboardBridge {
     static func live() -> KeyboardBridge? {
         if let shared { return shared }
         guard let model = TakeModel.live(), let mailbox = Mailbox.shared else { return nil }
-        let bridge = KeyboardBridge(model: model, mailbox: mailbox, log: .standard, keepNote: { words, at in
-            Notes.live()?.save(words, at: at)
-        })
+        let bridge = KeyboardBridge(
+            model: model, mailbox: mailbox, log: .standard,
+            keepNote: { words, at in Notes.live()?.save(words, at: at) },
+            rewriter: Rewriter.live(), keepAlive: BackgroundTime.hold
+        )
         bridge.listen()
         shared = bridge
         return bridge
