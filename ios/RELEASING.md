@@ -34,9 +34,13 @@ murmur makes only HTTPS requests through Apple's own networking and adds no encr
 
 ## TestFlight test notes
 
-Paste this into the build's What to Test in App Store Connect, TestFlight, under the build:
+Paste this into the build's What to Test in App Store Connect, TestFlight, under the build. Build 443 (TestFlight 1):
 
 > First TestFlight build of murmur voice dictation. Finish first run: microphone, the murmur keyboard, Full Access, and your provider key. Then dictate with the murmur keyboard in Messages, Notes, Mail, and Safari. Try a take where you say nothing (nothing should be typed) and a take with Wi-Fi and cellular off (it should wait, then send when you retry). If something goes wrong, Settings, Diagnostics, Save report makes a report you can read and then share.
+
+Build 473 (TestFlight 2, uploaded 2026-10-15; Claude sets it through the App Store Connect API):
+
+> Second TestFlight build. New: Notes (keep a take as a note instead of typing it), Transform (select text, touch and hold the pill, tap Transform, and say how to change it; for more than a sentence, tap Copy first), and murmur Pro in Settings (purchases in TestFlight are free; Pro adds provider profiles and the supporter mark). Everything from the first build still applies. If something goes wrong, Settings, Diagnostics, Save report makes a report you can read and then share.
 
 ## Internal testing
 
