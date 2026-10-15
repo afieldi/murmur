@@ -10,7 +10,10 @@
 // field before they arrived. The pill is drawn from the take's stage and
 // the loudness the app writes to the app group (IOS-010), with a light tap
 // when a take starts and when it stops. Note in the pill's menu makes the
-// next take a note, saved in murmur instead of typed (IOS-023).
+// next take a note, saved in murmur instead of typed (IOS-023). With text
+// selected, Transform in the menu starts a take that says how to change
+// it; the rewrite goes in its place, and Insert last brings back the
+// original (IOS-024).
 import UIKit
 
 final class KeyboardViewController: UIInputViewController {
@@ -135,42 +138,62 @@ final class KeyboardViewController: UIInputViewController {
             // This keyboard's take is still starting or being transcribed.
             break
         case (nil, _):
-            let take = UUID()
-            guard let mailbox = Mailbox.shared else { return }
-            haptic.impactOccurred()
-            rest?.invalidate()
-            // The last take's ending gives way to the new take at once.
-            pad.setStage(.idle)
             let note = noteNext
             noteNext = false
-            mailbox.ask(take, note: note)
-            pad.insertLast.isHidden = true
-            phase = nil
-            if SessionState.read().isOn() {
-                waiting = Pad.Waiting(take: take, opened: false, field: textDocumentProxy.documentIdentifier, at: .now)
-                pad.status.text = "Starting"
-                Signal.start.post()
-                // A running session answers within a moment; when it does not,
-                // murmur was closed, so open it with the same take. A late
-                // answer to the start and the link are one take.
-                expectAnswer(within: 2) { [weak self] in
-                    self?.openMurmur(take, note: note)
-                }
-            } else {
-                openMurmur(take, note: note)
+            begin(note: note, original: nil)
+        }
+    }
+
+    /// Transform in the pill's menu (IOS-024): a take that says how to
+    /// change the selected text. A selection longer than a sentence is
+    /// taken whole from the clipboard, or not at all.
+    private func transform(_ shown: String) {
+        guard waiting == nil else { return }
+        let selected = textDocumentProxy.selectedText ?? shown
+        let original = Pad.isWhole(selected) ? selected : Pad.whole(selected, clipboard: UIPasteboard.general.hasStrings ? UIPasteboard.general.string : nil)
+        guard let original else {
+            pad.status.text = Pad.copyFirst
+            return
+        }
+        begin(note: false, original: original, selected: selected)
+    }
+
+    /// Starts a take under a new id: a note, a transform of the original,
+    /// or words to type.
+    private func begin(note: Bool, original: String?, selected: String? = nil) {
+        let take = UUID()
+        guard let mailbox = Mailbox.shared else { return }
+        haptic.impactOccurred()
+        rest?.invalidate()
+        // The last take's ending gives way to the new take at once.
+        pad.setStage(.idle)
+        mailbox.ask(take, note: note, selection: original)
+        pad.insertLast.isHidden = true
+        phase = nil
+        if SessionState.read().isOn() {
+            waiting = Pad.Waiting(take: take, opened: false, field: textDocumentProxy.documentIdentifier, at: .now, original: original, selected: selected)
+            pad.status.text = "Starting"
+            Signal.start.post()
+            // A running session answers within a moment; when it does not,
+            // murmur was closed, so open it with the same take. A late
+            // answer to the start and the link are one take.
+            expectAnswer(within: 2) { [weak self] in
+                self?.openMurmur(take, note: note, original: original, selected: selected)
             }
+        } else {
+            openMurmur(take, note: note, original: original, selected: selected)
         }
     }
 
     /// Opens murmur with the take's link; murmur starts the session and the
     /// take, and you swipe back.
-    private func openMurmur(_ take: UUID, note: Bool) {
-        Mailbox.shared?.ask(take, note: note)
+    private func openMurmur(_ take: UUID, note: Bool, original: String?, selected: String?) {
+        Mailbox.shared?.ask(take, note: note, selection: original)
         guard let url = TakeLink.url(for: take), let scene = view.window?.windowScene else {
             end(Pad.openRefused)
             return
         }
-        waiting = Pad.Waiting(take: take, opened: true, field: nil, at: .now)
+        waiting = Pad.Waiting(take: take, opened: true, field: nil, at: .now, original: original, selected: selected)
         pad.status.text = Pad.opening
         scene.open(url, options: nil) { [weak self] opened in
             MainActor.assumeIsolated {
@@ -239,11 +262,27 @@ final class KeyboardViewController: UIInputViewController {
         pad.returnKey.accessibilityLabel = title
     }
 
-    /// A long press on the pill holds Note (IOS-023), and End session while
-    /// one runs.
+    /// A long press on the pill holds Transform while text is selected
+    /// (IOS-024), Note (IOS-023), and End session while one runs.
     private func setPillMenu() {
         let armed = noteNext
         var items: [UIMenuElement] = [
+            // Asked each time the menu opens, so it follows the selection.
+            // A field that keeps its selection from keyboards never offers it.
+            UIDeferredMenuElement.uncached { [weak self] completion in
+                MainActor.assumeIsolated {
+                    guard let self, self.waiting == nil, let selected = self.textDocumentProxy.selectedText,
+                          !selected.allSatisfy(\.isWhitespace) else {
+                        completion([])
+                        return
+                    }
+                    completion([
+                        UIAction(title: Pad.transformMenu, image: UIImage(systemName: "wand.and.stars")) { [weak self] _ in
+                            self?.transform(selected)
+                        }
+                    ])
+                }
+            },
             UIAction(title: armed ? Pad.typeMenu : Pad.noteMenu, image: UIImage(systemName: armed ? "keyboard" : "note.text")) { [weak self] _ in
                 guard let self else { return }
                 self.noteNext = !armed
@@ -277,6 +316,17 @@ final class KeyboardViewController: UIInputViewController {
         }
         let sameField = waiting?.sameField(as: textDocumentProxy.documentIdentifier) ?? false
         switch Pad.react(to: entry, mine: waiting?.take, sameField: sameField, visible: visible) {
+        case .insert(let take) where waiting?.original != nil:
+            // A rewrite goes in only over the text it rewrites; otherwise it
+            // waits as Insert last and the selection stays as it was.
+            if waiting?.replaces(textDocumentProxy.selectedText) == true, let words = mailbox.claim(take) {
+                textDocumentProxy.insertText(words)
+                end(Pad.rewritten, showing: .inserted)
+            } else {
+                mailbox.offer(take)
+                end(Pad.selectionMoved)
+            }
+            pad.insertLast.isHidden = false
         case .insert(let take):
             if let words = mailbox.claim(take) { insert(words) }
             end(nil, showing: .inserted)
