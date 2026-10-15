@@ -86,6 +86,20 @@ extension KeyboardBridgeTests {
     }
 
     /// A selection past the shared limit is never sent, and nothing is heard.
+    /// A take link for a selection murmur cannot send opens nothing: no
+    /// Recording screen waiting on a take that already ended.
+    @Test func aRefusedSelectionOpensNothing() throws {
+        let model = try model(.says("make this shorter"))
+        let bridge = KeyboardBridge(model: model, mailbox: mailbox, announce: { _ in }, rewriter: try rewriter(Self.chat("x"), connected: false))
+        bridge.listen()
+        let take = UUID()
+        mailbox.ask(take, selection: Self.selected)
+        #expect(!bridge.opened(take))
+        #expect(mailbox.read()?.phase == .failed)
+        #expect(mailbox.read()?.line == TransformCopy.noConnection)
+        #expect(microphone.started == 0)
+    }
+
     @Test func aSelectionTooLongEndsTheTakeBeforeItListens() async throws {
         let model = try model(.says("make this shorter"))
         let chat = Self.chat("x")
@@ -169,8 +183,12 @@ extension TakeModelTests {
         ("Call Dr. Smith today.", false),
         ("Call the dentist. Email Bob.", false),
         ("milk\neggs", false),
-        ("Is it done?Yes", true),
-        ("第一。第二", true),
+        ("第一。第二", false),
+        ("She said \"Stop.\" He said \"Go.\" They left.", false),
+        ("She said “Stop.” He said “Go.” They left.", false),
+        ("(Call him.) Then go.", false),
+        ("今日は晴れ。明日は雨。明後日は雪。", false),
+        ("यह एक है। वह दो है। सब ठीक है।", false),
         ("第一。 第二", false),
         (String(repeating: "a", count: 300), true),
         (String(repeating: "a", count: 301), false)
@@ -193,6 +211,72 @@ extension TakeModelTests {
         // Shorter than what the keyboard saw cannot be the whole of it.
         #expect(Pad.whole(shortened, clipboard: "This is text0. 1234567890") == nil)
         #expect(Pad.pieces("One.\n\nTwo!  Three") == ["One.", "Two!", "Three"])
+        // Every piece the keyboard saw must be in the clipboard, in order.
+        #expect(Pad.whole("One. Two. Three.", clipboard: "One. Changed a great deal here. Three.") == nil)
+        #expect(Pad.whole("One. Two. Three.", clipboard: "One. Zero. Two. Four. Three.") == "One. Zero. Two. Four. Three.")
+    }
+
+    /// A copy counts for a selection only when it came after the keyboard
+    /// saw that selection, and never once murmur has typed into the field:
+    /// an older clipboard that opens and closes alike is not the selection.
+    @Test func aCopyCountsOnlyAfterTheSelectionWasSeen() {
+        var mark = Pad.SelectionMark(selected: nil, count: 5)
+        mark.see("A. B.", count: 5)
+        #expect(!mark.copiedSince(5))
+        #expect(mark.copiedSince(6))
+        // The same selection seen again keeps the moment it was first seen.
+        mark.see("A. B.", count: 7)
+        #expect(mark.copiedSince(7))
+        // A new selection moves the moment.
+        mark.see("C. D.", count: 7)
+        #expect(!mark.copiedSince(7))
+        // Once murmur types, the clipboard then is older than the field.
+        mark.typed(count: 8)
+        #expect(!mark.copiedSince(8))
+        #expect(mark.copiedSince(9))
+    }
+
+    /// The keyboard's text proxy may not have the selection yet when it
+    /// comes back: one look again before deciding it moved.
+    @Test func aRewriteLooksAgainOnceBeforeItWaits() {
+        #expect(Pad.landing(replaces: true, lookedAgain: false) == .replace)
+        #expect(Pad.landing(replaces: true, lookedAgain: true) == .replace)
+        #expect(Pad.landing(replaces: false, lookedAgain: false) == .lookAgain)
+        #expect(Pad.landing(replaces: false, lookedAgain: true) == .offer)
+    }
+
+    /// A rewrite offered instead of typed replaced nothing, so it has no
+    /// original to bring back.
+    @Test func anOfferedRewriteForgetsItsOriginal() {
+        let mailbox = Mailbox(file: FileManager.default.temporaryDirectory.appending(path: "offer-\(UUID().uuidString).json"))
+        let take = UUID()
+        mailbox.write(MailboxEntry(take: take, phase: .ready, words: "rewrite", at: .now, original: "original"))
+        mailbox.offer(take)
+        #expect(mailbox.claim() == "rewrite")
+        #expect(mailbox.claim() == nil)
+    }
+
+    /// Deleting everything in murmur takes a waiting original too.
+    @Test func deletingEverythingTakesTheOriginal() {
+        let mailbox = Mailbox(file: FileManager.default.temporaryDirectory.appending(path: "forget-\(UUID().uuidString).json"))
+        let take = UUID()
+        mailbox.write(MailboxEntry(take: take, phase: .ready, words: "rewrite", at: .now, original: "original"))
+        mailbox.forget(nil)
+        #expect(mailbox.read()?.words == nil)
+        #expect(mailbox.read()?.original == nil)
+    }
+
+    /// An ask murmur never answered is withdrawn when its take ends, so the
+    /// selection does not wait in the app group.
+    @Test func anUnansweredAskIsWithdrawn() {
+        let mailbox = Mailbox(file: FileManager.default.temporaryDirectory.appending(path: "withdraw-\(UUID().uuidString).json"))
+        let take = UUID()
+        mailbox.ask(take, selection: "secret words")
+        mailbox.withdraw(UUID())
+        #expect(FileManager.default.fileExists(atPath: mailbox.requestFile.path))
+        mailbox.withdraw(take)
+        #expect(!FileManager.default.fileExists(atPath: mailbox.requestFile.path))
+        #expect(mailbox.answer(within: 3) == nil)
     }
 
     /// A take a keyboard before transforms saved still reads.

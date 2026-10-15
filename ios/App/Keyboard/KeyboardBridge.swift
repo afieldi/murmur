@@ -128,15 +128,16 @@ import Observation
         startedAt = .now
         cancelled = false
         // A selection that cannot be sent ends the take before anything is
-        // heard, so nothing is said for nothing.
+        // heard, so nothing is said for nothing, and a take link opens no
+        // Recording screen for it.
         if let selection {
             guard let rewriter else {
                 write(.failed, line: TransformCopy.kept, ends: true)
-                return true
+                return false
             }
             if let refusal = rewriter.refusal(selection) {
                 write(.failed, line: refusal, ends: true)
-                return true
+                return false
             }
         }
         // Written here, not read from the model, whose state may still

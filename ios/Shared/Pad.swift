@@ -47,14 +47,16 @@ enum Pad {
     /// keyboard only the first and last sentences of a longer selection
     /// (Apple bug FB7789012, still so in 2026), and a rewrite of part of
     /// it would replace all of it, so only one sentence of modest length
-    /// counts. Anything that could be a sentence break counts as one.
+    /// counts. Anything that could be a sentence break counts as one, by
+    /// the pad's own rule and by Foundation's sentence finder alike.
     static func isWhole(_ selected: String) -> Bool {
-        selected.utf16.count <= wholeLimit && pieces(selected).count <= 1
+        selected.utf16.count <= wholeLimit && pieces(selected).count <= 1 && sentences(selected) <= 1
     }
 
     /// The whole selection from the clipboard, when you copied it: the
-    /// same text, or text that opens with the selection's first sentence
-    /// and closes with its last, as iOS shortens it. Nil otherwise.
+    /// same text, or text that opens with the selection's first sentence,
+    /// holds every piece the keyboard saw in order, and closes with its
+    /// last, as iOS shortens it. Nil otherwise.
     static func whole(_ selected: String, clipboard: String?) -> String? {
         guard let clipboard, !clipboard.isEmpty else { return nil }
         if clipboard == selected { return clipboard }
@@ -62,13 +64,80 @@ enum Pad {
         guard let first = parts.first, let last = parts.last,
               clipboard.utf16.count > selected.utf16.count, clipboard.hasPrefix(first), clipboard.hasSuffix(last)
         else { return nil }
+        let source = clipboard as NSString
+        var from = 0
+        for part in parts {
+            let found = source.range(of: part, options: .literal, range: NSRange(location: from, length: source.length - from))
+            guard found.location != NSNotFound else { return nil }
+            from = found.location + found.length
+        }
         return clipboard
     }
 
-    /// The selection split wherever a sentence might end: after . ! ? or
-    /// an ellipsis before a space, and at every line break.
+    /// When the keyboard last saw the selection change, by the clipboard's
+    /// change count (IOS-024): a copy counts for a selection only when it
+    /// came after, so an older clipboard that opens and closes alike is
+    /// never taken for it. Reading the count never asks to paste.
+    struct SelectionMark: Equatable {
+        private(set) var selected: String?
+        private(set) var count: Int
+
+        init(selected: String?, count: Int) {
+            self.selected = selected
+            self.count = count
+        }
+
+        /// A selection the keyboard sees; only a new one moves the mark.
+        mutating func see(_ selected: String?, count: Int) {
+            guard selected != self.selected else { return }
+            self.selected = selected
+            self.count = count
+        }
+
+        /// murmur typed into the field: the clipboard now is older than
+        /// what the field holds.
+        mutating func typed(count: Int) {
+            selected = nil
+            self.count = count
+        }
+
+        func copiedSince(_ count: Int) -> Bool {
+            count != self.count
+        }
+    }
+
+    /// Where a rewrite goes when it comes back (IOS-024): in, over its
+    /// selection; or, when the keyboard does not see that selection, one
+    /// look again a moment later (a keyboard coming back from murmur may
+    /// not have it yet), then Insert last.
+    enum Landing: Equatable {
+        case replace, lookAgain, offer
+    }
+
+    static func landing(replaces: Bool, lookedAgain: Bool) -> Landing {
+        if replaces { return .replace }
+        return lookedAgain ? .offer : .lookAgain
+    }
+
+    /// How many sentences Foundation finds in the text.
+    static func sentences(_ text: String) -> Int {
+        var count = 0
+        let source = text as NSString
+        source.enumerateSubstrings(in: NSRange(location: 0, length: source.length), options: .bySentences) { sentence, _, _, _ in
+            if let sentence, !sentence.allSatisfy(\.isWhitespace) { count += 1 }
+        }
+        return count
+    }
+
+    /// The selection split wherever a sentence might end: after . ! ? an
+    /// ellipsis, or a danda, with any closing quotes or brackets, before
+    /// a space; right after a CJK or Devanagari full stop, space or not;
+    /// and at every line break.
     static func pieces(_ text: String) -> [String] {
-        let breaks = try! NSRegularExpression(pattern: "(?<=[.!?\\u2026\\u3002\\uFF01\\uFF1F])\\s+|[\\n\\r\\u2028\\u2029]+")
+        let ends = "\\u3002\\uFF01\\uFF1F\\u0964\\u0965"
+        let breaks = try! NSRegularExpression(
+            pattern: "(?<=[.!?\\u2026\(ends)][\"'\\u201D\\u2019\\u00BB)\\]]{0,3})\\s+|(?<=[\(ends)])(?=\\S)|[\\n\\r\\u2028\\u2029]+"
+        )
         let source = text as NSString
         var out: [String] = []
         var cursor = 0

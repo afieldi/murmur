@@ -116,6 +116,8 @@ struct Mailbox: Sendable {
                   entry.take == take, entry.phase == .ready, entry.words != nil, entry.typed == nil
             else { return }
             entry.typed = .offered
+            // Offered, not typed: nothing was replaced, so no original.
+            entry.original = nil
             try? JSONEncoder().encode(entry).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         }
     }
@@ -131,7 +133,19 @@ struct Mailbox: Sendable {
                   words?.contains(waiting) ?? true
             else { return }
             entry.words = nil
+            entry.original = nil
             try? JSONEncoder().encode(entry).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        }
+    }
+
+    /// Takes back an ask murmur never answered (IOS-024), so a selection
+    /// never waits in the app group for a take that ended.
+    func withdraw(_ take: UUID) {
+        coordinate(requestFile, writing: true) { url in
+            guard let data = try? Data(contentsOf: url), let request = try? JSONDecoder().decode(Request.self, from: data),
+                  request.take == take
+            else { return }
+            try? FileManager.default.removeItem(at: url)
         }
     }
 

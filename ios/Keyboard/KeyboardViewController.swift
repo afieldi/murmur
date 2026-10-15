@@ -29,6 +29,13 @@ final class KeyboardViewController: UIInputViewController {
     private var visible = false
     private var deleteRepeat: Timer?
     private var noAnswer: Timer?
+    /// When this keyboard last saw the selection change, by the clipboard's
+    /// count: only a copy made after counts as the selection (IOS-024).
+    private var mark = Pad.SelectionMark(selected: nil, count: UIPasteboard.general.changeCount)
+    /// A rewrite looks for its selection once more before it waits, since a
+    /// keyboard back from murmur may not have the selection yet.
+    private var lookedAgain = false
+    private var lookAgain: Timer?
     /// Brings the pill back to rest after it shows how a take ended.
     private var rest: Timer?
     private let haptic = UIImpactFeedbackGenerator(style: .light)
@@ -74,6 +81,7 @@ final class KeyboardViewController: UIInputViewController {
         // without Full Access it cannot write, which says the same.
         if hasFullAccess { KeyboardReport(fullAccess: true, at: .now).write() }
         applyLook()
+        noteSelection()
         waiting = Pad.Waiting.load(from: memory)
         // A take that opened murmur is taken over by the keyboard you come
         // back to, and lands in its field.
@@ -110,6 +118,17 @@ final class KeyboardViewController: UIInputViewController {
     override func textDidChange(_ textInput: (any UITextInput)?) {
         super.textDidChange(textInput)
         setReturnTitle()
+        noteSelection()
+    }
+
+    override func selectionDidChange(_ textInput: (any UITextInput)?) {
+        super.selectionDidChange(textInput)
+        noteSelection()
+    }
+
+    /// Marks when the selection changed, by the clipboard's count.
+    private func noteSelection() {
+        mark.see(textDocumentProxy.selectedText, count: UIPasteboard.general.changeCount)
     }
 
     @objc private func pillDown() {
@@ -149,8 +168,13 @@ final class KeyboardViewController: UIInputViewController {
     /// taken whole from the clipboard, or not at all.
     private func transform(_ shown: String) {
         guard waiting == nil else { return }
+        noteSelection()
         let selected = textDocumentProxy.selectedText ?? shown
-        let original = Pad.isWhole(selected) ? selected : Pad.whole(selected, clipboard: UIPasteboard.general.hasStrings ? UIPasteboard.general.string : nil)
+        // Only a copy made since this selection was seen can be it; the
+        // count is read without asking to paste.
+        let pasteboard = UIPasteboard.general
+        let copied = mark.copiedSince(pasteboard.changeCount) && pasteboard.hasStrings ? pasteboard.string : nil
+        let original = Pad.isWhole(selected) ? selected : Pad.whole(selected, clipboard: copied)
         guard let original else {
             pad.status.text = Pad.copyFirst
             return
@@ -170,6 +194,7 @@ final class KeyboardViewController: UIInputViewController {
         mailbox.ask(take, note: note, selection: original)
         pad.insertLast.isHidden = true
         phase = nil
+        lookedAgain = false
         if SessionState.read().isOn() {
             waiting = Pad.Waiting(take: take, opened: false, field: textDocumentProxy.documentIdentifier, at: .now, original: original, selected: selected)
             pad.status.text = "Starting"
@@ -319,14 +344,24 @@ final class KeyboardViewController: UIInputViewController {
         case .insert(let take) where waiting?.original != nil:
             // A rewrite goes in only over the text it rewrites; otherwise it
             // waits as Insert last and the selection stays as it was.
-            if waiting?.replaces(textDocumentProxy.selectedText) == true, let words = mailbox.claim(take) {
+            switch Pad.landing(replaces: waiting?.replaces(textDocumentProxy.selectedText) == true, lookedAgain: lookedAgain) {
+            case .replace:
+                guard let words = mailbox.claim(take) else { return end(nil) }
                 textDocumentProxy.insertText(words)
+                mark.typed(count: UIPasteboard.general.changeCount)
                 end(Pad.rewritten, showing: .inserted)
-            } else {
+                pad.insertLast.isHidden = false
+            case .lookAgain:
+                lookedAgain = true
+                lookAgain?.invalidate()
+                lookAgain = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: false) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.refresh() }
+                }
+            case .offer:
                 mailbox.offer(take)
                 end(Pad.selectionMoved)
+                pad.insertLast.isHidden = false
             }
-            pad.insertLast.isHidden = false
         case .insert(let take):
             if let words = mailbox.claim(take) { insert(words) }
             end(nil, showing: .inserted)
@@ -346,13 +381,18 @@ final class KeyboardViewController: UIInputViewController {
 
     private func insert(_ words: String) {
         textDocumentProxy.insertText(Pad.spaced(words, after: textDocumentProxy.documentContextBeforeInput))
+        mark.typed(count: UIPasteboard.general.changeCount)
     }
 
     /// Ends the take: the pill shows how it ended for a moment, then rests.
     private func end(_ line: String?, showing stage: PillStage = .idle) {
+        // An ask murmur never answered is taken back, selection and all.
+        if let waiting, phase == nil { Mailbox.shared?.withdraw(waiting.take) }
         waiting = nil
         phase = nil
         noAnswer?.invalidate()
+        lookAgain?.invalidate()
+        lookedAgain = false
         pad.setStage(stage)
         pad.status.text = line ?? (noteNext ? Pad.noteNext : Pad.idleHint)
         rest?.invalidate()
