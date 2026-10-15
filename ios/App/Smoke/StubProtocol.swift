@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // A local stand-in provider for the smoke (ios/prd.json IOS-005, IOS-006,
-// IOS-007): it answers Test connection, transcriptions, and polish inside
-// the app, through the real URLSession, without a network or a server.
+// IOS-007): it answers Test connection, transcriptions, polish, the notes'
+// sort (IOS-023), and transforms (IOS-024) inside the app, through the real
+// URLSession, without a network or a server.
 import Foundation
 import MurmurCore
 import Synchronization
@@ -45,6 +46,12 @@ final class StubProtocol: URLProtocol {
 
     private static let sort = Mutex<(replies: [SortReply], asked: [[String]])>(([], []))
 
+    /// The transform's stand-in (IOS-024): it rewrites a request shaped as
+    /// desktop's transform, the selection fenced in its own message and the
+    /// instruction in the last, and turns away anything else.
+    static let rewriteBaseUrl = "https://rewrite.stub.invalid/v1"
+    static let rewritten = "smoke rewrite from the stand-in"
+
     static func script(_ replies: [SortReply]) {
         sort.withLock { $0 = (replies, []) }
     }
@@ -85,6 +92,8 @@ final class StubProtocol: URLProtocol {
             (status, body) = (500, #"{"error":{"message":"Internal error"}}"#)
         case ("sort", _):
             (status, body) = authorized ? Self.sortAnswer(request) : (401, "{}")
+        case ("rewrite", _):
+            (status, body) = authorized ? Self.rewriteAnswer(request) : (401, "{}")
         case ("chatty", _):
             (status, body) = (200, #"{"choices":[{"message":{"content":"Sure! Here is the cleaned text: send the report."}}]}"#)
         case (_, .offline?):
@@ -121,6 +130,18 @@ final class StubProtocol: URLProtocol {
         let completion: [String: Any] = ["choices": [["message": ["content": content]]]]
         let data = (try? JSONSerialization.data(withJSONObject: completion)) ?? Data()
         return (200, String(decoding: data, as: UTF8.self))
+    }
+
+    /// The rewrite, for a request with a system message, the fenced
+    /// selection, and the instruction, in that order.
+    private static func rewriteAnswer(_ request: URLRequest) -> (Int, String) {
+        let body = request.httpBody ?? request.httpBodyStream.map(read) ?? Data()
+        let messages = ((try? JSONSerialization.jsonObject(with: body)) as? [String: Any])?["messages"] as? [[String: String]] ?? []
+        guard messages.map({ $0["role"] ?? "" }) == ["system", "user", "user"],
+              messages[1]["content"]?.hasPrefix("SELECTION\n<selection>\n") == true, messages[1]["content"]?.hasSuffix("\n</selection>") == true,
+              messages[2]["content"]?.hasPrefix("INSTRUCTION\n") == true
+        else { return (400, "{}") }
+        return (200, #"{"choices":[{"message":{"content":"\#(rewritten)"}}]}"#)
     }
 
     /// A take reached us whole: a form with a WAV file and a model in it.

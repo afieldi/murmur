@@ -56,6 +56,7 @@ enum SmokeRunner {
             ("shareCard", checkShareCard),
             ("analytics", checkAnalytics),
             ("notes", checkNotes),
+            ("transform", checkTransform),
             ("sharedJson", { try checkSharedJson(expected: request.sharedCount) })
         ]
         var results: [String: Bool] = [:]
@@ -844,6 +845,71 @@ enum SmokeRunner {
             }
             guard same(first, scenario.report) else { return "\(scenario.name): the report is \(String(describing: first))" }
             if let again = scenario.again, !same(notes.state.report, again) { return "\(scenario.name): Sort again reported \(String(describing: notes.state.report))" }
+        }
+        return nil
+    }
+
+    /// A transform through the keyboard's mailbox in the app group (IOS-024):
+    /// the take is heard as an instruction, the selection and instruction go
+    /// through the real URLSession to a stand-in that rewrites, and the
+    /// keyboard gets the rewrite and then the original; a stand-in that
+    /// fails leaves the selection as it was and says so.
+    static func checkTransform() throws {
+        if let failure = onMain({ await transformFailure() }) { throw SmokeFailure(failure) }
+    }
+
+    @MainActor private static func transformFailure() async -> String? {
+        guard let key = APIKey(StubProtocol.key), let container = AppGroup.containerURL,
+              let defaults = UserDefaults(suiteName: "murmur.smoke.transform.\(UUID().uuidString)"),
+              let catalog = try? BundledRules.catalog(), let rules = try? BundledRules.takeRules(), let transform = try? BundledRules.transform()
+        else { return "the stand-ins did not build" }
+        let scratch = FileManager.default.temporaryDirectory.appending(path: "smoke-transform-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let mailbox = Mailbox(file: container.appending(path: "smoke-transform-\(UUID().uuidString).json"))
+        defer {
+            for place in [scratch, mailbox.file, mailbox.requestFile] { try? FileManager.default.removeItem(at: place) }
+        }
+        let connections = ConnectionStore(defaults: defaults)
+        let ring = MemoryKeyRing()
+        try? ring.save(key, for: connections.load(catalog: catalog).transcription.baseUrl)
+        let cleanup = CleanupStore(defaults: defaults)
+        cleanup.save(CleanupSettings(polish: false))
+        let model = TakeModel(
+            microphone: ScriptedMicrophone(samples: ScriptedMicrophone.tone), store: WaitingStore(directory: scratch.appending(path: "takes", directoryHint: .isDirectory)),
+            rules: rules, catalog: catalog, connections: connections, cleanup: cleanup, ring: ring,
+            send: { request in (Data(#"{"text":"make this shorter"}"#.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!) },
+            copy: { _ in }
+        )
+        let session = StubProtocol.session()
+        let selection = "The meeting ran long, and nobody could say why it had been called."
+        for baseUrl in [StubProtocol.rewriteBaseUrl, StubProtocol.chatErrorBaseUrl] {
+            let connection = PolishConnection(baseUrl: baseUrl, model: "smoke-model", key: key)
+            let rewriter = Rewriter(rules: transform, connection: { connection }, send: { try await session.data(for: $0) })
+            let bridge = KeyboardBridge(model: model, mailbox: mailbox, announce: { _ in }, rewriter: rewriter)
+            bridge.listen()
+            let take = UUID()
+            mailbox.ask(take, selection: selection)
+            bridge.hear(.start)
+            for _ in 0..<100 where !model.isRecording {
+                try? await Task.sleep(for: .milliseconds(20))
+            }
+            guard model.isRecording else { return "\(baseUrl): the instruction was not heard" }
+            bridge.hear(.stop)
+            var entry = mailbox.read()
+            for _ in 0..<250 where ![.ready, .failed].contains(entry?.phase) {
+                try? await Task.sleep(for: .milliseconds(20))
+                entry = mailbox.read()
+            }
+            guard let entry, entry.take == take else { return "\(baseUrl): the keyboard heard nothing back" }
+            if baseUrl == StubProtocol.rewriteBaseUrl {
+                guard entry.phase == .ready, entry.words == StubProtocol.rewritten, entry.original == selection else { return "the rewrite came back as \(entry.phase)" }
+                guard mailbox.claim(take) == StubProtocol.rewritten, mailbox.claim() == selection, mailbox.claim() == nil else {
+                    return "the rewrite, then the original, did not come back once each"
+                }
+            } else {
+                guard entry.phase == .failed, entry.line == TransformCopy.kept, entry.words == nil, mailbox.claim() == nil else {
+                    return "the failing stand-in gave \(entry.phase) with words"
+                }
+            }
         }
         return nil
     }

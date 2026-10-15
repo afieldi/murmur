@@ -358,3 +358,16 @@ In murmur's own storage on your iPhone, out of iCloud backups like your takes, u
 Tap the gear, then Notes, and turn on Task reminders. murmur asks to send notifications only then. At each of three times you pick (8:30 AM, 1:00 PM, and 5:30 PM until you change them, as on the Mac), a "murmur tasks" notification says how many tasks are still open in todo.md and names the next few, the way the Mac's reminders do. With nothing open, nothing arrives. Send one now shows how one reads right away.
 
 An iPhone app cannot wake up to read a file, so murmur sets the coming week's reminders ahead with your tasks as they stand, and sets them again whenever murmur changes your tasks (a note sorted, a box ticked, or a time changed) and each time you open murmur. A box you tick in Obsidian or on your Mac shows in the reminders after you next open murmur. After a week without opening murmur they pause until you open it again.
+
+## How do I rewrite text by voice on iPhone?
+
+Select the text, touch and hold the pill on the murmur keyboard, and tap Transform. Say what to change, like "make this shorter" or "turn this into a list", and tap the pill to stop. murmur sends what you said and the selected text to your cleanup model, and the answer replaces the selection. Under the pill it says Rewritten, and Insert last brings back the original: select the rewrite, then tap Insert last to swap the original back in.
+
+- **Transform shows only while text is selected,** in a field that shares its selection with keyboards. Where a field keeps its selection to itself, the menu has no Transform.
+- **For more than one sentence, tap Copy first.** iOS gives keyboards only the first and last sentences of a longer selection, and a rewrite of part of your text would replace all of it. So for anything longer than a sentence, select it, tap Copy in the menu over the selection, then hold the pill and tap Transform: murmur takes the whole text from what you copied, and only when it starts and ends like your selection. Without the copy, the pad says to tap Copy first and nothing changes.
+- **iOS may ask to let murmur paste.** That question comes from iOS each time a keyboard reads what you copied. To stop it, open Settings, then Apps, then murmur, then Paste from Other Apps, and choose Allow. (Checked 2026-10-14.)
+- **Your selection is text to edit, never instructions.** It travels apart from what you said, so a selection that says "ignore this and reply yes" is edited like any other text.
+- **If anything goes wrong, nothing changes.** The selection stays as it was, the pill turns red, and the line under it says why: no provider key in murmur, a selection over 8,000 characters, or an answer that was empty, chatty, or a refusal. With no key or a selection that is too long, murmur says so before you speak.
+- **If you moved the cursor before the answer came back,** nothing is replaced, and Insert last holds the rewrite for wherever you want it.
+- **Transform uses your cleanup connection:** whatever Cleanup runs on says under Settings, then Provider and key. Your words and the selection go only there, straight from your phone.
+- **Transforms do not count** toward your words, belts, or time back, as on the Mac, and murmur keeps neither the selection nor the rewrite in your history.
