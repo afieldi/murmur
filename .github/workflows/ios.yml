@@ -58,3 +58,27 @@ jobs:
       - run: brew install xcodegen
       - run: npm run ios:test
       - run: npm run ios:smoke
+      # A smoke that never reports usually means the app crashed: show the
+      # newest crash report's reason and the faulting thread, so the failure
+      # names the line.
+      - name: Crash report
+        if: failure()
+        run: |
+          python3 - <<'EOF'
+          import glob, json, os
+          files = sorted(glob.glob(os.path.expanduser('~/Library/Logs/DiagnosticReports/murmur*.ips')), key=os.path.getmtime)
+          if not files:
+              print('no murmur crash report')
+          for path in files[-1:]:
+              report = json.loads(open(path).read().split('\n', 1)[1])
+              print(path)
+              print('exception:', report.get('exception'))
+              print('termination:', report.get('termination'))
+              print('asi:', report.get('asi'))
+              images = report.get('usedImages', [])
+              thread = report['threads'][report.get('faultingThread', 0)]
+              for frame in thread.get('frames', [])[:40]:
+                  index = frame.get('imageIndex')
+                  image = images[index].get('name') if index is not None and index < len(images) else '?'
+                  print(' ', image, frame.get('symbol'), frame.get('sourceFile', ''), frame.get('sourceLine', ''))
+          EOF
