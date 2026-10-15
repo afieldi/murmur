@@ -14,4 +14,9 @@ import Testing
     @Test func aMissingCountCanNeverMatch() {
         #expect(SmokeRequest(arguments: ["murmur", "--smoke"])?.sharedCount == -1)
     }
+
+    @Test func readsTheStoreKitFile() {
+        #expect(SmokeRequest(arguments: ["murmur", "--smoke", "--storekit=/tmp/a b.storekit"])?.storeKitFile?.path == "/tmp/a b.storekit")
+        #expect(SmokeRequest(arguments: ["murmur", "--smoke"])?.storeKitFile == nil)
+    }
 }

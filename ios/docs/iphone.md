@@ -371,3 +371,21 @@ Select the text, touch and hold the pill on the murmur keyboard, and tap Transfo
 - **If you moved the cursor before the answer came back,** nothing is replaced, and Insert last holds the rewrite for wherever you want it.
 - **Transform uses your cleanup connection:** whatever Cleanup runs on says under Settings, then Provider and key. Your words and the selection go only there, straight from your phone.
 - **Transforms do not count** toward your words, belts, or time back, as on the Mac, and murmur keeps neither the selection nor the rewrite in your history.
+
+## How do I get murmur Pro on iPhone?
+
+Open murmur, tap the gear, then murmur Pro, and tap Get murmur Pro. It is a one-time purchase through the App Store with your Apple Account, and it supports murmur. Everything you use today stays free: dictation, cleanup, notes, the Journey, and every provider. Pro adds:
+
+- **Provider profiles.** Save your whole provider setup, transcription and cleanup, under a name in Settings, then Provider and key, and switch to it in one tap. A profile keeps addresses and models; your keys stay in your iPhone's Keychain.
+- **Early access.** New conveniences come to Pro first, then to everyone.
+- **The supporter mark.** murmur Pro in Settings says Supporter, or Founding member.
+
+Belts and cosmetics are earned by practice, never sold.
+
+- **On a new iPhone,** sign in with the same Apple Account, open Settings, murmur Pro, and tap Restore purchases.
+- **If Apple refunds the purchase,** Pro turns off. Profiles you saved stay, unused, and come back if you buy Pro again.
+- **Founding members of murmur on the Mac** get their ten percent through a founders code: email support@murmurapp.app from the address on your desktop license. Once it checks out, you get a one-time code to enter with Redeem a code in Settings, murmur Pro, or in the App Store. Apple's codes last at most six months, so ask when you are ready. A purchase made with a founders code shows Founding member. (Checked 2026-10-15 against Apple's App Store Connect Help.)
+
+## Does my desktop Pro carry over to iPhone?
+
+No. Apple's App Review Guidelines (3.1.1) do not let an iPhone app unlock features with a license key, so a murmur license key never unlocks anything on iPhone, and murmur never asks for one. murmur Pro on iPhone is its own purchase through the App Store. Founding members get their ten percent there with a founders code, as above. (Checked 2026-10-10 against Apple's App Review Guidelines.)

@@ -12,6 +12,8 @@ struct SmokeRequest: Equatable {
     /// How many shared rule files the build bundled; -1 when not given,
     /// which no real count matches.
     let sharedCount: Int
+    /// ios/murmur.storekit on the Mac, which the simulator can read (IOS-025).
+    let storeKitFile: URL?
 
     /// Nil unless the app was launched with --smoke.
     init?(arguments: [String]) {
@@ -21,6 +23,8 @@ struct SmokeRequest: Equatable {
             .filter { $0.hasPrefix(prefix) }
             .compactMap { Int($0.dropFirst(prefix.count)) }
             .first ?? -1
+        let file = "--storekit="
+        storeKitFile = arguments.first { $0.hasPrefix(file) }.map { URL(fileURLWithPath: String($0.dropFirst(file.count))) }
     }
 }
 
@@ -57,6 +61,7 @@ enum SmokeRunner {
             ("analytics", checkAnalytics),
             ("notes", checkNotes),
             ("transform", checkTransform),
+            ("pro", { try checkPro(request.storeKitFile) }),
             ("sharedJson", { try checkSharedJson(expected: request.sharedCount) })
         ]
         var results: [String: Bool] = [:]
@@ -911,6 +916,45 @@ enum SmokeRunner {
                 }
             }
         }
+        return nil
+    }
+
+    /// murmur Pro played out from ios/murmur.storekit (IOS-025): the app's
+    /// product and the founders code are in the file; Pro starts free with
+    /// the file's price, a purchase makes it Pro, a new phone restores it,
+    /// a refund ends it, and a founders code makes a founding member.
+    static func checkPro(_ url: URL?) throws {
+        guard let url else { throw SmokeFailure("no --storekit file given") }
+        let file = try StoreKitFile.read(url)
+        if let failure = onMain({ await proFailure(file) }) { throw SmokeFailure(failure) }
+    }
+
+    @MainActor private static func proFailure(_ file: StoreKitFile) async -> String? {
+        let product = ProRules.productId
+        guard let item = file.products.first(where: { $0.productID == product }), item.type == "NonConsumable" else {
+            return "the StoreKit file has no non-consumable \(product)"
+        }
+        guard (item.offerCodes ?? []).contains(where: { $0.referenceName == ProRules.foundersCode }) else { return "the StoreKit file has no founders code" }
+        let shop = ScriptedShop(file)
+        let store = ProStore(shop: shop, product: product)
+        await store.start()
+        guard store.status == .free, store.price == "$" + item.displayPrice else { return "Pro did not start free at the file's price" }
+        await store.buy()
+        guard store.status.isPro, !store.status.isFounder else { return "a purchase gave \(store.status)" }
+        let phone = ProStore(shop: ScriptedShop(file, bought: shop.bought), product: product)
+        await phone.start()
+        await phone.restore()
+        guard phone.status.isPro else { return "a new phone did not restore Pro" }
+        shop.refund(product)
+        for _ in 0..<50 where store.status.isPro {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        guard store.status == .free else { return "a refund left Pro on" }
+        shop.buy(product, code: ProRules.foundersCode)
+        for _ in 0..<50 where !store.status.isFounder {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        guard store.status.isFounder else { return "a founders code gave \(store.status)" }
         return nil
     }
 

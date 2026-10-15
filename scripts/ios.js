@@ -157,7 +157,8 @@ async function smoke() {
     spawnSync('xcrun', ['simctl', 'terminate', udid, bundleId], { stdio: 'ignore' })
     // A shared CI runner can take a while to start the painter page's web
     // process the first time (IOS-018).
-    const launched = spawnSync('xcrun', ['simctl', 'launch', '--console', udid, bundleId, '--smoke', `--shared-count=${count}`], {
+    const storeKit = join(iosDir, 'murmur.storekit')
+    const launched = spawnSync('xcrun', ['simctl', 'launch', '--console', udid, bundleId, '--smoke', `--shared-count=${count}`, `--storekit=${storeKit}`], {
       encoding: 'utf8',
       timeout: 240_000
     })
