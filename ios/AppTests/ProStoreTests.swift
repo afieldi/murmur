@@ -219,11 +219,23 @@ import Testing
     }
 }
 
+/// Where StoreKit's test environment works: Apple broke it on iOS 26.3
+/// simulators and it stays broken through 26.x (FB22237318, Apple's forums,
+/// checked 2026-10-15), mended in iOS 27. CI's runner has iOS 26.5, so this
+/// story runs on iOS 27 here; the stand-in tests and the smoke run everywhere.
+enum StoreKitTesting {
+    static var works: Bool {
+        let version = ProcessInfo.processInfo.operatingSystemVersion
+        return version.majorVersion != 26 || version.minorVersion < 3
+    }
+}
+
 /// The real StoreKit, in Xcode's test environment, on ios/murmur.storekit.
 /// One session plays the whole story in order, since every test shares the
 /// one StoreKit test environment, and each step waits for StoreKit to
 /// settle: a purchase, a refund, a founders code, and a restore.
-@MainActor @Suite(.serialized) struct ProStoreKitTests {
+@MainActor @Suite(.serialized, .enabled(if: StoreKitTesting.works, "StoreKit testing is broken on iOS 26.3 to 26.x simulators (Apple FB22237318)"))
+struct ProStoreKitTests {
     let product = ProRules.productId
 
     /// Refreshes until the store says so, or five seconds pass.
