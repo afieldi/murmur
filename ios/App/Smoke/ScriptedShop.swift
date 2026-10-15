@@ -41,7 +41,7 @@ final class ScriptedShop: ProShop {
         return true
     }
 
-    func restore() async -> Bool { true }
+    func restore() async -> ProRestore { .synced }
 
     /// Apple refunds every purchase of the product.
     func refund(_ product: String) {

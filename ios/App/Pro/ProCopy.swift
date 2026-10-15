@@ -9,7 +9,9 @@ enum ProCopy {
     static let pitch = "A one-time purchase that supports murmur. Everything you use today stays free: dictation, cleanup, notes, the Journey, and every provider."
     static let profiles = "Provider profiles: save whole provider setups under names and switch in one tap."
     static let early = "Early access: new conveniences come to Pro first, then to everyone."
-    static let mark = "The supporter mark, here and on your Settings."
+    static let markPerk = "The supporter mark, here and in Settings."
+    static let unverified = "The App Store could not confirm this purchase. If you were charged, tap Restore purchases."
+    static let asking = "Asking the App Store"
     static let earned = "Belts and cosmetics are earned by practice, never sold."
     static let unavailable = "murmur Pro is not for sale right now. Check your connection, then come back."
     static let redeem = "Redeem a code"
@@ -25,7 +27,7 @@ enum ProCopy {
     static let foundingPerk = "A permanent ten percent discount on every future paid product is yours, cloud included."
     static let supporter = "Supporter"
     /// The lines that say something went wrong, shown in red.
-    static let problems: Set<String> = [buyFailed, restoreFailed]
+    static let problems: Set<String> = [buyFailed, restoreFailed, unverified]
 
     static func buy(_ price: String) -> String {
         "Get murmur Pro for \(price)"

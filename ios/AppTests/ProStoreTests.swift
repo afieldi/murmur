@@ -2,6 +2,7 @@
 import Foundation
 import StoreKit
 import StoreKitTest
+import Synchronization
 import Testing
 @testable import murmur
 
@@ -57,7 +58,7 @@ import Testing
         #expect(!shop.buy(product, code: "not-a-code"))
     }
 
-    @Test(arguments: [(ProBuy.cancelled, nil), (.pending, ProCopy.pending), (.failed, ProCopy.buyFailed)] as [(ProBuy, String?)])
+    @Test(arguments: [(ProBuy.cancelled, nil), (.pending, ProCopy.pending), (.failed, ProCopy.buyFailed), (.unverified, ProCopy.unverified)] as [(ProBuy, String?)])
     func aPurchaseThatDoesNotFinishSaysWhy(_ outcome: ProBuy, _ message: String?) async {
         let store = ProStore(shop: FixedShop(outcome: outcome), product: product)
         await store.buy()
@@ -70,9 +71,68 @@ import Testing
         let store = ProStore(shop: ScriptedShop(file), product: product)
         await store.restore()
         #expect(store.message == ProCopy.nothingToRestore)
-        let offline = ProStore(shop: FixedShop(outcome: .failed, synced: false), product: product)
+        let offline = ProStore(shop: FixedShop(outcome: .failed, restored: .failed), product: product)
         await offline.restore()
         #expect(offline.message == ProCopy.restoreFailed)
+    }
+
+    /// Cancelling the App Store's sign in is not an error.
+    @Test func cancellingRestoreSaysNothing() async {
+        let store = ProStore(shop: FixedShop(outcome: .failed, restored: .cancelled), product: product)
+        await store.restore()
+        #expect(store.message == nil)
+    }
+
+    /// Until the App Store answers, the screen waits instead of saying Pro
+    /// is not for sale, and a new visit starts without the last message.
+    @Test func proSaysWhenItHasHeardAndForgetsOldMessages() async {
+        let store = ProStore(shop: FixedShop(outcome: .failed), product: product)
+        #expect(!store.answered)
+        await store.buy()
+        #expect(store.message == ProCopy.buyFailed)
+        await store.start()
+        #expect(store.answered)
+        #expect(store.message == nil)
+    }
+
+    /// Leaving the screen before the App Store answers changes nothing: a
+    /// cancelled load never blanks the price or turns a buyer free.
+    @Test func aCancelledLoadChangesNothing() async throws {
+        let shop = GatedShop()
+        let store = ProStore(shop: shop, product: product)
+        shop.answer(GatedShop.Answer(price: "$39.99", bought: true))
+        await store.start()
+        #expect(store.status.isPro)
+        shop.hold()
+        let leaving = Task { await store.start() }
+        try await waitUntil { shop.waiting == 1 }
+        leaving.cancel()
+        shop.release(0, GatedShop.Answer(price: nil, bought: false))
+        shop.open(GatedShop.Answer(price: nil, bought: false))
+        await leaving.value
+        #expect(store.status.isPro)
+        #expect(store.price == "$39.99")
+    }
+
+    /// An older answer that lands after a newer one never overwrites it.
+    @Test func anOlderRefreshNeverOverwritesANewerOne() async throws {
+        let shop = GatedShop()
+        let store = ProStore(shop: shop, product: product)
+        shop.hold()
+        let older = Task { await store.refresh() }
+        try await waitUntil { shop.waiting == 1 }
+        let newer = Task { await store.refresh() }
+        try await waitUntil { shop.waiting == 2 }
+        shop.release(1, GatedShop.Answer(price: nil, bought: true))
+        await newer.value
+        #expect(store.status.isPro)
+        shop.release(0, GatedShop.Answer(price: nil, bought: false))
+        await older.value
+        #expect(store.status.isPro)
+    }
+
+    @Test func theMarkLineSaysWhereItShows() {
+        #expect(ProCopy.markPerk == "The supporter mark, here and in Settings.")
     }
 
     /// No App Store answer: no price to show, and the free app goes on.
@@ -91,11 +151,70 @@ import Testing
 
     struct FixedShop: ProShop {
         let outcome: ProBuy
-        var synced = true
+        var restored = ProRestore.synced
         func price(_ product: String) async -> String? { nil }
         func purchases(_ product: String) async -> [ProPurchase] { [] }
         func buy(_ product: String) async -> ProBuy { outcome }
-        func restore() async -> Bool { synced }
+        func restore() async -> ProRestore { restored }
+        func updates() -> AsyncStream<Void> { AsyncStream { _ in } }
+    }
+
+    /// A shop whose answers wait until the test releases them, one by one.
+    final class GatedShop: ProShop {
+        struct Answer: Sendable {
+            let price: String?
+            let bought: Bool
+        }
+
+        private let state = Mutex<(answer: Answer, held: Bool, waiting: [CheckedContinuation<Answer, Never>])>((Answer(price: nil, bought: false), false, []))
+
+        var waiting: Int { state.withLock { $0.waiting.count } }
+
+        /// What every call gets from now on.
+        func answer(_ answer: Answer) {
+            state.withLock { $0.answer = answer }
+        }
+
+        /// From now on, every call gets this at once.
+        func open(_ answer: Answer) {
+            state.withLock {
+                $0.answer = answer
+                $0.held = false
+            }
+        }
+
+        /// From now on, every call waits to be released.
+        func hold() {
+            state.withLock { $0.held = true }
+        }
+
+        /// Answers the call that waited in this place.
+        func release(_ index: Int, _ answer: Answer) {
+            let call = state.withLock { $0.waiting[index] }
+            call.resume(returning: answer)
+        }
+
+        private func next() async -> Answer {
+            await withCheckedContinuation { call in
+                let now: Answer? = state.withLock { state in
+                    if state.held {
+                        state.waiting.append(call)
+                        return nil
+                    }
+                    return state.answer
+                }
+                if let now { call.resume(returning: now) }
+            }
+        }
+
+        func price(_ product: String) async -> String? { await next().price }
+
+        func purchases(_ product: String) async -> [ProPurchase] {
+            await next().bought ? [ProPurchase(product: product, purchased: Date(timeIntervalSince1970: 1_790_000_000), revoked: nil, code: nil)] : []
+        }
+
+        func buy(_ product: String) async -> ProBuy { .failed }
+        func restore() async -> ProRestore { .synced }
         func updates() -> AsyncStream<Void> { AsyncStream { _ in } }
     }
 }
@@ -126,13 +245,18 @@ import Testing
         #expect(store.status == .free)
         #expect(store.price == "$39.99")
 
-        let bought = try await session.buyProduct(identifier: product)
-        try await settle(store) { store.status.isPro }
+        // Get murmur Pro's own path, StoreKit's purchase and all.
+        await store.buy()
         #expect(store.status.isPro)
         #expect(!store.status.isFounder)
+        #expect(store.message == nil)
 
-        try session.refundTransaction(identifier: UInt(bought.id))
-        try await settle(store) { store.status == .free }
+        // The refund reaches the store through the App Store's updates alone.
+        let bought = try #require(session.allTransactions().last)
+        try session.refundTransaction(identifier: bought.identifier)
+        for _ in 0..<50 where store.status.isPro {
+            try await Task.sleep(for: .milliseconds(100))
+        }
         #expect(store.status == .free)
 
         let coded = try await session.buyProduct(identifier: product, options: [.codeOffer(referenceName: ProRules.foundersCode)])

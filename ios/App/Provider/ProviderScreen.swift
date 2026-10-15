@@ -85,6 +85,17 @@ struct ProviderScreen: View {
         .tint(Tokens.brand)
         .navigationTitle("Provider and key")
         .navigationBarTitleDisplayMode(.inline)
+        // On the form, not a section, so one alert names the setup; Save
+        // waits for a name.
+        .alert(ProfileCopy.nameIt, isPresented: $naming) {
+            TextField(ProfileCopy.name, text: $draft)
+            Button(ProfileCopy.saveIt) {
+                model.saveProfile(draft)
+                draft = ""
+            }
+            .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            Button(ProfileCopy.cancel, role: .cancel) { draft = "" }
+        }
     }
 
     private func presetPicker(role: ProviderRole) -> some View {
@@ -184,14 +195,6 @@ extension ProviderScreen {
             Text(ProfileCopy.footer).foregroundStyle(Tokens.textDim)
         }
         .listRowBackground(Tokens.panel)
-        .alert(ProfileCopy.nameIt, isPresented: $naming) {
-            TextField(ProfileCopy.name, text: $draft)
-            Button(ProfileCopy.saveIt) {
-                model.saveProfile(draft)
-                draft = ""
-            }
-            Button(ProfileCopy.cancel, role: .cancel) { draft = "" }
-        }
     }
 }
 
@@ -255,10 +258,10 @@ let previewCatalog: ProviderCatalog = {
     }
 }()
 
-@MainActor private func previewModel(_ keys: [String: String] = [:]) -> ProviderModel {
+@MainActor private func previewModel(_ keys: [String: String] = [:], pro: Bool = false) -> ProviderModel {
     let ring = MemoryKeyRing(Dictionary(uniqueKeysWithValues: keys.compactMap { url, key in APIKey(key).map { (url, $0) } }))
     let defaults = UserDefaults(suiteName: "murmur.previews.\(UUID().uuidString)") ?? .standard
-    return ProviderModel(catalog: previewCatalog, store: ConnectionStore(defaults: defaults), ring: ring, send: { _ in throw URLError(.notConnectedToInternet) })
+    return ProviderModel(catalog: previewCatalog, store: ConnectionStore(defaults: defaults), ring: ring, send: { _ in throw URLError(.notConnectedToInternet) }, isPro: { pro })
 }
 
 #Preview("No key") {
@@ -267,5 +270,17 @@ let previewCatalog: ProviderCatalog = {
 
 #Preview("Saved key") {
     NavigationStack { ProviderScreen(model: previewModel(["https://api.groq.com/openai/v1": "gsk_abcdefgh1234"])) }.preferredColorScheme(.dark)
+}
+
+#Preview("Profiles with Pro") {
+    let model = previewModel(pro: true)
+    model.saveProfile("Groq at home")
+    model.chooseTranscription(previewCatalog.presets(for: .transcription).last)
+    model.saveProfile("Work")
+    return NavigationStack { ProviderScreen(model: model, pro: .preview(bought: true)) }.preferredColorScheme(.dark)
+}
+
+#Preview("Profiles without Pro") {
+    NavigationStack { ProviderScreen(model: previewModel(), pro: .preview(bought: false)) }.preferredColorScheme(.dark)
 }
 #endif
