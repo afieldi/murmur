@@ -166,6 +166,7 @@ targets:
       - path: AppTests
     dependencies:
       - target: murmur
+      - sdk: StoreKitTest.framework
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
