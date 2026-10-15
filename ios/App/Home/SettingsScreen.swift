@@ -5,6 +5,8 @@
 import SwiftUI
 
 struct SettingsScreen: View {
+    var pro: ProStore = .live()
+
     var body: some View {
         List {
             Group {
@@ -16,6 +18,17 @@ struct SettingsScreen: View {
                 NavigationLink("Look") { LookRoute() }
                 NavigationLink(NumbersCopy.screen) { TimeBackScreen(history: History.live()) }
                 NavigationLink(NotesCopy.title) { NotesSettingsScreen() }
+                // murmur Pro (IOS-025) sits after what you use, never first,
+                // with the supporter mark once bought.
+                NavigationLink {
+                    ProRoute()
+                } label: {
+                    LabeledContent {
+                        if let mark = ProCopy.mark(pro.status) { Text(mark).foregroundStyle(Tokens.brand) }
+                    } label: {
+                        Text(ProCopy.title)
+                    }
+                }
                 NavigationLink("Diagnostics") { DiagnosticsRoute() }
                 NavigationLink("About") { AboutScreen() }
             }

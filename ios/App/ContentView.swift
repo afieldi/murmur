@@ -47,6 +47,9 @@ struct ContentView: View {
         .task {
             _ = KeyboardBridge.live()
             _ = Session.live()
+            // murmur Pro follows the App Store from launch, so a purchase made
+            // elsewhere or a refund lands (IOS-025).
+            Task { await ProStore.live().start() }
             if !setup.seen {
                 // Everything done already: nothing to walk through.
                 if let next = setup.next { firstRun = next } else { setup.seen = true }
