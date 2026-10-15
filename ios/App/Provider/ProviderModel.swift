@@ -2,6 +2,8 @@
 // The Provider screen's state (ios/prd.json IOS-005): which presets are
 // picked for transcription and cleanup, and one key slot for each. The
 // choices save to ConnectionStore as they change; keys go to the key ring.
+// With murmur Pro, whole setups save as profiles to switch between
+// (IOS-025).
 import Foundation
 import MurmurCore
 import Observation
@@ -12,11 +14,20 @@ final class ProviderModel {
     private(set) var settings: ConnectionSettings
     let transcriptionKey: KeySlot
     let cleanupKey: KeySlot
+    /// The saved provider profiles (IOS-025).
+    private(set) var profiles: [ProviderProfile]
     @ObservationIgnored private let store: ConnectionStore
+    /// Whether murmur Pro is active: profiles save, switch, and go only then.
+    @ObservationIgnored private let isPro: @MainActor () -> Bool
 
-    init(catalog: ProviderCatalog, store: ConnectionStore, ring: any KeyRing, send: @escaping ConnectionTest.Send) {
+    init(
+        catalog: ProviderCatalog, store: ConnectionStore, ring: any KeyRing, send: @escaping ConnectionTest.Send,
+        isPro: @escaping @MainActor () -> Bool = { false }
+    ) {
         self.catalog = catalog
         self.store = store
+        self.isPro = isPro
+        profiles = store.profiles()
         let settings = store.load(catalog: catalog)
         self.settings = settings
         transcriptionKey = KeySlot(baseUrl: settings.transcription.baseUrl, catalog: catalog, ring: ring, send: send)
@@ -111,6 +122,27 @@ final class ProviderModel {
                 if $0.cleanup.separate { $0.cleanup.llmModel = newValue } else { $0.transcription.llmModel = newValue }
             }
         }
+    }
+
+    /// Saves the setup on screen under a name; false without Pro or a name.
+    @discardableResult
+    func saveProfile(_ name: String) -> Bool {
+        guard isPro(), let profile = ProviderProfile.make(name, settings: settings) else { return false }
+        profiles.append(profile)
+        store.saveProfiles(profiles)
+        return true
+    }
+
+    /// Switches to a saved setup; the key ring supplies its keys.
+    func applyProfile(_ id: String) {
+        guard isPro(), let profile = profiles.first(where: { $0.id == id }) else { return }
+        update { $0 = profile.settings }
+    }
+
+    func deleteProfile(_ id: String) {
+        guard isPro() else { return }
+        profiles.removeAll { $0.id == id }
+        store.saveProfiles(profiles)
     }
 
     private func update(_ change: (inout ConnectionSettings) -> Void) {

@@ -8,6 +8,9 @@ import SwiftUI
 
 struct ProviderScreen: View {
     @State var model: ProviderModel
+    var pro: ProStore = .live()
+    @State private var naming = false
+    @State private var draft = ""
 
     var body: some View {
         Form {
@@ -66,6 +69,8 @@ struct ProviderScreen: View {
                 Text("Fixes punctuation and filler words after each take.").foregroundStyle(Tokens.textDim)
             }
             .listRowBackground(Tokens.panel)
+
+            profilesSection
 
             Section {
                 Text("Your keys stay on this iPhone, in its Keychain. Only the murmur app can read them; the keyboard never can, and they never sync to another device.")
@@ -148,13 +153,74 @@ struct ModelField: View {
     }
 }
 
+extension ProviderScreen {
+    /// Provider profiles (IOS-025): with Pro, your saved setups to switch
+    /// to and Save this setup; without, where Pro is.
+    var profilesSection: some View {
+        Section {
+            if pro.status.isPro {
+                ForEach(model.profiles) { profile in
+                    Button {
+                        model.applyProfile(profile.id)
+                    } label: {
+                        Label(profile.name, systemImage: profile.settings == model.settings ? "checkmark.circle.fill" : "circle")
+                    }
+                    .buttonStyle(RowAction())
+                    .frame(minHeight: 44)
+                    .accessibilityLabel(ProfileCopy.use(profile.name, current: profile.settings == model.settings))
+                    .swipeActions {
+                        Button(ProfileCopy.delete, role: .destructive) { model.deleteProfile(profile.id) }
+                    }
+                }
+                Button(ProfileCopy.save) { naming = true }
+                    .buttonStyle(RowAction())
+                    .frame(minHeight: 44)
+            } else {
+                NavigationLink(ProfileCopy.withPro) { ProRoute() }
+            }
+        } header: {
+            SectionTitle(ProfileCopy.title)
+        } footer: {
+            Text(ProfileCopy.footer).foregroundStyle(Tokens.textDim)
+        }
+        .listRowBackground(Tokens.panel)
+        .alert(ProfileCopy.nameIt, isPresented: $naming) {
+            TextField(ProfileCopy.name, text: $draft)
+            Button(ProfileCopy.saveIt) {
+                model.saveProfile(draft)
+                draft = ""
+            }
+            Button(ProfileCopy.cancel, role: .cancel) { draft = "" }
+        }
+    }
+}
+
+enum ProfileCopy {
+    static let title = "Profiles"
+    static let save = "Save this setup"
+    static let saveIt = "Save"
+    static let cancel = "Cancel"
+    static let delete = "Delete"
+    static let name = "Name"
+    static let nameIt = "Name this setup"
+    static let withPro = "Provider profiles come with murmur Pro"
+    static let footer = "A profile keeps the providers and models below; each provider's key stays in your Keychain."
+
+    static func use(_ name: String, current: Bool) -> String {
+        current ? "\(name), in use" : "Use \(name)"
+    }
+}
+
 extension ProviderModel {
     /// The real screen: the bundled catalog, saved choices, the Keychain,
-    /// and a session that keeps no cookies or cache.
+    /// a session that keeps no cookies or cache, and murmur Pro's status.
     static func live() -> ProviderModel? {
         guard let catalog = try? BundledRules.catalog() else { return nil }
         let session = URLSession(configuration: .ephemeral)
-        return ProviderModel(catalog: catalog, store: ConnectionStore(), ring: KeychainKeyRing(), send: { try await session.data(for: $0) })
+        return ProviderModel(
+            catalog: catalog, store: ConnectionStore(), ring: KeychainKeyRing(), send: { try await session.data(for: $0) },
+            isPro: { ProStore.live().status.isPro }
+        )
     }
 }
 
