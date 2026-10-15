@@ -5,7 +5,8 @@
 // once it is done, its words. The keyboard claims the words once, which
 // clears them, so a take never inserts twice and the shared drawer never
 // keeps words longer than it must. Reads and writes are coordinated, since
-// the app and the keyboard are two processes.
+// the app and the keyboard are two processes. A transform's ask carries
+// the selection it rewrites (IOS-024).
 import Foundation
 
 struct MailboxEntry: Codable, Equatable, Sendable {
@@ -33,12 +34,21 @@ struct MailboxEntry: Codable, Equatable, Sendable {
     var typed: Typed? = nil
     /// Where a note landed, for the keyboard's receipt (IOS-023): inbox.
     var noted: String? = nil
+    /// A rewrite's selection as it was (IOS-024), while the rewrite waits
+    /// to be typed: once it is, the original takes the words' place, so
+    /// Insert last brings it back.
+    var original: String? = nil
+    /// The line under the pill when the phase alone does not say why a
+    /// take ended (IOS-024): why a selection stayed as it was.
+    var line: String? = nil
 }
 
-/// A keyboard's ask for a take: its id, and whether to keep it as a note.
+/// A keyboard's ask for a take: its id, whether to keep it as a note, and
+/// the selection a transform rewrites (IOS-024).
 struct TakeAsk: Equatable, Sendable {
     let take: UUID
     let note: Bool
+    var selection: String? = nil
 }
 
 struct Mailbox: Sendable {
@@ -59,6 +69,8 @@ struct Mailbox: Sendable {
         let at: Date
         /// Missing in an ask from a keyboard before notes: a take to type.
         var note: Bool? = nil
+        /// The selection a transform rewrites (IOS-024); missing otherwise.
+        var selection: String? = nil
     }
 
     func read() -> MailboxEntry? {
@@ -76,7 +88,8 @@ struct Mailbox: Sendable {
     }
 
     /// The take's words, once: the first claim gets them and clears them,
-    /// and every later claim gets nil.
+    /// and every later claim gets nil. A rewrite's original takes its place
+    /// (IOS-024), for Insert last to bring back.
     func claim(_ take: UUID? = nil) -> String? {
         var words: String?
         coordinate(file, writing: true) { url in
@@ -86,7 +99,8 @@ struct Mailbox: Sendable {
                   entry.phase == .ready, let ready = entry.words
             else { return }
             words = ready
-            entry.words = nil
+            entry.words = entry.original
+            entry.original = nil
             entry.typed = .inserted
             try? JSONEncoder().encode(entry).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         }
@@ -122,10 +136,12 @@ struct Mailbox: Sendable {
     }
 
     /// The keyboard asks for a take with its own id, just before it signals
-    /// start; note keeps it as a note instead of typing it (IOS-023).
-    func ask(_ take: UUID, note: Bool = false, at: Date = .now) {
+    /// start; note keeps it as a note instead of typing it (IOS-023), and a
+    /// selection makes it a transform of that text (IOS-024).
+    func ask(_ take: UUID, note: Bool = false, selection: String? = nil, at: Date = .now) {
         coordinate(requestFile, writing: true) { url in
-            try? JSONEncoder().encode(Request(take: take, at: at, note: note)).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            try? JSONEncoder().encode(Request(take: take, at: at, note: note, selection: selection))
+                .write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         }
     }
 
@@ -140,7 +156,7 @@ struct Mailbox: Sendable {
                   let request = try? JSONDecoder().decode(Request.self, from: data),
                   abs(now.timeIntervalSince(request.at)) <= seconds
             else { return }
-            ask = TakeAsk(take: request.take, note: request.note ?? false)
+            ask = TakeAsk(take: request.take, note: request.note ?? false, selection: request.selection)
         }
         return ask
     }

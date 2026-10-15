@@ -32,6 +32,53 @@ enum Pad {
     static let noteNext = "Next take is a note"
     static let noteMenu = "Note"
     static let typeMenu = "Type the next take"
+    /// Transform in the pill's menu, offered with text selected (IOS-024),
+    /// and what the pad says once the rewrite is in, or waits.
+    static let transformMenu = "Transform"
+    static let rewritten = "Rewritten. Insert last brings back the original."
+    static let selectionMoved = "The selection changed, so nothing was replaced. Insert last has the rewrite."
+    static let copyFirst = "For more than a sentence, tap Copy first, then Transform."
+
+    /// The most a single sentence may hold for the keyboard to trust it
+    /// whole, in UTF-16 units.
+    static let wholeLimit = 300
+
+    /// Whether the keyboard surely holds the whole selection. iOS gives a
+    /// keyboard only the first and last sentences of a longer selection
+    /// (Apple bug FB7789012, still so in 2026), and a rewrite of part of
+    /// it would replace all of it, so only one sentence of modest length
+    /// counts. Anything that could be a sentence break counts as one.
+    static func isWhole(_ selected: String) -> Bool {
+        selected.utf16.count <= wholeLimit && pieces(selected).count <= 1
+    }
+
+    /// The whole selection from the clipboard, when you copied it: the
+    /// same text, or text that opens with the selection's first sentence
+    /// and closes with its last, as iOS shortens it. Nil otherwise.
+    static func whole(_ selected: String, clipboard: String?) -> String? {
+        guard let clipboard, !clipboard.isEmpty else { return nil }
+        if clipboard == selected { return clipboard }
+        let parts = pieces(selected)
+        guard let first = parts.first, let last = parts.last,
+              clipboard.utf16.count > selected.utf16.count, clipboard.hasPrefix(first), clipboard.hasSuffix(last)
+        else { return nil }
+        return clipboard
+    }
+
+    /// The selection split wherever a sentence might end: after . ! ? or
+    /// an ellipsis before a space, and at every line break.
+    static func pieces(_ text: String) -> [String] {
+        let breaks = try! NSRegularExpression(pattern: "(?<=[.!?\\u2026\\u3002\\uFF01\\uFF1F])\\s+|[\\n\\r\\u2028\\u2029]+")
+        let source = text as NSString
+        var out: [String] = []
+        var cursor = 0
+        for match in breaks.matches(in: text, range: NSRange(location: 0, length: source.length)) {
+            out.append(source.substring(with: NSRange(location: cursor, length: match.range.location - cursor)))
+            cursor = match.range.location + match.range.length
+        }
+        out.append(source.substring(from: cursor))
+        return out.filter { !$0.allSatisfy(\.isWhitespace) }
+    }
 
     /// The note receipt (IOS-023): where the note landed.
     static func noted(_ place: String?) -> String {
@@ -57,7 +104,7 @@ enum Pad {
         case .nothing where ours:
             return .status("Heard nothing")
         case .failed where ours:
-            return .status("That take did not work. Open murmur to see why.")
+            return .status(entry.line ?? "That take did not work. Open murmur to see why.")
         case .noted where ours:
             return .status(noted(entry.noted))
         default:
@@ -98,6 +145,11 @@ enum Pad {
         let at: Date
         /// An opened take that a keyboard you came back to has taken over.
         private(set) var adopted = false
+        /// The text a transform take rewrites (IOS-024), whole, and the
+        /// selection as the keyboard saw it: the rewrite goes in only while
+        /// that is still what is selected.
+        var original: String? = nil
+        var selected: String? = nil
 
         /// A take waited on longer than this is let go: its words, if any,
         /// wait as Insert last.
@@ -123,6 +175,12 @@ enum Pad {
         /// the first field the keyboard comes back to.
         func sameField(as current: UUID?) -> Bool {
             field == nil || field == current
+        }
+
+        /// Whether a transform's rewrite goes in now: only while the text it
+        /// rewrites is still what is selected, so it never lands anywhere else.
+        func replaces(_ current: String?) -> Bool {
+            original != nil && selected != nil && current == selected
         }
 
         /// The keyboard you came back to from murmur takes the opened take

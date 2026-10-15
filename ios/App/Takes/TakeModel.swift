@@ -41,9 +41,12 @@ struct TakeRules: Sendable {
 
     /// What a take is for (IOS-023): words to show and copy, or a note to
     /// keep. Only New note starts a note take; the keyboard and Dictate
-    /// share this model and their takes are never kept as notes.
+    /// share this model and their takes are never kept as notes. An
+    /// instruction (IOS-024) says how to change selected text: only the
+    /// dictionary touches its words, as on desktop, and like desktop's
+    /// transforms it counts toward nothing, so it stays out of history.
     enum Purpose: Sendable {
-        case words, note
+        case words, note, instruction
     }
 
     /// Two taps closer together than this are one double tap.
@@ -168,14 +171,14 @@ struct TakeRules: Sendable {
         }
         note(.captured(durationMs: length, peak: peak, voicedMs: voiced))
         state = .transcribing
-        switch await words(for: wav) {
+        switch await words(for: wav, cleanedUp: purpose != .instruction) {
         case .success(let words):
             state = words.map(State.words) ?? .heardNothing(sent: true)
             if let words {
                 // A note take is kept once, here, under the time it was spoken.
                 if purpose == .note { kept = KeptNote(words: words, place: keepNote(words, since)) }
                 let entry = HistoryEntry(at: since, durationMs: length, words: words)
-                record(entry)
+                if purpose != .instruction { record(entry) }
                 note(.words(count: entry.wordCount, retried: false))
             } else {
                 note(.heardNothing(durationMs: length, peak: peak, voicedMs: voiced, sent: true))
@@ -274,8 +277,9 @@ struct TakeRules: Sendable {
     }
 
     /// The cleaned-up words; nil when the provider heard only silence or
-    /// cleanup left nothing (a take of only um); or why it failed.
-    private func words(for wav: Data) async -> Result<String?, TakeFailure> {
+    /// cleanup left nothing (a take of only um); or why it failed. An
+    /// instruction gets the dictionary only, as desktop's transform does.
+    private func words(for wav: Data, cleanedUp: Bool = true) async -> Result<String?, TakeFailure> {
         let settings = connections.load(catalog: catalog)
         let baseUrl = settings.transcription.baseUrl
         guard let key = (try? ring.key(for: baseUrl)) ?? nil else { return .failure(.noKey) }
@@ -286,6 +290,10 @@ struct TakeRules: Sendable {
         switch await Transcription.run(wav: wav, baseUrl: baseUrl, model: settings.transcription.sttModel, key: key, prompt: hint, send: send) {
         case .words(let text):
             guard let heard = TakeAudio.heard(text, list: rules.hallucinations) else { return .success(nil) }
+            guard cleanedUp else {
+                let instruction = applyDictionary(heard, cleanupSettings.dictionary).trimmingCharacters(in: .whitespacesAndNewlines)
+                return .success(instruction.isEmpty ? nil : instruction)
+            }
             let connection = settings.polishConnection { [ring] in (try? ring.key(for: $0)) ?? nil }
             let finished = await Cleanup.finish(heard, settings: cleanupSettings, rules: rules.cleanup, connection: connection, send: send)
             return .success(finished.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : finished)

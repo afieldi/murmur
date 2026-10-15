@@ -37,6 +37,9 @@ enum ActivityEvent: Equatable, Sendable {
     case liveActivityRefused
     /// What the keyboard did with a keyboard take's words.
     case keyboard(UUID, KeyboardOutcome)
+    /// A transform (IOS-024): rewritten, or kept with desktop's reason.
+    /// Never the words.
+    case transform(kept: String?)
 
     /// The failure kinds a line may name; any other is other.
     static let kinds: Set<String> = ["auth", "badrequest", "server", "network", "timeout", "nospeech"]
@@ -61,6 +64,8 @@ enum ActivityEvent: Equatable, Sendable {
             "session live-activity-refused"
         case .keyboard(let take, let outcome):
             "keyboard take=\(Self.short(take)) \(outcome.rawValue)"
+        case .transform(let kept):
+            kept.map { "transform kept reason=\($0.replacingOccurrences(of: " ", with: "-"))" } ?? "transform rewritten"
         }
     }
 
