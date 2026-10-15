@@ -58,6 +58,8 @@ targets:
       path: Generated/App-Info.plist
       properties:
         CFBundleDisplayName: murmur
+        # murmur Pro's in-app purchase (IOS-025), named after the bundle id.
+        MurmurProProduct: $(MURMUR_BUNDLE_ID).pro
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         ITSAppUsesNonExemptEncryption: false
