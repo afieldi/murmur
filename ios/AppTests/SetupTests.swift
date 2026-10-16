@@ -16,9 +16,10 @@ import Testing
         Setup(microphone: access, report: { [report] in report.value }, hasKey: { [key] in key.value }, defaults: defaults)
     }
 
-    /// Four steps in order, then the practice take.
+    /// Four steps in order, then the practice take: your key comes before
+    /// the keyboard and the first take (LaBroi, 2026-10-16).
     @Test func theStepsGoInOrder() {
-        #expect(Setup.Step.allCases == [.microphone, .keyboard, .fullAccess, .key, .practice])
+        #expect(Setup.Step.allCases == [.microphone, .key, .keyboard, .fullAccess, .practice])
         let fresh = setup()
         #expect(fresh.next == .microphone)
         #expect(fresh.remaining == Setup.Step.allCases)
@@ -30,7 +31,7 @@ import Testing
         let setup = setup(ScriptedAccess(answer: true))
         await setup.allowMicrophone()
         #expect(setup.status(.microphone) == .done)
-        #expect(setup.next == .keyboard)
+        #expect(setup.next == .key)
     }
 
     /// A refused microphone says so, and stays first in line.
@@ -75,7 +76,7 @@ import Testing
         let first = setup()
         first.skip(.microphone)
         #expect(first.status(.microphone) == .skipped)
-        #expect(first.next == .keyboard)
+        #expect(first.next == .key)
         let again = setup()
         #expect(again.status(.microphone) == .skipped)
         #expect(again.remaining.contains(.microphone))
@@ -98,13 +99,17 @@ import Testing
     @Test func movingOnPassesStepsAlreadyDone() async {
         let setup = setup()
         await setup.allowMicrophone()
+        key.value = true
+        setup.refresh()
+        #expect(setup.step(after: .microphone) == .keyboard)
+        key.value = false
         report.value = KeyboardReport(fullAccess: true, at: .now)
         setup.refresh()
         #expect(setup.step(after: .microphone) == .key)
-        #expect(setup.step(after: .keyboard) == .key)
+        #expect(setup.step(after: .key) == .practice)
         setup.skip(.key)
         #expect(setup.step(after: .microphone) == .key)
-        #expect(setup.step(after: .key) == .practice)
+        #expect(setup.step(after: .keyboard) == .practice)
         setup.practiced()
         #expect(setup.step(after: .key) == nil)
         #expect(setup.step(after: .practice) == nil)
@@ -147,7 +152,8 @@ import Testing
     @Test func settingsStepsShowTheTaps() {
         #expect(SetupCopy.taps(.keyboard).first == "Tap Open Settings.")
         #expect(SetupCopy.taps(.fullAccess).contains { $0.contains("Allow Full Access") })
-        #expect(SetupCopy.progress(.fullAccess) == "Step 3 of 5")
+        #expect(SetupCopy.progress(.key) == "Step 2 of 5")
+        #expect(SetupCopy.progress(.fullAccess) == "Step 4 of 5")
     }
 
     @Test func everyLineFollowsTheWritingRules() {

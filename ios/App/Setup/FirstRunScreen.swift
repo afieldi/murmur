@@ -88,8 +88,17 @@ struct FirstRunScreen: View {
             if !text.isEmpty { setup.practiced() }
         }
         .sheet(isPresented: $addingKey, onDismiss: { setup.refresh() }) {
-            NavigationStack { ProviderRoute() }
-                .preferredColorScheme(.dark)
+            NavigationStack {
+                ProviderRoute()
+                    .toolbar {
+                        // Back to first run once the key is saved; the step
+                        // checks itself as the sheet closes.
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(SetupCopy.closeKey) { addingKey = false }
+                        }
+                    }
+            }
+            .preferredColorScheme(.dark)
         }
     }
 

@@ -48,6 +48,7 @@ enum SetupCopy {
     static let allow = "Allow the microphone"
     static let added = "I added it"
     static let addKey = "Add your key"
+    static let closeKey = "Done"
     static let homeTitle = "Finish setting up"
     static let homeFooter = "murmur works best with every step done. Skipped steps wait here."
 

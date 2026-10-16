@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // First run (ios/prd.json IOS-011): four steps in order, allow the
-// microphone, add the murmur keyboard, turn on Full Access, and add a key,
-// then a practice take. Each step's status comes from the world (the
+// microphone, add a key, add the murmur keyboard, and turn on Full Access,
+// then a practice take. The key comes before the keyboard and the first take
+// (LaBroi, 2026-10-16). Each step's status comes from the world (the
 // microphone permission, the keyboard's own report, a saved key) plus what
 // you chose here (skipped, or said the keyboard is added), so a step done
 // in Settings checks itself when you come back. Any step can be skipped,
@@ -18,7 +19,7 @@ import Observation
 
 @Observable @MainActor final class Setup {
     enum Step: String, CaseIterable, Sendable {
-        case microphone, keyboard, fullAccess, key, practice
+        case microphone, key, keyboard, fullAccess, practice
     }
 
     enum Status: Equatable, Sendable {
