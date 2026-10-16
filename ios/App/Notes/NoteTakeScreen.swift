@@ -10,6 +10,7 @@ import SwiftUI
 struct NoteTakeRoute: View {
     /// Opened by the control, the Action Button, or the icon: listen at once.
     var startNow = false
+    var make: @MainActor () -> (model: TakeModel?, notes: Notes?) = { (TakeModel.live(), Notes.live()) }
     @State private var model: TakeModel?
     @State private var notes: Notes?
     @State private var failed = false
@@ -21,12 +22,15 @@ struct NoteTakeRoute: View {
             } else if failed {
                 Note(text: "murmur could not read its rules. Reinstall murmur to fix it.", color: Tokens.red, symbol: "exclamationmark.triangle")
                     .padding()
+            } else {
+                // The ground until the model is built: a Group with nothing in
+                // it never runs its task, and the screen would stay blank.
+                Tokens.ink.ignoresSafeArea()
             }
         }
         .task {
             guard model == nil || notes == nil else { return }
-            model = TakeModel.live()
-            notes = Notes.live()
+            (model, notes) = make()
             failed = model == nil || notes == nil
         }
     }

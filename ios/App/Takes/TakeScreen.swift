@@ -302,6 +302,7 @@ extension TakeModel {
 
 /// Opens the take screen, built once the shared rules are read.
 struct TakeRoute: View {
+    var make: @MainActor () -> TakeModel? = { TakeModel.live() }
     @State private var model: TakeModel?
     @State private var failed = false
 
@@ -312,11 +313,15 @@ struct TakeRoute: View {
             } else if failed {
                 Note(text: "murmur could not read its rules. Reinstall murmur to fix it.", color: Tokens.red, symbol: "exclamationmark.triangle")
                     .padding()
+            } else {
+                // The ground until the model is built: a Group with nothing in
+                // it never runs its task, and the screen would stay blank.
+                Tokens.ink.ignoresSafeArea()
             }
         }
         .task {
             guard model == nil else { return }
-            model = TakeModel.live()
+            model = make()
             failed = model == nil
         }
     }

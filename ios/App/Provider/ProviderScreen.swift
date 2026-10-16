@@ -229,6 +229,7 @@ extension ProviderModel {
 
 /// Opens the Provider screen, built once the catalog is read.
 struct ProviderRoute: View {
+    var make: @MainActor () -> ProviderModel? = { ProviderModel.live() }
     @State private var model: ProviderModel?
     @State private var failed = false
 
@@ -239,11 +240,15 @@ struct ProviderRoute: View {
             } else if failed {
                 Note(text: "murmur could not read its provider list. Reinstall murmur to fix it.", color: Tokens.red, symbol: "exclamationmark.triangle")
                     .padding()
+            } else {
+                // The ground until the model is built: a Group with nothing in
+                // it never runs its task, and the screen would stay blank.
+                Tokens.ink.ignoresSafeArea()
             }
         }
         .task {
             guard model == nil else { return }
-            model = ProviderModel.live()
+            model = make()
             failed = model == nil
         }
     }

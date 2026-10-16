@@ -72,14 +72,21 @@ extension CleanupModel {
 
 /// Opens the Cleanup screen with its model built once.
 struct CleanupRoute: View {
+    var make: @MainActor () -> CleanupModel = { CleanupModel.live() }
     @State private var model: CleanupModel?
 
     var body: some View {
         Group {
-            if let model { CleanupScreen(model: model) }
+            if let model {
+                CleanupScreen(model: model)
+            } else {
+                // The ground until the model is built: a Group with nothing in
+                // it never runs its task, and the screen would stay blank.
+                Tokens.ink.ignoresSafeArea()
+            }
         }
         .task {
-            if model == nil { model = CleanupModel.live() }
+            if model == nil { model = make() }
         }
     }
 }
