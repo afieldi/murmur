@@ -230,6 +230,9 @@ extension ProviderModel {
 /// Opens the Provider screen, built once the catalog is read.
 struct ProviderRoute: View {
     var make: @MainActor () -> ProviderModel? = { ProviderModel.live() }
+    /// On a sheet (first run's Add your key): Done keeps a pasted key, then
+    /// closes.
+    var done: (() -> Void)?
     @State private var model: ProviderModel?
     @State private var failed = false
 
@@ -250,6 +253,15 @@ struct ProviderRoute: View {
             guard model == nil else { return }
             model = make()
             failed = model == nil
+        }
+        .toolbar {
+            if let done {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(SetupCopy.closeKey) {
+                        if model?.keepDrafts() ?? true { done() }
+                    }
+                }
+            }
         }
     }
 }

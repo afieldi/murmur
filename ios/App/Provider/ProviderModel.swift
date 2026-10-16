@@ -145,6 +145,18 @@ final class ProviderModel {
         store.saveProfiles(profiles)
     }
 
+    /// Done on the key sheet: a pasted key that can be saved is saved, as
+    /// Save key would, so closing never throws it away. False when the
+    /// Keychain refused one, so the sheet stays open to say why.
+    func keepDrafts() -> Bool {
+        var kept = true
+        for slot in [transcriptionKey, cleanupKey] where slot.canSave {
+            slot.save()
+            if slot.failure != nil { kept = false }
+        }
+        return kept
+    }
+
     private func update(_ change: (inout ConnectionSettings) -> Void) {
         var next = settings
         change(&next)

@@ -229,6 +229,37 @@ import Testing
         #expect(!"\(defaults.dictionaryRepresentation())".contains("gsk_groqgroq1111"))
     }
 
+    /// Done on the key sheet keeps a pasted key in either slot, as Save key
+    /// would, so closing the sheet never throws it away.
+    @Test func doneKeepsAPastedKey() throws {
+        let model = model()
+        model.transcriptionKey.draft = "gsk_groqgroq1111"
+        model.separateCleanup = true
+        model.chooseCleanup(try preset("openai"))
+        model.cleanupKey.draft = "sk-openaiopenai2222"
+        #expect(model.keepDrafts())
+        #expect(try ring.key(for: groq)?.secret == "gsk_groqgroq1111")
+        #expect(try ring.key(for: "https://api.openai.com/v1")?.secret == "sk-openaiopenai2222")
+        #expect(model.transcriptionKey.masked == "••••1111")
+        #expect(model.cleanupKey.draft == "")
+    }
+
+    /// With nothing pasted, Done only closes.
+    @Test func doneWithNothingPastedSavesNothing() throws {
+        let model = model()
+        #expect(model.keepDrafts())
+        #expect(try ring.key(for: groq) == nil)
+    }
+
+    /// A key the Keychain refused stays in its field, and the sheet stays
+    /// open so the failure shows.
+    @Test func doneStaysOpenWhenTheKeychainRefuses() {
+        let model = ProviderModel(catalog: catalog, store: ConnectionStore(defaults: defaults), ring: FailingRing(), send: { _ in throw URLError(.cancelled) })
+        model.transcriptionKey.draft = "gsk_groqgroq1111"
+        #expect(!model.keepDrafts())
+        #expect(model.transcriptionKey.draft == "gsk_groqgroq1111")
+    }
+
     @Test func aKeychainFailureIsSaidPlainly() {
         let slot = KeySlot(baseUrl: groq, catalog: catalog, ring: FailingRing(), send: { _ in throw URLError(.cancelled) })
         #expect(slot.failure == "murmur could not reach the Keychain (code -25308). Try again.")

@@ -186,7 +186,7 @@ Every waveform follows these stages; an error is always plain red, never paint. 
 Open murmur once; it walks you through four steps and a practice take. Each step says why murmur needs it, and any step can be skipped. What you skip waits on murmur's home screen under Finish setting up.
 
 1. **Allow the microphone.** Tap Allow the microphone, then Allow. If you said no before, tap Open Settings and turn on Microphone.
-2. **Add your key.** Pick who transcribes, paste your key, tap Save key, then tap Done. See How do I add my API key on iPhone?
+2. **Add your key.** Pick who transcribes, paste your key, and tap Done; Done saves a pasted key. See How do I add my API key on iPhone?
 3. **Add the murmur keyboard.** Tap Open Settings, tap Keyboards, turn on murmur, then turn on Allow Full Access and tap Allow. Come back, tap the box, and pick murmur with the globe key: with Full Access on, the keyboard tells murmur it is ready, and this step and the next check themselves. If you leave Full Access off for now, tap I added it.
 4. **Turn on Full Access.** If you left it off, the same place in Settings has the switch; come back and tap the box as above. The keyboard sends nothing anywhere and only types the words you dictate.
 5. **Try your first take.** Tap the box, pick murmur with the globe key, tap the pill, say a sentence, and tap the pill again. Your words land in the box.
