@@ -46,6 +46,10 @@ Build 477 (TestFlight 3, uploaded 2026-10-16, fixes from the first look at build
 
 > Fixes from your first look: Add your key opens Provider and key again (it showed a blank screen, and so did Cleanup, Dictate, and New note), first run now asks for your key before the keyboard and the first take, and the key sheet has Done. Everything from build 473 still applies: Notes, Transform, and murmur Pro in Settings (purchases in TestFlight are free). If something goes wrong, Settings, Diagnostics, Save report makes a report you can read and then share.
 
+Build 479 (TestFlight 4, uploaded 2026-10-17, the keyboard and Full Access as one first-run step, from the look at build 477; set the same way):
+
+> Fixes from your look at build 477: the keyboard and Full Access are now one first-run step, Add the murmur keyboard, since both switches are on the same page in Settings. It checks itself once you pick murmur in the box with Full Access on, and the I added it button is gone. Everything from build 477 still applies: Add your key opens Provider and key, first run asks for your key before the keyboard and the first take, the key sheet has Done, and Notes, Transform, and murmur Pro are in Settings (purchases in TestFlight are free). If something goes wrong, Settings, Diagnostics, Save report makes a report you can read and then share.
+
 ## Internal testing
 
 - The internal group is murmur team, with lbwalton@gmail.com in it (IOS-004). In App Store Connect, murmur voice dictation, TestFlight, Internal Testing, murmur team: if automatic distribution is on, each processed build joins the group by itself. If the new build is not listed under Builds, click the plus next to Builds and add it.
