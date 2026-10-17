@@ -26,8 +26,8 @@ struct FirstRunScreen: View {
                     .foregroundStyle(Tokens.textDim)
                 Spacer()
                 Button(SetupCopy.later) { close() }
+                    .buttonStyle(TapTargetStyle())
                     .foregroundStyle(Tokens.brand)
-                    .frame(minHeight: 44)
             }
             .padding(.horizontal, 24)
             StepDots(step: step, setup: setup)
@@ -125,10 +125,10 @@ struct FirstRunScreen: View {
             }
             // The box makes the keyboard appear, and it reports itself.
             if step == .keyboard, setup.status(step) != .done {
-                Box(prompt: SetupCopy.checkBox, text: $check)
+                FirstRunBox(prompt: SetupCopy.checkBox, text: $check)
             }
             if step == .practice {
-                Box(prompt: SetupCopy.practiceBox, text: $practice)
+                FirstRunBox(prompt: SetupCopy.practiceBox, text: $practice)
                 if setup.status(.practice) == .done {
                     Text(SetupCopy.practiceDone)
                         .font(.subheadline)
@@ -227,16 +227,39 @@ private struct StepDots: View {
     }
 }
 
-private struct Box: View {
+/// The box a step's keyboard shows in.
+struct FirstRunBox: View {
     let prompt: String
     @Binding var text: String
+    @FocusState private var focused: Bool
 
     var body: some View {
-        TextField(prompt, text: $text, axis: .vertical)
-            .lineLimit(2...5)
-            .padding(14)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Tokens.panel))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Tokens.panelEdge))
+        // The hint is its own text, so it wraps in full at any size (a text
+        // field's hint stops at its line limit) and in dim text, which reads
+        // at AA on the panel. It keeps its room once you type, so the box
+        // never jumps; the field's title stays its VoiceOver label.
+        ZStack(alignment: .topLeading) {
+            Text(prompt)
+                .foregroundStyle(Tokens.textDim)
+                .opacity(text.isEmpty ? 1 : 0)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            TextField(prompt, text: $text, prompt: Text(verbatim: ""), axis: .vertical)
+                .lineLimit(2...5)
+                .focused($focused)
+        }
+        .padding(14)
+        // A tap anywhere in the box starts typing, the hint's lower lines and
+        // the margin included, since a long hint makes the box taller than
+        // the field. The catcher sits behind the field, so the field keeps
+        // its own taps for the cursor and selection.
+        .background {
+            Color.clear
+                .contentShape(RoundedRectangle(cornerRadius: 14))
+                .onTapGesture { focused = true }
+        }
+        .background(RoundedRectangle(cornerRadius: 14).fill(Tokens.panel))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Tokens.panelEdge))
     }
 }
 
@@ -248,6 +271,7 @@ private struct Primary: View {
         Button(action: action) {
             Text(title)
                 .font(.body.weight(.semibold))
+                .padding(.horizontal, 16)
                 .frame(maxWidth: .infinity, minHeight: 50)
                 .background(Capsule().fill(Tokens.brand))
                 .foregroundStyle(Tokens.ink)
@@ -262,8 +286,22 @@ private struct Secondary: View {
 
     var body: some View {
         Button(title, action: action)
+            .buttonStyle(TapTargetStyle(fill: true))
             .foregroundStyle(Tokens.brand)
-            .frame(maxWidth: .infinity, minHeight: 44)
+    }
+}
+
+/// A text button whose whole frame takes the tap, at least 44 points each
+/// way: the frame sits inside the button, where a frame outside it grows the
+/// layout but leaves the tap on the words.
+struct TapTargetStyle: ButtonStyle {
+    var fill = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .frame(minWidth: 44, maxWidth: fill ? .infinity : nil, minHeight: 44)
+            .contentShape(Rectangle())
+            .opacity(configuration.isPressed ? 0.6 : 1)
     }
 }
 
@@ -283,10 +321,7 @@ struct SetupChecklist: View {
                     resume(step)
                 } label: {
                     HStack {
-                        Image(systemName: FirstRunScreen.symbol(step))
-                            .foregroundStyle(Tokens.brand)
-                            .frame(width: 24)
-                            .accessibilityHidden(true)
+                        StepIcon(step: step)
                         Text(SetupCopy.title(step))
                             .foregroundStyle(Tokens.text)
                         Spacer()
@@ -305,5 +340,19 @@ struct SetupChecklist: View {
             Text(SetupCopy.homeFooter).foregroundStyle(Tokens.textDim)
         }
         .listRowBackground(Tokens.panel)
+    }
+}
+
+/// A step's symbol in Home's checklist, in a column the titles line up on.
+/// The column grows with the text, so the symbol never runs into its title.
+struct StepIcon: View {
+    let step: Setup.Step
+    @ScaledMetric(relativeTo: .body) private var width: CGFloat = 24
+
+    var body: some View {
+        Image(systemName: FirstRunScreen.symbol(step))
+            .foregroundStyle(Tokens.brand)
+            .frame(width: width)
+            .accessibilityHidden(true)
     }
 }

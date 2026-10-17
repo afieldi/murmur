@@ -146,7 +146,7 @@ import Testing
     /// keyboard does and never does.
     @Test func theKeyboardStepSaysItSendsNothing() {
         let why = SetupCopy.why(.keyboard)
-        #expect(why.contains("Full Access"))
+        #expect(why.contains("Full Access lets it hand your take to murmur"))
         #expect(why.contains("the keyboard sends nothing anywhere"))
         #expect(why.contains("only types the words you dictate"))
     }
