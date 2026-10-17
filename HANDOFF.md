@@ -25,6 +25,8 @@ Live-verification items land here as stories complete. Check them off, then tell
 
 ## Live verification queue
 
+- [ ] US-105 apply corrections (built 2026-10-17 on feature/corrections; needs a test build or the next release). (1) Open murmur's window, click Dictation, and turn on Apply corrections, the switch right under Smart lists. Formatting must be on Full. (2) Dictate: "Send the invoice to Mark on Tuesday. Oh wait, actually what I mean is Wednesday." It should type: Send the invoice to Mark on Wednesday. (3) Dictate: "Book the flight for the twelfth, no, the fourteenth, and get a window seat." It should type the fourteenth, with no twelfth. (4) Dictate: "Actually, the tests are passing now, so we can merge." The Actually stays. (5) Turn the switch off and repeat step 2: the slip-up stays in, the way it works today. Tell Claude how each went, and anything it typed wrong.
+
 - [x] US-100 the light of the hours you painted in: live-verified by LaBroi 2026-10-09 on the test build. Ships with 0.1.10.
 - [x] US-101 the seal in your belt's color: live-verified by LaBroi 2026-10-09 on the test build. Ships with 0.1.10.
 - [x] US-102 Save the week: live-verified by LaBroi 2026-10-09 on the test build. Ships with 0.1.10.

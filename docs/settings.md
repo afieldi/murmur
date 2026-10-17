@@ -73,7 +73,7 @@ Set a transform chord under Settings, Transform. Select text in any app, hold th
 
 - **Off**: the raw transcript, untouched
 - **Light**: filler words removed, sentences capitalized
-- **Full**: everything in light, plus spoken punctuation commands ("period", "comma", "new line", "new paragraph"), self-corrections ("scratch that"), number style, closing punctuation, and the AI cleanup pass through your configured cleanup model
+- **Full**: everything in light, plus spoken punctuation commands ("period", "comma", "new line", "new paragraph"), self-corrections ("scratch that", and with Apply corrections on, spoken fixes like "oh wait, I mean Wednesday"), number style, closing punctuation, and the AI cleanup pass through your configured cleanup model
 
 The cleanup pass fails open: if the model is slow, wrong, or chatty, murmur inserts the deterministically formatted text instead. A dictation is never lost or delayed indefinitely because of the cleanup model.
 
@@ -85,6 +85,24 @@ Smart lists turns spoken structure into real structure. It is off by default (di
 - **By command.** Say "bullet point", "next item", or "next bullet" to start a dash line yourself, the same way "period" and "new line" work today. Commands are deterministic: they work even when the cleanup model is unreachable.
 
 Lists use plain text markers ("- " and "1. "), so they paste correctly everywhere, and markdown apps render them as lists. Automatic list recognition needs the cleanup pass (Full formatting and a working cleanup model); the spoken commands only need Full formatting. Verified against format-spec version 1 (2026-09-13).
+
+## How do I make murmur fix my spoken slip-ups?
+
+Turn on Apply corrections in Settings, Dictation. With it on and formatting at Full, when you say something wrong and then fix it, only the fix is typed:
+
+- "Send the invoice to Mark on Tuesday. Oh wait, actually what I mean is Wednesday." types "Send the invoice to Mark on Wednesday."
+- "The budget is fifteen thousand, sorry, fifty thousand for the quarter." types "The budget is fifty thousand for the quarter."
+- "I think we should, we should ship on Friday." types "I think we should ship on Friday."
+
+It is off by default, and off means dictation behaves exactly as it always has: your slip-ups stay in the text.
+
+**What counts as a correction?** A cue word that takes back something you just said: oh wait, wait, actually, I mean, sorry, no, rather, make that, what I meant was, let me rephrase that. The fix can come in the same sentence or the next one. Restarted phrases and stumbled repeats are dropped too.
+
+**Will it remove "actually" or "I mean" when I mean them?** No. When nothing is being taken back, the cue word is part of what you said and stays: "Actually, the tests are passing now" and "I mean, it works, but it could be faster" type exactly as spoken.
+
+**Can it lose words?** The cleanup pass still fails open: when the model's answer does not look like a correction, murmur types your formatted words instead. A cut deeper than ordinary cleanup is accepted only when your speech carried a cue word, the cut removed one, the cut is no bigger than those cues explain (about one wrong phrase each), and every word left is a word you said. A rewrite in new words never earns that deeper cut, and no cut may remove more than 60% of what you said. Measured on Groq with gpt-oss-120b (2026-10-17, 23 test sentences, 10 runs each, with Smart lists on and off), it fixed all 280 corrections and kept all 180 cue words that were meant. In an earlier run while the instructions were being tuned, the model once dropped a few real words next to a fix, so read back anything that matters.
+
+Corrections need the cleanup pass (Full formatting and a working cleanup model). Saying "scratch that" deletes the current sentence at Full formatting with or without this switch.
 
 ## What does the analytics tab show, and how is the cost estimated?
 
