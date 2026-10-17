@@ -42,6 +42,10 @@ Build 473 (TestFlight 2, uploaded 2026-10-15; Claude sets it through the App Sto
 
 > Second TestFlight build. New: Notes (keep a take as a note instead of typing it), Transform (select text, touch and hold the pill, tap Transform, and say how to change it; for more than a sentence, tap Copy first), and murmur Pro in Settings (purchases in TestFlight are free; Pro adds provider profiles and the supporter mark). Everything from the first build still applies. If something goes wrong, Settings, Diagnostics, Save report makes a report you can read and then share.
 
+Build 477 (TestFlight 3, uploaded 2026-10-16, fixes from the first look at build 473; set the same way):
+
+> Fixes from your first look: Add your key opens Provider and key again (it showed a blank screen, and so did Cleanup, Dictate, and New note), first run now asks for your key before the keyboard and the first take, and the key sheet has Done. Everything from build 473 still applies: Notes, Transform, and murmur Pro in Settings (purchases in TestFlight are free). If something goes wrong, Settings, Diagnostics, Save report makes a report you can read and then share.
+
 ## Internal testing
 
 - The internal group is murmur team, with lbwalton@gmail.com in it (IOS-004). In App Store Connect, murmur voice dictation, TestFlight, Internal Testing, murmur team: if automatic distribution is on, each processed build joins the group by itself. If the new build is not listed under Builds, click the plus next to Builds and add it.
