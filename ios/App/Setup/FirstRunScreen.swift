@@ -67,7 +67,7 @@ struct FirstRunScreen: View {
         .fullScreenCover(isPresented: $opener.showingOverSetup) { RecordingRoute() }
         // Waiting on the keyboard's report: look again every second.
         .task(id: step) {
-            guard step == .keyboard || step == .fullAccess else { return }
+            guard step == .keyboard else { return }
             while !Task.isCancelled, setup.status(step) != .done {
                 try? await Task.sleep(for: .seconds(1))
                 setup.refresh()
@@ -124,7 +124,7 @@ struct FirstRunScreen: View {
                 }
             }
             // The box makes the keyboard appear, and it reports itself.
-            if step == .keyboard || step == .fullAccess, setup.status(step) != .done {
+            if step == .keyboard, setup.status(step) != .done {
                 Box(prompt: SetupCopy.checkBox, text: $check)
             }
             if step == .practice {
@@ -155,7 +155,7 @@ struct FirstRunScreen: View {
                 Primary(title: step == .practice ? SetupCopy.finish : SetupCopy.next) { advance() }
             } else {
                 switch step {
-                case .microphone where status == .denied, .keyboard, .fullAccess:
+                case .microphone where status == .denied, .keyboard:
                     Primary(title: SetupCopy.openSettings) { openSettings() }
                 case .microphone:
                     Primary(title: SetupCopy.allow) { Task { await setup.allowMicrophone() } }
@@ -163,9 +163,6 @@ struct FirstRunScreen: View {
                     Primary(title: SetupCopy.addKey) { addingKey = true }
                 case .practice:
                     EmptyView()
-                }
-                if step == .keyboard {
-                    Secondary(title: SetupCopy.added) { setup.keyboardAdded() }
                 }
                 Secondary(title: SetupCopy.skip) {
                     setup.skip(step)
@@ -206,7 +203,6 @@ struct FirstRunScreen: View {
         switch step {
         case .microphone: "mic"
         case .keyboard: "keyboard"
-        case .fullAccess: "lock.open"
         case .key: "key"
         case .practice: "waveform"
         }

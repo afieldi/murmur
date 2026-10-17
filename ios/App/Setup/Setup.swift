@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// First run (ios/prd.json IOS-011): four steps in order, allow the
-// microphone, add a key, add the murmur keyboard, and turn on Full Access,
-// then a practice take. The key comes before the keyboard and the first take
-// (LaBroi, 2026-10-16). Each step's status comes from the world (the
-// microphone permission, the keyboard's own report, a saved key) plus what
-// you chose here (skipped, or said the keyboard is added), so a step done
-// in Settings checks itself when you come back. Any step can be skipped,
-// and Home lists what is left until it is done.
+// First run (ios/prd.json IOS-011): three steps in order, allow the
+// microphone, add a key, and add the murmur keyboard with Full Access, then a
+// practice take. The key comes before the keyboard and the first take
+// (LaBroi, 2026-10-16), and the keyboard and Full Access are one step, since
+// both switches are on the same page in Settings (LaBroi, 2026-10-17). Each
+// step's status comes from the world (the microphone permission, the
+// keyboard's own report, a saved key) plus what you skipped here, so a step
+// done in Settings checks itself when you come back. Any step can be
+// skipped, and Home lists what is left until it is done.
 import AVFoundation
 import Foundation
 import Observation
@@ -19,7 +20,7 @@ import Observation
 
 @Observable @MainActor final class Setup {
     enum Step: String, CaseIterable, Sendable {
-        case microphone, key, keyboard, fullAccess, practice
+        case microphone, key, keyboard, practice
     }
 
     enum Status: Equatable, Sendable {
@@ -41,7 +42,6 @@ import Observation
 
     static let seenKey = "firstRunSeen"
     static let skippedKey = "firstRunSkipped"
-    static let keyboardKey = "firstRunKeyboardAdded"
     static let practicedKey = "firstRunPracticed"
 
     init(microphone: any MicrophoneAccess, report: @escaping @MainActor () -> KeyboardReport?, hasKey: @escaping @MainActor () -> Bool, defaults: UserDefaults = .standard) {
@@ -73,7 +73,6 @@ import Observation
     /// Checks every step again, as when you come back from Settings.
     func refresh() {
         let skipped = Set(defaults.stringArray(forKey: Self.skippedKey) ?? [])
-        let fullAccess = report()?.fullAccess == true
         func open(_ step: Step) -> Status { skipped.contains(step.rawValue) ? .skipped : .todo }
         let microphone: Status = switch self.microphone.status {
         case .granted: .done
@@ -82,10 +81,10 @@ import Observation
         }
         statuses = [
             .microphone: microphone,
-            // The keyboard reports itself only with Full Access, so its report
-            // proves both; without it, your word that it is added does.
-            .keyboard: fullAccess || defaults.bool(forKey: Self.keyboardKey) ? .done : open(.keyboard),
-            .fullAccess: fullAccess ? .done : open(.fullAccess),
+            // The keyboard reports itself only with Full Access, and without
+            // it the keyboard cannot hand a take to murmur, so only its report
+            // does this step.
+            .keyboard: report()?.fullAccess == true ? .done : open(.keyboard),
             .key: hasKey() ? .done : open(.key),
             .practice: defaults.bool(forKey: Self.practicedKey) ? .done : open(.practice)
         ]
@@ -93,12 +92,6 @@ import Observation
 
     func allowMicrophone() async {
         _ = await microphone.request()
-        refresh()
-    }
-
-    /// You added the keyboard; the app cannot see that until it reports.
-    func keyboardAdded() {
-        defaults.set(true, forKey: Self.keyboardKey)
         refresh()
     }
 

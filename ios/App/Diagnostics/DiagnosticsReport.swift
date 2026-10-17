@@ -19,8 +19,6 @@ struct DiagnosticsFacts: Sendable {
     var device: String
     /// The keyboard's own report: it writes one only with Full Access.
     var keyboard: KeyboardReport?
-    /// You said in first run that you added the keyboard.
-    var keyboardAdded: Bool
     var sessionMinutes: Int
     var sessionOn: Bool
     /// A preset's name, or custom: a custom address is never written.
@@ -48,7 +46,7 @@ enum DiagnosticsReport {
 
     static func text(_ facts: DiagnosticsFacts) -> String {
         let keyboard = facts.keyboard.map { "reported with Full Access, last \($0.at.formatted(.iso8601))" }
-            ?? "no report yet (it reports only with Full Access on; added in first run: \(facts.keyboardAdded ? "yes" : "not said"))"
+            ?? "no report yet (it reports only with Full Access on)"
         let lines = [
             "murmur diagnostics report",
             "generated: \(facts.generated.formatted(.iso8601))",
@@ -112,7 +110,6 @@ enum DiagnosticsReport {
             system: "\(UIDevice.current.systemName) \(UIDevice.current.systemVersion)",
             device: model(),
             keyboard: keyboard?.fullAccess == true ? keyboard : nil,
-            keyboardAdded: defaults.bool(forKey: Setup.keyboardKey),
             sessionMinutes: Session.Length(rawValue: minutes)?.rawValue ?? Session.Length.fifteen.rawValue,
             sessionOn: session.isOn(at: now),
             provider: name(connection.transcription.baseUrl, in: catalog),

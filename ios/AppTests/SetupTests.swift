@@ -16,10 +16,11 @@ import Testing
         Setup(microphone: access, report: { [report] in report.value }, hasKey: { [key] in key.value }, defaults: defaults)
     }
 
-    /// Four steps in order, then the practice take: your key comes before
-    /// the keyboard and the first take (LaBroi, 2026-10-16).
+    /// Three steps in order, then the practice take: your key comes before
+    /// the keyboard and the first take (LaBroi, 2026-10-16), and the keyboard
+    /// and Full Access are one trip to Settings (LaBroi, 2026-10-17).
     @Test func theStepsGoInOrder() {
-        #expect(Setup.Step.allCases == [.microphone, .key, .keyboard, .fullAccess, .practice])
+        #expect(Setup.Step.allCases.map(\.rawValue) == ["microphone", "key", "keyboard", "practice"])
         let fresh = setup()
         #expect(fresh.next == .microphone)
         #expect(fresh.remaining == Setup.Step.allCases)
@@ -45,21 +46,22 @@ import Testing
 
     /// The keyboard's own report, written only with Full Access, proves the
     /// keyboard is added and Full Access is on.
-    @Test func theKeyboardsReportProvesBothSteps() {
+    @Test func theKeyboardsReportDoesTheKeyboardStep() {
         let setup = setup()
+        #expect(setup.status(.keyboard) == .todo)
         report.value = KeyboardReport(fullAccess: true, at: .now)
         setup.refresh()
         #expect(setup.status(.keyboard) == .done)
-        #expect(setup.status(.fullAccess) == .done)
     }
 
-    /// Without Full Access the keyboard cannot report, so your word that it
-    /// is added does that step alone.
-    @Test func yourWordAddsTheKeyboardOnly() {
+    /// Without Full Access the keyboard cannot hand a take to murmur, so the
+    /// step waits for the report; an I added it tapped on an older build no
+    /// longer counts.
+    @Test func theKeyboardStepWaitsForFullAccess() {
+        defaults.set(true, forKey: "firstRunKeyboardAdded")
         let setup = setup()
-        setup.keyboardAdded()
-        #expect(setup.status(.keyboard) == .done)
-        #expect(setup.status(.fullAccess) == .todo)
+        #expect(setup.status(.keyboard) == .todo)
+        #expect(setup.remaining.contains(.keyboard))
     }
 
     @Test func aSavedKeyChecksItself() {
@@ -94,8 +96,7 @@ import Testing
     }
 
     /// Moving on goes to the next step not done yet, so a step done another
-    /// way (the report proves both keyboard steps) is passed over, and the
-    /// end is the end.
+    /// way (the keyboard's report) is passed over, and the end is the end.
     @Test func movingOnPassesStepsAlreadyDone() async {
         let setup = setup()
         await setup.allowMicrophone()
@@ -141,19 +142,21 @@ import Testing
         }
     }
 
-    /// The Full Access step says plainly what the keyboard does and never does.
-    @Test func fullAccessSaysTheKeyboardSendsNothing() {
-        let why = SetupCopy.why(.fullAccess)
-        #expect(why.contains("sends nothing anywhere"))
+    /// The keyboard step asks for Full Access and says plainly what the
+    /// keyboard does and never does.
+    @Test func theKeyboardStepSaysItSendsNothing() {
+        let why = SetupCopy.why(.keyboard)
+        #expect(why.contains("Full Access"))
+        #expect(why.contains("the keyboard sends nothing anywhere"))
         #expect(why.contains("only types the words you dictate"))
     }
 
     /// Steps done in Settings show the exact taps.
     @Test func settingsStepsShowTheTaps() {
         #expect(SetupCopy.taps(.keyboard).first == "Tap Open Settings.")
-        #expect(SetupCopy.taps(.fullAccess).contains { $0.contains("Allow Full Access") })
-        #expect(SetupCopy.progress(.key) == "Step 2 of 5")
-        #expect(SetupCopy.progress(.fullAccess) == "Step 4 of 5")
+        #expect(SetupCopy.taps(.keyboard).contains { $0.contains("Turn on murmur") && $0.contains("Allow Full Access") })
+        #expect(SetupCopy.progress(.key) == "Step 2 of 4")
+        #expect(SetupCopy.progress(.keyboard) == "Step 3 of 4")
     }
 
     @Test func everyLineFollowsTheWritingRules() {

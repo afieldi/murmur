@@ -8,7 +8,6 @@ enum SetupCopy {
         switch step {
         case .microphone: "Allow the microphone"
         case .keyboard: "Add the murmur keyboard"
-        case .fullAccess: "Turn on Full Access"
         case .key: "Add your key"
         case .practice: "Try your first take"
         }
@@ -17,8 +16,7 @@ enum SetupCopy {
     static func why(_ step: Setup.Step) -> String {
         switch step {
         case .microphone: "murmur needs the microphone to hear your takes, and it keeps nothing it hears between them."
-        case .keyboard: "The murmur keyboard puts the pill in every app, so you can dictate wherever you type."
-        case .fullAccess: "Full Access lets the keyboard hand your take to murmur; the keyboard sends nothing anywhere and only types the words you dictate."
+        case .keyboard: "The murmur keyboard puts the pill in every app, and Full Access lets it hand your take to murmur; the keyboard sends nothing anywhere and only types the words you dictate."
         case .key: "murmur sends each take to the transcription provider you choose, with your own key."
         case .practice: "Try a take here first, with the real pill, before you use it in other apps."
         }
@@ -28,8 +26,7 @@ enum SetupCopy {
     /// to murmur's own page, the closest place iOS allows.
     static func taps(_ step: Setup.Step) -> [String] {
         switch step {
-        case .keyboard: ["Tap Open Settings.", "Tap Keyboards, turn on murmur, then turn on Allow Full Access and tap Allow.", "Come back, tap the box below, and pick murmur with the globe key."]
-        case .fullAccess: ["Tap Open Settings.", "Tap Keyboards.", "Turn on Allow Full Access, then tap Allow.", "Come back, tap the box below, and pick murmur with the globe key."]
+        case .keyboard: ["Tap Open Settings.", "Tap Keyboards.", "Turn on murmur, then turn on Allow Full Access and tap Allow.", "Come back, tap the box below, and pick murmur with the globe key."]
         case .practice: ["Tap the box below.", "Hold the globe key and pick murmur.", "Tap the pill, say a sentence, and tap the pill again."]
         case .microphone, .key: []
         }
@@ -46,7 +43,6 @@ enum SetupCopy {
     static let finish = "Finish"
     static let openSettings = "Open Settings"
     static let allow = "Allow the microphone"
-    static let added = "I added it"
     static let addKey = "Add your key"
     static let closeKey = "Done"
     static let homeTitle = "Finish setting up"

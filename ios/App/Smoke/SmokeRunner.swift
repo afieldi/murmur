@@ -306,9 +306,9 @@ enum SmokeRunner {
 
     /// First run walks its steps with each permission granted and refused
     /// (IOS-011): the microphone allowed or not, and Full Access on (the
-    /// keyboard reports itself) or off (it cannot, so your word adds the
-    /// keyboard). Whatever was refused says so and waits on Home while the
-    /// rest go on.
+    /// keyboard reports itself) or off (it cannot, so the keyboard step
+    /// waits). Whatever was refused says so and waits on Home while the rest
+    /// go on.
     static func checkFirstRun() throws {
         if let failure = onMain({ await firstRunFailure() }) { throw SmokeFailure(failure) }
     }
@@ -327,15 +327,15 @@ enum SmokeRunner {
                 if fullAccess {
                     report.value = KeyboardReport(fullAccess: true, at: .now)
                     setup.refresh()
-                    guard setup.status(.keyboard) == .done, setup.status(.fullAccess) == .done else { return "\(walk): the report did not prove both keyboard steps" }
+                    guard setup.status(.keyboard) == .done else { return "\(walk): the report did not do the keyboard step" }
                 } else {
-                    setup.keyboardAdded()
-                    guard setup.status(.keyboard) == .done, setup.status(.fullAccess) == .todo else { return "\(walk): the keyboard steps read wrong without a report" }
+                    setup.refresh()
+                    guard setup.status(.keyboard) == .todo else { return "\(walk): the keyboard step read \(setup.status(.keyboard)) without a report" }
                 }
                 key.value = true
                 setup.refresh()
                 setup.practiced()
-                let left = (allowed ? [] : [Setup.Step.microphone]) + (fullAccess ? [] : [Setup.Step.fullAccess])
+                let left = (allowed ? [] : [Setup.Step.microphone]) + (fullAccess ? [] : [Setup.Step.keyboard])
                 guard setup.remaining == left else { return "\(walk): left \(setup.remaining)" }
             }
         }
