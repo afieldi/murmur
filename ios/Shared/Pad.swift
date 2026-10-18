@@ -31,7 +31,8 @@ enum Pad {
     /// After Note in the pill's menu (IOS-023), until the take starts.
     static let noteNext = "Next take is a note"
     static let noteMenu = "Note"
-    static let typeMenu = "Type the next take"
+    /// Under the pill once a note lands (LaBroi, 2026-10-18).
+    static let openNote = "Open note"
     /// Transform in the pill's menu, offered with text selected (IOS-024),
     /// and what the pad says once the rewrite is in, or waits.
     static let transformMenu = "Transform"
@@ -147,6 +148,27 @@ enum Pad {
         }
         out.append(source.substring(from: cursor))
         return out.filter { !$0.allSatisfy(\.isWhitespace) }
+    }
+
+    /// An item in the pill's menu.
+    struct MenuItem: Equatable {
+        let title: String
+        let symbol: String
+        let on: Bool
+    }
+
+    /// Note is one switch (LaBroi, 2026-10-18): the same item, checked
+    /// while the next take is a note.
+    static func noteItem(armed: Bool) -> MenuItem {
+        MenuItem(title: noteMenu, symbol: "note.text", on: armed)
+    }
+
+    /// Where Open note goes: murmur, which hands the note on to Obsidian
+    /// when the notes are in a vault. A keyboard may open no app but its
+    /// own (App Review Guidelines 4.4.1, checked 2026-10-18).
+    static func noteLink(_ entry: MailboxEntry?, scheme: String = TakeLink.scheme) -> URL? {
+        guard let entry, entry.phase == .noted, let file = entry.notedFile else { return nil }
+        return NoteLink.murmur(file: file, scheme: scheme)
     }
 
     /// The note receipt (IOS-023): where the note landed.

@@ -90,6 +90,32 @@ import Testing
         #expect(!FileManager.default.fileExists(atPath: vault.path(percentEncoded: false)))
     }
 
+    /// Picking the murmur folder itself (LaBroi, 2026-10-18), the one the
+    /// Mac made in the vault, writes into it: the same files the Mac
+    /// writes, not a murmur folder inside it. A pick made before this
+    /// counts too.
+    @Test func pickingTheMurmurFolderWritesIntoIt() throws {
+        let folder = root.appending(path: "Vault/murmur", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let choice = NotesFolderChoice(defaults)
+        try choice.pick(folder)
+        let store = choice.store()
+        try store.append("murmur/inbox/2026-10-18.md", "one\n")
+        #expect(try String(contentsOf: folder.appending(path: "inbox/2026-10-18.md"), encoding: .utf8) == "one\n")
+        #expect(!FileManager.default.fileExists(atPath: folder.appending(path: "murmur").path(percentEncoded: false)))
+        #expect(store.read("murmur/inbox/2026-10-18.md") == "one\n")
+        #expect(store.inboxDays(rules: try BundledRules.sorter()) == ["murmur/inbox/2026-10-18.md"])
+    }
+
+    /// A vault that is itself named murmur nests as the Mac does.
+    @Test func aVaultNamedMurmurStillNests() throws {
+        let vault = root.appending(path: "Murmur", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: vault.appending(path: ".obsidian"), withIntermediateDirectories: true)
+        let store = NoteStore.picked(vault)
+        try store.append("murmur/inbox/2026-10-18.md", "one\n")
+        #expect(FileManager.default.fileExists(atPath: vault.appending(path: "murmur/inbox/2026-10-18.md").path(percentEncoded: false)))
+    }
+
     @Test func keepNotesInMurmurForgetsThePick() throws {
         let vault = root.appending(path: "vault", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: vault, withIntermediateDirectories: true)

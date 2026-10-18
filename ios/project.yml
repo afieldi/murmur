@@ -72,6 +72,9 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: $(MURMUR_BUNDLE_ID)
             CFBundleURLSchemes: [$(MURMUR_BUNDLE_ID)]
+        # A note's receipt opens in Obsidian only when Obsidian is there to
+        # take the link (IOS-023).
+        LSApplicationQueriesSchemes: [obsidian]
         # New note on a press and hold of murmur's icon (IOS-023).
         UIApplicationShortcutItems:
           - UIApplicationShortcutItemType: $(MURMUR_BUNDLE_ID).note

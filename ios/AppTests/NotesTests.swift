@@ -156,6 +156,24 @@ final class ScriptedChat: @unchecked Sendable {
         #expect(notes.state.newest == nil)
     }
 
+    /// A note kept from the keyboard says which day's file it landed in, for
+    /// Open note under the pill (LaBroi, 2026-10-18).
+    @Test func aKeptNoteSaysWhereToOpenIt() {
+        let notes = notes(sort: false)
+        #expect(notes.keep("Call the dentist.", at: at) == NoteKept(place: "inbox", file: "murmur/inbox/2026-09-18.md"))
+    }
+
+    /// murmur's note link opens only an inbox day murmur wrote: a link
+    /// from any other app naming another file opens nothing.
+    @Test func aLinkOutsideTheInboxOpensNothing() {
+        let notes = notes(sort: false)
+        notes.save("Call the dentist.", at: at)
+        #expect(notes.inboxFile("murmur/inbox/2026-09-18.md") == "murmur/inbox/2026-09-18.md")
+        #expect(notes.inboxFile("murmur/inbox/2026-09-19.md") == nil)
+        #expect(notes.inboxFile("murmur/todo.md") == nil)
+        #expect(notes.inboxFile("murmur/inbox/../todo.md") == nil)
+    }
+
     /// A folder chosen in Settings takes the next note; the last stays put.
     @Test func aNewFolderTakesTheNextNote() async throws {
         let counts = Counts()

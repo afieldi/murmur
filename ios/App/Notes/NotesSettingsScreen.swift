@@ -177,7 +177,7 @@ enum NotesSettingsCopy {
     static let ownFolder = "In murmur"
     static let chooseFolder = "Choose folder"
     static let useOwn = "Keep notes in murmur"
-    static let folderFooter = "Pick a folder of your own, such as your Obsidian vault, and murmur writes the same markdown files there that it writes on a Mac: murmur/inbox, murmur/todo.md, and murmur/ideas.md. Notes already written stay where they are."
+    static let folderFooter = "Pick a folder of your own, such as your Obsidian vault, and murmur writes the same markdown files there that it writes on a Mac: murmur/inbox, murmur/todo.md, and murmur/ideas.md. To share them with your Mac, pick the vault your Mac uses. Notes already written stay where they are."
     static let notKept = "murmur could not keep that folder. Try again."
 
     /// What VoiceOver reads for the folder row.

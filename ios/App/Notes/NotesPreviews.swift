@@ -11,6 +11,7 @@ import SwiftUI
 #Preview("Notes, folder lost") { NotesPreview(.lost) }
 #Preview("New note, ready") { NoteTakePreview(.ready) }
 #Preview("New note, noted") { NoteTakePreview(.noted) }
+#Preview("New note, noted in a vault") { NoteTakePreview(.notedInVault) }
 #Preview("New note, not saved") { NoteTakePreview(.notSaved) }
 #Preview("Settings, notes") {
     NavigationStack { NotesSettingsScreen() }
@@ -33,10 +34,13 @@ private final class PreviewChat: @unchecked Sendable {
 }
 
 /// Scratch notes for a preview: a folder of their own and a state file.
-@MainActor private func previewNotes(lost: Bool = false, chat: PreviewChat? = nil) -> Notes? {
+@MainActor private func previewNotes(lost: Bool = false, vault: Bool = false, chat: PreviewChat? = nil) -> Notes? {
     guard let rules = try? BundledRules.sorter() else { return nil }
     let root = FileManager.default.temporaryDirectory.appending(path: "murmur-notes-preview-\(UUID().uuidString)", directoryHint: .isDirectory)
-    let folder = NoteStore(root: root.appending(path: "notes", directoryHint: .isDirectory), picked: lost, lost: lost)
+    let notesRoot = root.appending(path: "notes", directoryHint: .isDirectory)
+    // A vault is a folder with Obsidian's settings folder in it.
+    if vault { try? FileManager.default.createDirectory(at: notesRoot.appending(path: ".obsidian"), withIntermediateDirectories: true) }
+    let folder = NoteStore(root: notesRoot, picked: lost || vault, lost: lost)
     return Notes(
         folder: folder, rules: rules, stateFile: NotesStateFile(file: root.appending(path: "state.json")),
         sortOn: { true }, ask: { chat?.ask }
@@ -76,7 +80,7 @@ struct NotesPreview: View {
 }
 
 struct NoteTakePreview: View {
-    enum Scene { case ready, noted, notSaved }
+    enum Scene: CaseIterable { case ready, noted, notedInVault, notSaved }
 
     let scene: Scene
     @State private var model: TakeModel?
@@ -86,12 +90,13 @@ struct NoteTakePreview: View {
 
     var body: some View {
         NavigationStack {
-            if let model, let notes { NoteTakeScreen(model: model, notes: notes) }
+            // Obsidian stands in as installed, so a vault's receipt points out.
+            if let model, let notes { NoteTakeScreen(model: model, notes: notes, opens: { _ in true }) }
         }
         .tint(Tokens.brand)
         .preferredColorScheme(.dark)
         .task {
-            let notes = previewNotes()
+            let notes = previewNotes(vault: scene == .notedInVault)
             self.notes = notes
             model = await Self.model(for: scene, notes: notes)
         }

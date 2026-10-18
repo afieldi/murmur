@@ -34,6 +34,8 @@ struct MailboxEntry: Codable, Equatable, Sendable {
     var typed: Typed? = nil
     /// Where a note landed, for the keyboard's receipt (IOS-023): inbox.
     var noted: String? = nil
+    /// The day's file the note landed in, for Open note under the pill.
+    var notedFile: String? = nil
     /// A rewrite's selection as it was (IOS-024), while the rewrite waits
     /// to be typed: once it is, the original takes the words' place, so
     /// Insert last brings it back.

@@ -33,7 +33,7 @@ import Observation
     private let log: ActivityLog?
     /// Saves a note's words; the word for the receipt, or nil when it could
     /// not be saved (IOS-023).
-    private let keepNote: @MainActor (String, Date) -> String?
+    private let keepNote: @MainActor (String, Date) -> NoteKept?
     /// Rewrites a selection by a spoken instruction (IOS-024); nil when the
     /// transform's rules did not load.
     private let rewriter: Rewriter?
@@ -56,7 +56,7 @@ import Observation
     init(
         model: TakeModel, mailbox: Mailbox, limit: TimeInterval = KeyboardBridge.takeLimit, levels: LevelFile = .shared,
         log: ActivityLog? = nil, announce: @escaping @MainActor (Signal) -> Void = { $0.post() },
-        keepNote: @escaping @MainActor (String, Date) -> String? = { _, _ in nil }, rewriter: Rewriter? = nil,
+        keepNote: @escaping @MainActor (String, Date) -> NoteKept? = { _, _ in nil }, rewriter: Rewriter? = nil,
         keepAlive: @escaping @MainActor () -> @MainActor () -> Void = { {} }
     ) {
         self.model = model
@@ -207,8 +207,8 @@ import Observation
         case .words(let text):
             // A note that could not be saved is typed instead: the words are
             // never lost.
-            if note, let place = keepNote(text, startedAt) {
-                write(.noted, noted: place, ends: true)
+            if note, let kept = keepNote(text, startedAt) {
+                write(.noted, kept: kept, ends: true)
             } else {
                 write(.ready, words: text, ends: true)
             }
@@ -236,10 +236,13 @@ import Observation
     }
 
     private func write(
-        _ phase: MailboxEntry.Phase, words: String? = nil, noted: String? = nil, original: String? = nil, line: String? = nil, ends: Bool = false
+        _ phase: MailboxEntry.Phase, words: String? = nil, kept: NoteKept? = nil, original: String? = nil, line: String? = nil, ends: Bool = false
     ) {
         guard let take else { return }
-        mailbox.write(MailboxEntry(take: take, phase: phase, words: words, at: startedAt, noted: noted, original: original, line: line))
+        mailbox.write(MailboxEntry(
+            take: take, phase: phase, words: words, at: startedAt,
+            noted: kept?.place, notedFile: kept?.file, original: original, line: line
+        ))
         announce(.changed)
         if ends {
             self.take = nil
@@ -258,7 +261,7 @@ extension KeyboardBridge {
         guard let model = TakeModel.live(), let mailbox = Mailbox.shared else { return nil }
         let bridge = KeyboardBridge(
             model: model, mailbox: mailbox, log: .standard,
-            keepNote: { words, at in Notes.live()?.save(words, at: at) },
+            keepNote: { words, at in Notes.live()?.keep(words, at: at) },
             rewriter: Rewriter.live(), keepAlive: BackgroundTime.hold
         )
         bridge.listen()

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+import MurmurCore
 import SwiftUI
 
 /// The app's root: Home (IOS-012), with Dictate and Settings at the top.
@@ -11,7 +12,10 @@ struct ContentView: View {
     @State private var setup = Setup.live()
     @State private var history = History.live()
     @State private var firstRun: Setup.Step?
+    /// The note murmur's note link asked for (IOS-023).
+    @State private var openedNote: OpenedNote?
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         NavigationStack {
@@ -71,10 +75,43 @@ struct ContentView: View {
             }
         }
         .onOpenURL { url in
+            if let file = NoteLink.file(in: url) {
+                openNote(file)
+                return
+            }
             Task { await opener.open(url) }
+        }
+        .sheet(item: $openedNote) { note in
+            NavigationStack {
+                NoteFileScreen(title: Receipt.placeName(note.file), relative: note.file, folder: note.folder)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("Done") { openedNote = nil }
+                        }
+                    }
+            }
+            .preferredColorScheme(.dark)
         }
         .fullScreenCover(isPresented: $opener.showing) { RecordingRoute() }
     }
+}
+
+extension ContentView {
+    /// Open note under the pill (IOS-023): murmur hands the note on to
+    /// Obsidian when the notes are in a vault and Obsidian is there, and
+    /// shows it itself otherwise. Only an inbox day murmur wrote opens.
+    private func openNote(_ file: String) {
+        guard let notes = Notes.live(), let day = notes.inboxFile(file) else { return }
+        let link = NoteReceipt.link(day, in: notes.folder, opens: { UIApplication.shared.canOpenURL($0) })
+        NoteOpening.open(day, link: link, with: { openURL($0, completion: $1) }, show: { openedNote = OpenedNote(file: $0, folder: notes.folder) })
+    }
+}
+
+/// A note file opened from murmur's note link.
+struct OpenedNote: Identifiable {
+    let file: String
+    let folder: NoteStore
+    var id: String { file }
 }
 
 #Preview {

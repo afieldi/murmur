@@ -44,12 +44,14 @@ final class KeyboardViewController: UIInputViewController {
         get { memory.bool(forKey: "noteNext") }
         set { memory.set(newValue, forKey: "noteNext") }
     }
+    /// murmur's link to the note that just landed, for Open note.
+    private var noteLink: URL?
 
     override func viewDidLoad() {
         super.viewDidLoad()
         pad.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(pad)
-        let height = view.heightAnchor.constraint(equalToConstant: 236)
+        let height = view.heightAnchor.constraint(equalToConstant: PadView.height)
         height.priority = .defaultHigh
         NSLayoutConstraint.activate([
             height,
@@ -63,6 +65,7 @@ final class KeyboardViewController: UIInputViewController {
         pad.space.addTarget(self, action: #selector(tapSpace), for: .touchUpInside)
         pad.returnKey.addTarget(self, action: #selector(tapReturn), for: .touchUpInside)
         pad.insertLast.addTarget(self, action: #selector(tapInsertLast), for: .touchUpInside)
+        pad.openNote.addTarget(self, action: #selector(tapOpenNote), for: .touchUpInside)
         pad.delete.addTarget(self, action: #selector(deleteDown), for: .touchDown)
         pad.delete.addTarget(self, action: #selector(deleteUp), for: [.touchUpInside, .touchUpOutside, .touchCancel])
         pad.pill.addTarget(self, action: #selector(pillDown), for: .touchDown)
@@ -192,7 +195,8 @@ final class KeyboardViewController: UIInputViewController {
         // The last take's ending gives way to the new take at once.
         pad.setStage(.idle)
         mailbox.ask(take, note: note, selection: original)
-        pad.insertLast.isHidden = true
+        pad.offer(nil)
+        noteLink = nil
         phase = nil
         lookedAgain = false
         if SessionState.read().isOn() {
@@ -252,9 +256,22 @@ final class KeyboardViewController: UIInputViewController {
         end(Pad.busy)
     }
 
+    /// Opens the note that just landed in murmur, which hands it on to
+    /// Obsidian when the notes are in a vault: a keyboard may open no app
+    /// but its own (App Review Guidelines 4.4.1).
+    @objc private func tapOpenNote() {
+        guard let noteLink, let scene = view.window?.windowScene else { return }
+        scene.open(noteLink, options: nil, completionHandler: nil)
+    }
+
+    private func showOpenNote(_ link: URL?) {
+        noteLink = link
+        pad.offer(link == nil ? nil : .openNote)
+    }
+
     @objc private func tapInsertLast() {
         if let words = Mailbox.shared?.claim() { insert(words) }
-        pad.insertLast.isHidden = true
+        pad.offer(nil)
     }
 
     @objc private func tapSpace() { textDocumentProxy.insertText(" ") }
@@ -308,7 +325,7 @@ final class KeyboardViewController: UIInputViewController {
                     ])
                 }
             },
-            UIAction(title: armed ? Pad.typeMenu : Pad.noteMenu, image: UIImage(systemName: armed ? "keyboard" : "note.text")) { [weak self] _ in
+            Self.action(Pad.noteItem(armed: armed)) { [weak self] in
                 guard let self else { return }
                 self.noteNext = !armed
                 if self.waiting == nil { self.pad.status.text = self.noteNext ? Pad.noteNext : Pad.idleHint }
@@ -319,6 +336,11 @@ final class KeyboardViewController: UIInputViewController {
             items.append(UIAction(title: "End session", image: UIImage(systemName: "stop.circle")) { _ in Signal.end.post() })
         }
         pad.pill.menu = UIMenu(children: items)
+    }
+
+    /// A menu item, checked while it is on.
+    private static func action(_ item: Pad.MenuItem, _ handler: @escaping @MainActor () -> Void) -> UIAction {
+        UIAction(title: item.title, image: UIImage(systemName: item.symbol), state: item.on ? .on : .off) { _ in handler() }
     }
 
     /// Reads the mailbox and does what the newest entry asks, only while
@@ -350,7 +372,7 @@ final class KeyboardViewController: UIInputViewController {
                 textDocumentProxy.insertText(words)
                 mark.typed(count: UIPasteboard.general.changeCount)
                 end(Pad.rewritten, showing: .inserted)
-                pad.insertLast.isHidden = false
+                pad.offer(.insertLast)
             case .lookAgain:
                 lookedAgain = true
                 lookAgain?.invalidate()
@@ -360,20 +382,23 @@ final class KeyboardViewController: UIInputViewController {
             case .offer:
                 mailbox.offer(take)
                 end(Pad.selectionMoved)
-                pad.insertLast.isHidden = false
+                pad.offer(.insertLast)
             }
         case .insert(let take):
             if let words = mailbox.claim(take) { insert(words) }
             end(nil, showing: .inserted)
         case .offerInsertLast:
-            pad.insertLast.isHidden = false
+            pad.offer(.insertLast)
             if let take = entry?.take { mailbox.offer(take) }
             if entry?.take == waiting?.take { end(nil) }
         case .status(let line):
             pad.status.text = line
             if phase == .nothing { end(line, showing: .noSpeech) }
             if phase == .failed { end(line, showing: .error) }
-            if phase == .noted { end(line, showing: .inserted) }
+            if phase == .noted {
+                end(line, showing: .inserted)
+                showOpenNote(Pad.noteLink(entry))
+            }
         case .none:
             break
         }

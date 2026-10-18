@@ -327,12 +327,20 @@ A painting is made from its takes: deleting a take takes its stroke away, and Cl
 Tap New note on murmur's Home screen and talk. When you stop, the words are kept as a note instead of offered to copy, and murmur says Noted to inbox. An iPhone has no hotkey, so murmur gives you three quicker ways in, each opening New note already listening:
 
 - **The murmur icon:** touch and hold murmur's icon on the Home Screen and tap New note.
-- **Control Center or the Action Button:** add the New note control the same way as Start murmur (see How do I start murmur from Control Center or the Action Button?). On an iPhone with an Action Button, one press opens a note.
+- **Control Center or the Action Button:** add the New note control, the one with a pencil on a square, the same way as Start murmur (see How do I start murmur from Control Center or the Action Button?). Start murmur, the waveform, starts a session and records nothing by itself; New note opens a note. On an iPhone with an Action Button, one press opens a note.
 - **Shortcuts:** murmur adds New murmur note to the Shortcuts app.
 
-From any app, use the murmur keyboard: press and hold the pill and tap Note. Under the pill it says Next take is a note. Tap the pill and talk as usual: when you stop, nothing is typed, and the line under the pill says Noted to inbox. Note is for the next take only; the take after it types again. To change your mind before you talk, press and hold the pill and tap Type the next take.
+From any app, use the murmur keyboard: press and hold the pill and tap Note. Note shows a checkmark, and under the pill it says Next take is a note. Tap the pill and talk as usual: when you stop, nothing is typed, and the line under the pill says Noted to inbox. Note is for the next take only; the take after it types again. To change your mind before you talk, press and hold the pill and tap Note again to clear the checkmark.
+
+With a session running, the note is taken without leaving the app you are in. With none, murmur opens to listen, as it does for any take, since an iPhone keyboard cannot use the microphone itself, and you swipe back when you are done (see How do I start murmur from Control Center or the Action Button?).
 
 Every note lands first in that day's inbox file, under the time you said it, word for word as cleanup left it, the same file a Mac writes (murmur/inbox/2026-10-14.md for a note on October 14). The take is in your takes on Home too, as every take is. If murmur cannot write the note, the keyboard types the words instead, so a note is never lost.
+
+## How do I open a note right after I say it on iPhone?
+
+Tap its receipt. In New note, tap Noted to inbox: the day's inbox file the note landed in opens in Obsidian when your notes folder is in an Obsidian vault and Obsidian is on your iPhone, and in murmur otherwise. Under the pill, tap Open note: murmur opens and does the same, since an iPhone keyboard may open no app but its own (Apple's App Review Guidelines, 4.4.1, checked 2026-10-18).
+
+murmur knows a vault by its place in iCloud Drive, then Obsidian, or by the settings folder Obsidian keeps in every vault, when the folder you picked is the vault itself. Obsidian opens the file by the vault's name and the file's path in it (Obsidian's help, Obsidian URI, checked 2026-10-18). The Notes screen lists every inbox day too.
 
 ## How does murmur sort my notes on iPhone?
 
@@ -345,6 +353,8 @@ With sorting off, notes stay in the inbox only, and the words of a note never le
 ## Can murmur save my notes to Obsidian on iPhone?
 
 Yes. Your notes are plain markdown files, so any folder works, an Obsidian vault included. Tap the gear, then Notes, then Choose folder, and pick your vault. On iPhone, Obsidian keeps a vault that syncs through iCloud in iCloud Drive, then Obsidian, then your vault's name, and any other vault (Obsidian Sync, for one) in On My iPhone, then Obsidian, then your vault's name (Obsidian's help, checked 2026-10-14). murmur writes there what it writes on a Mac with the same folder: murmur/inbox for each day's notes, murmur/todo.md, and murmur/ideas.md. Point the Mac at the same vault and both add to the same files.
+
+To share notes with your Mac, pick the vault itself, the folder that has murmur's folder in it, the same one your Mac's notes folder points to. Picking the murmur folder inside it works too: a folder named murmur that is not itself a vault is taken as murmur's own folder, so the notes go straight into it instead of into a second murmur folder inside it. For a vault On My iPhone, though, pick the vault itself if you want notes to open in Obsidian: there murmur can tell a vault only by looking inside the folder you picked.
 
 If both devices add to the same day's file before they sync, a vault in iCloud Drive can keep only one of the two versions. Obsidian Sync merges the two, except when both devices start the same day's file within a couple of minutes of each other, when it keeps one (Obsidian's help, checked 2026-10-14). Either way the words are still in that device's takes. Notes already written stay where they were: switching folders moves nothing. To go back, tap Keep notes in murmur. If murmur can no longer reach the folder, say after the vault moved, Settings, Notes says so, and a note from the keyboard is typed instead until you choose the folder again.
 

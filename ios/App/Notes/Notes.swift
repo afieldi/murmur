@@ -23,6 +23,13 @@ struct NewestNote: Codable, Equatable, Sendable {
     var place: String { Receipt.whereText(inbox: inbox, sorted: filed) }
 }
 
+/// A note kept from the keyboard: the word for its receipt (inbox), and
+/// the day's file it landed in, for Open note under the pill.
+struct NoteKept: Equatable, Sendable {
+    let place: String
+    let file: String
+}
+
 /// What the notes keep between launches.
 struct NotesState: Codable, Equatable, Sendable {
     var newest: NewestNote?
@@ -115,6 +122,17 @@ struct NotesStateFile: Sendable {
         keep()
         if sortOn() { queue { notes in await notes.run { memory, ask in await NoteSort.sort(input, memory: memory, folder: notes.folder, rules: notes.rules, ask: ask) } } }
         return Receipt.pillPlace(inbox, max: rules.pillPlaceMax)
+    }
+
+    /// Saves a note from the keyboard, and says where it landed.
+    func keep(_ text: String, at when: Date = .now) -> NoteKept? {
+        guard let place = save(text, at: when), let file = state.newest?.inbox else { return nil }
+        return NoteKept(place: place, file: file)
+    }
+
+    /// The file a note link names, only when it is an inbox day here.
+    func inboxFile(_ file: String) -> String? {
+        folder.inboxDays(rules: rules).contains(file) ? file : nil
     }
 
     /// Sends the newest note's unsettled lines again.

@@ -1,17 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // The dictation pad's keys (ios/prd.json IOS-008): the pill in the middle,
 // drawn by the one pill module (IOS-010),
-// with globe, space, delete, and return around it, and Insert last when a
-// take landed after you left its field. Kept in Shared so the app can
+// with globe, space, delete, and return around it, Insert last when a
+// take landed after you left its field, and Open note when a note landed. Kept in Shared so the app can
 // preview it; only the keyboard wires it to a text field.
 import UIKit
 
 final class PadView: UIView {
+    /// The keyboard's height.
+    static let height: CGFloat = 236
+
     let pill = UIButton(type: .system)
     /// The waveform inside the pill.
     let wave = PillView()
     let status = UILabel()
     let insertLast = UIButton(type: .system)
+    /// Opens the note that just landed (LaBroi, 2026-10-18).
+    let openNote = UIButton(type: .system)
     let globe = UIButton(type: .system)
     let space = UIButton(type: .system)
     let delete = UIButton(type: .system)
@@ -50,13 +55,17 @@ final class PadView: UIView {
         insertLook.baseForegroundColor = UIColor(Tokens.brand)
         insertLast.configuration = insertLook
         insertLast.isHidden = true
+        var openLook = insertLook
+        openLook.title = Pad.openNote
+        openNote.configuration = openLook
+        openNote.isHidden = true
 
         key(globe, image: "globe", label: "Next keyboard")
         key(space, title: "space", label: "Space")
         key(delete, image: "delete.left", label: "Delete")
         key(returnKey, title: "Return", label: "Return")
 
-        let top = UIStackView(arrangedSubviews: [insertLast, pill, status, fullAccess])
+        let top = UIStackView(arrangedSubviews: [insertLast, openNote, pill, status, fullAccess])
         top.axis = .vertical
         top.alignment = .center
         top.spacing = 6
@@ -89,6 +98,7 @@ final class PadView: UIView {
             wave.topAnchor.constraint(equalTo: pill.topAnchor, constant: 14),
             wave.bottomAnchor.constraint(equalTo: pill.bottomAnchor, constant: -14),
             insertLast.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            openNote.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
             pill.widthAnchor.constraint(greaterThanOrEqualToConstant: 176),
             globe.widthAnchor.constraint(equalToConstant: 48),
             delete.widthAnchor.constraint(equalToConstant: 56),
@@ -107,6 +117,15 @@ final class PadView: UIView {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("PadView is built in code") }
+
+    /// What the space above the pill offers, one at a time, so the pad
+    /// never runs out of height.
+    enum Offer { case insertLast, openNote }
+
+    func offer(_ offer: Offer?) {
+        insertLast.isHidden = offer != .insertLast
+        openNote.isHidden = offer != .openNote
+    }
 
     /// The pill in a stage: the waveform draws it, and VoiceOver reads it as
     /// a button with the stage's name.

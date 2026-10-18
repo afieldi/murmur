@@ -18,8 +18,57 @@ struct NoteStore: NoteFolder, Equatable {
     /// A picked folder murmur can no longer reach: reads find nothing and
     /// writes fail, so a note is typed or kept elsewhere instead of lost.
     var lost = false
+    /// The picked folder is murmur's own folder, the one the Mac made in a
+    /// vault (LaBroi, 2026-10-18), so the layout's murmur folder is this one.
+    var inside = false
 
     static let standard = NoteStore(root: URL.applicationSupportDirectory.appending(path: "notes", directoryHint: .isDirectory))
+    /// The folder the layout keeps every file in: murmur/inbox, murmur/todo.md.
+    static let layoutFolder = "murmur"
+    /// The folder iCloud Drive keeps Obsidian's vaults in, on any device.
+    static let obsidianCloud = ["iCloud~md~obsidian", "Documents"]
+    /// The rest of iCloud Drive, where Obsidian on iPhone opens no vault.
+    static let cloudDrive = "com~apple~CloudDocs"
+
+    /// A folder you picked, as murmur uses it: one named murmur that is not
+    /// itself a vault is murmur's folder, so the notes go straight into it.
+    static func picked(_ url: URL) -> NoteStore {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        let named = url.lastPathComponent.lowercased() == layoutFolder
+        return NoteStore(root: url, picked: true, inside: named && !isVault(url))
+    }
+
+    /// The Obsidian vault the notes are in, as its name and the picked
+    /// folder's path inside it: the vault the path runs through in iCloud
+    /// Drive's Obsidian folder, or the picked folder itself when it holds
+    /// the settings folder Obsidian keeps in every vault. Read from the
+    /// path alone where it can be, so no lookup on disk can disagree.
+    private var vault: (name: String, below: [String])? {
+        guard picked else { return nil }
+        let parts = root.pathComponents
+        let cloud = Self.obsidianCloud
+        if let at = parts.indices.first(where: { Array(parts[$0...].prefix(cloud.count)) == cloud }), at + cloud.count < parts.count {
+            let top = at + cloud.count
+            return (parts[top], Array(parts[(top + 1)...]))
+        }
+        // Obsidian on iPhone opens vaults only in its own folders.
+        guard !parts.contains(Self.cloudDrive) else { return nil }
+        let found = reachable { Self.isVault(root) } ?? false
+        return found ? (root.lastPathComponent, []) : nil
+    }
+
+    /// Obsidian's link to a file here, when the notes are in a vault.
+    func obsidianLink(_ relative: String) -> URL? {
+        guard let vault, let inside = parts(relative) else { return nil }
+        return NoteLink.obsidian(vault: vault.name, file: (vault.below + inside).joined(separator: "/"))
+    }
+
+    private static func isVault(_ url: URL) -> Bool {
+        var isFolder: ObjCBool = false
+        let settings = url.appending(path: ".obsidian", directoryHint: .isDirectory)
+        return FileManager.default.fileExists(atPath: settings.path(percentEncoded: false), isDirectory: &isFolder) && isFolder.boolValue
+    }
 
     func read(_ relative: String) -> String? {
         guard let url = url(relative) else { return nil }
@@ -43,11 +92,18 @@ struct NoteStore: NoteFolder, Equatable {
         return names.filter { $0.hasSuffix(".md") }.sorted(by: >).map { "\(folder)/\($0)" }
     }
 
-    /// A path inside the folder, never outside it.
+    /// A path inside the folder, never outside it. In murmur's own folder
+    /// the layout's murmur folder is the folder itself.
     func url(_ relative: String) -> URL? {
-        let parts = relative.split(separator: "/", omittingEmptySubsequences: true)
+        parts(relative)?.reduce(root) { $0.appending(path: $1) }
+    }
+
+    /// A path's parts below the folder, nil for one that would leave it.
+    private func parts(_ relative: String) -> [String]? {
+        var parts = relative.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
         guard !parts.isEmpty, !parts.contains(where: { $0 == "." || $0 == ".." }) else { return nil }
-        return parts.reduce(root) { $0.appending(path: String($1)) }
+        if inside, parts.count > 1, parts[0] == Self.layoutFolder { parts.removeFirst() }
+        return parts
     }
 
     private func write(_ relative: String, merging: Bool, _ next: (Data) -> Data) throws {
@@ -151,6 +207,6 @@ struct NotesFolderChoice {
                 defaults.set(fresh, forKey: Self.bookmarkKey)
             }
         }
-        return NoteStore(root: url, picked: true)
+        return NoteStore.picked(url)
     }
 }

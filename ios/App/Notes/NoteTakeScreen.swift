@@ -40,10 +40,14 @@ struct NoteTakeScreen: View {
     let model: TakeModel
     let notes: Notes
     var startNow = false
+    /// Whether an app is there to take a link; previews stand in for Obsidian.
+    var opens: @MainActor (URL) -> Bool = { UIApplication.shared.canOpenURL($0) }
     @State private var opener = NoteOpener.shared
     /// The last open from the icon, the control, or Shortcuts this screen
     /// started listening for.
     @State private var handled: Int?
+    /// The day's file the receipt opened in murmur.
+    @State private var shown: String?
 
     var body: some View {
         List {
@@ -59,7 +63,7 @@ struct NoteTakeScreen: View {
                     Text(kept.words)
                         .textSelection(.enabled)
                     if let place = kept.place {
-                        Outcome(title: Pad.noted(place), detail: notes.state.newest?.place ?? "", color: Tokens.brand, symbol: "note.text")
+                        NoteReceipt(place: place, notes: notes, shown: $shown, opens: opens)
                     } else {
                         Outcome(title: "Not saved", detail: NotesCopy.notSaved, color: Tokens.red, symbol: "xmark.circle")
                     }
@@ -78,6 +82,9 @@ struct NoteTakeScreen: View {
         .tint(Tokens.brand)
         .navigationTitle(NotesCopy.newNote)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(item: $shown) { file in
+            NoteFileScreen(title: Receipt.placeName(file), relative: file, folder: notes.folder)
+        }
         .sensoryFeedback(.impact(weight: .light), trigger: model.isRecording)
         .task(id: startNow ? opener.request : nil) {
             // Once for each open, so a second press of the Action Button
@@ -87,6 +94,63 @@ struct NoteTakeScreen: View {
             if !model.isRecording, !model.isBusy { await model.start(as: .note) }
         }
         .onDisappear { model.cancel(ifFor: .note) }
+    }
+}
+
+/// A note's receipt, which opens the day's file (LaBroi, 2026-10-18): in
+/// Obsidian when the notes are in a vault and Obsidian is there, and in
+/// murmur otherwise.
+struct NoteReceipt: View {
+    let place: String
+    let notes: Notes
+    @Binding var shown: String?
+    /// Whether an app is there to take a link; previews stand in for Obsidian.
+    var opens: @MainActor (URL) -> Bool = { UIApplication.shared.canOpenURL($0) }
+    @Environment(\.openURL) private var openURL
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        let file = notes.state.newest?.inbox
+        let link = Self.link(file, in: notes.folder, opens: opens)
+        // At the accessibility sizes the mark goes under the words, which
+        // keep the row's width.
+        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))
+        Button {
+            guard let file else { return }
+            NoteOpening.open(file, link: link, with: { openURL($0, completion: $1) }, show: { shown = $0 })
+        } label: {
+            layout {
+                Outcome(title: Pad.noted(place), detail: notes.state.newest?.place ?? "", color: Tokens.brand, symbol: "note.text")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                // Out to another app, or on within murmur.
+                Image(systemName: link == nil ? "chevron.right" : "arrow.up.forward.app")
+                    .foregroundStyle(Tokens.textDim)
+                    .accessibilityHidden(true)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(link == nil ? NotesCopy.opensHere : NotesCopy.opensInObsidian)
+    }
+
+    /// Obsidian's link to the day's file, when the notes are in a vault and
+    /// Obsidian is there to take it.
+    static func link(_ file: String?, in folder: NoteStore, opens: @MainActor (URL) -> Bool) -> URL? {
+        guard let file, let link = folder.obsidianLink(file), opens(link) else { return nil }
+        return link
+    }
+}
+
+/// Opens a note's day file: in Obsidian when there is a link and Obsidian
+/// takes it, and in murmur when it does not or there is none (LaBroi: "If
+/// the user doesn't have Obsidian, then it should open to the app where
+/// it's saved locally").
+@MainActor enum NoteOpening {
+    static func open(_ file: String, link: URL?, with openURL: (URL, @escaping (Bool) -> Void) -> Void, show: @escaping (String) -> Void) {
+        guard let link else { return show(file) }
+        openURL(link) { accepted in
+            if !accepted { show(file) }
+        }
     }
 }
 
