@@ -54,6 +54,10 @@ Build 482 (TestFlight 5, uploaded 2026-10-18, the fixes from LaBroi's notes chec
 
 > Fixes from your notes check on build 479: in New note, tap Noted to inbox to open the note, in Obsidian when your notes folder is in a vault and Obsidian is on the phone, and in murmur otherwise. After the keyboard keeps a note, Open note shows above the pill; it opens murmur, which hands the note to Obsidian, since Apple lets a keyboard open no other app. Note in the pill's menu is one switch with a checkmark, and picking the murmur folder in your vault writes into it, not into a second murmur folder. Everything from build 479 still applies. If something goes wrong, Settings, Diagnostics, Save report makes a report you can read and then share.
 
+Build 485 (TestFlight 6, uploaded 2026-10-18, the fixes from LaBroi's re-check of build 482; set the same way):
+
+> Fixes from your re-check of build 482: the New note control in Control Center and on the Action Button now opens murmur on New note, listening. Settings, Notes has File layout at the bottom, as on the Mac: Inbox file, Tasks file, and Ideas file. Type the same as your Mac's (yours is murmur/notes/{date}.md) so both write the same files. Everything from build 482 still applies. If something goes wrong, Settings, Diagnostics, Save report makes a report you can read and then share.
+
 ## Internal testing
 
 - The internal group is murmur team, with lbwalton@gmail.com in it (IOS-004). In App Store Connect, murmur voice dictation, TestFlight, Internal Testing, murmur team: if automatic distribution is on, each processed build joins the group by itself. If the new build is not listed under Builds, click the plus next to Builds and add it.
