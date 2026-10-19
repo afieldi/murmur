@@ -13,10 +13,10 @@ import UIKit
     /// Shows the view in a window, as the app does, tall when the whole page
     /// should show, and draws it once something is on screen, looking every
     /// tenth of a second for up to three seconds.
-    func render(_ view: some View, tall: Bool = false) async throws -> UIImage {
+    func render(_ view: some View, tall: Bool = false, height: CGFloat = 3_200) async throws -> UIImage {
         let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let window = UIWindow(windowScene: scene)
-        if tall { window.frame.size.height = 3_200 }
+        if tall { window.frame.size.height = height }
         window.rootViewController = UIHostingController(rootView: view)
         window.isHidden = false
         defer { window.isHidden = true }

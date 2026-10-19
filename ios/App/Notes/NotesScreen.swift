@@ -23,8 +23,8 @@ struct NotesFiles: Equatable, Sendable {
     var ideas: String?
     var days: [String]
 
-    @concurrent nonisolated static func load(_ folder: NoteStore, rules: SorterRules) async -> NotesFiles {
-        NotesFiles(tasks: folder.read(rules.layout.tasks), ideas: folder.read(rules.layout.ideas), days: folder.inboxDays(rules: rules))
+    @concurrent nonisolated static func load(_ folder: NoteStore, rules: SorterRules, inbox: NoteInbox) async -> NotesFiles {
+        NotesFiles(tasks: folder.read(rules.layout.tasks), ideas: folder.read(rules.layout.ideas), days: folder.inboxDays(inbox))
     }
 
     @concurrent nonisolated static func read(_ folder: NoteStore, _ relative: String) async -> String? {
@@ -119,7 +119,7 @@ struct NotesScreen: View {
         // Read again on every change the notes make: a sort, a save, an
         // action, a new folder.
         .task(id: notes.revision) {
-            files = await NotesFiles.load(notes.folder, rules: notes.rules)
+            files = await NotesFiles.load(notes.folder, rules: notes.rules, inbox: notes.inbox)
         }
         .scrollContentBackground(.hidden)
         .background(Tokens.ink)

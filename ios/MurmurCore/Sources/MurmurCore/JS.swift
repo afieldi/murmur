@@ -21,6 +21,9 @@ enum JS {
     /// $ without the m flag: the very end. (ICU's $ also matches before a
     /// final line break.)
     static let end = "\\z"
+    /// . without the s flag: anything but JavaScript's line terminators.
+    /// (ICU's also stops at U+0085.)
+    static let dot = "[^\\n\\r\\u2028\\u2029]"
     /// $ with the m flag: before any of JavaScript's line terminators.
     static let lineEnd = "(?=[\\n\\r\\u2028\\u2029]|\\z)"
     /// ^ with the m flag: after any of JavaScript's line terminators.

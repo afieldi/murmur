@@ -5,7 +5,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
-import { appendSeparator, DEFAULT_NOTE_ENTRY_TEMPLATE, renderNoteEntry } from './notes'
+import { appendSeparator, DEFAULT_NOTE_ENTRY_TEMPLATE, renderNoteEntry, resolveNotePath } from './notes'
 import { pillPlace, placeName, receiptLine } from './receipt'
 import { cutRun, findSeams, leadWords, seamSides, splitUnits, validateSort } from './sorter'
 import { parseListItems, parseTodo, reminderBody, tickLine } from './todo'
@@ -148,12 +148,50 @@ const places: Array<{ relative: string; location: 'folder' | 'fallback' }> = [
 
 const entries = ['Call the dentist.', 'Line one\nLine two\n\n\n', '{time} said aloud', '']
 
+// Path templates as someone might type them in Settings, Notes, File layout.
+const paths = [
+  'murmur/inbox/{date}.md',
+  'murmur/notes/{date}.md',
+  '{year}/{month}/{day}.md',
+  'murmur/{datetime}.txt',
+  'murmur/{time}.md',
+  'murmur/{unknown}.md',
+  'journal\\{date}.md',
+  '  murmur//inbox/{date}.MD  ',
+  'Café/{date}.md',
+  '',
+  '   ',
+  '/etc/{date}.md',
+  '~/notes/{date}.md',
+  'C:/notes/{date}.md',
+  '../escape/{date}.md',
+  'murmur/./x.md',
+  'murmur/what?.md',
+  'murmur/trailing./x.md',
+  'murmur/space /x.md',
+  'murmur/tab\there.md',
+  'murmur/con.md',
+  'murmur/LPT1',
+  'murmur/inbox/{date}',
+  'murmur/inbox/{date}.markdown',
+  'murmur/.md',
+  // A combining mark after a slash: JavaScript splits on code units, so
+  // the slash is still a slash.
+  '../\u0301notes/{date}.md',
+  '/\u0301x.md',
+  '~\u0301/x.md',
+  'journal\\\u0301{date}.md',
+  // NEL: inside a name for JavaScript's dot.
+  'a\u0085b.md',
+  'con.\u0085/x.md'
+]
+
 test("desktop's note rules give shared/notes-vectors.json's answers", () => {
   const when = new Date(2026, 8, 18, 10, 32)
   const data = {
     version: 1,
     comment:
-      "Desktop's pure note rules (src/shared/sorter.ts, todo.ts, receipt.ts, notes.ts) over these inputs, for every platform to give the same answers (ios/prd.json IOS-023). Seams are given as their two sides and the lead words they offer. Entries render at 10:32 on 2026-09-18 with the default entry template.",
+      "Desktop's pure note rules (src/shared/sorter.ts, todo.ts, receipt.ts, notes.ts) over these inputs, for every platform to give the same answers (ios/prd.json IOS-023). Seams are given as their two sides and the lead words they offer. Entries render at 10:32 on 2026-09-18 with the default entry template, and paths resolve at the same moment.",
     split: texts.map((text) => ({ text, ...splitUnits(text) })),
     seams: sentences.map((sentence) => {
       const seams = findSeams(sentence)
@@ -167,7 +205,11 @@ test("desktop's note rules give shared/notes-vectors.json's answers", () => {
     receipts: receiptTexts.map((text) => ({ text, line: receiptLine(text) })),
     places: places.map((p) => ({ ...p, placeName: placeName(p.relative), pillPlace: pillPlace(p.relative, p.location) })),
     entries: entries.map((text) => ({ text, entry: renderNoteEntry(DEFAULT_NOTE_ENTRY_TEMPLATE, text, when) })),
-    separators: [null, '', 'x', 'x\n'].map((tail) => ({ tail, separator: appendSeparator(tail) }))
+    separators: [null, '', 'x', 'x\n'].map((tail) => ({ tail, separator: appendSeparator(tail) })),
+    paths: paths.map((template) => {
+      const result = resolveNotePath(template, when)
+      return result.ok ? { template, relative: result.relative } : { template, problem: result.reason }
+    })
   }
   const file = join(__dirname, '../../shared/notes-vectors.json')
   // MURMUR_WRITE_VECTORS=1 writes desktop's answers before comparing.

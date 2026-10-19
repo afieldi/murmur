@@ -39,10 +39,10 @@ final class ScriptedChat: @unchecked Sendable {
     var folder: NoteStore { NoteStore(root: root.appending(path: "notes", directoryHint: .isDirectory)) }
     var stateFile: NotesStateFile { NotesStateFile(file: root.appending(path: "state.json")) }
 
-    func notes(sort: Bool = true, chat: ScriptedChat? = nil, counts: Counts? = nil) -> Notes {
+    func notes(sort: Bool = true, chat: ScriptedChat? = nil, counts: Counts? = nil, layout: NoteLayout? = nil) -> Notes {
         Notes(
             folder: folder, rules: rules, stateFile: stateFile, sortOn: { sort }, ask: { chat?.ask },
-            remind: { counts?.reminded += 1 }, timeZone: { [utc] in utc },
+            remind: { counts?.reminded += 1 }, timeZone: { [utc] in utc }, layout: { layout },
             keepAlive: {
                 counts?.held += 1
                 return { counts?.released += 1 }
@@ -76,6 +76,69 @@ final class ScriptedChat: @unchecked Sendable {
         #expect(notes.state.report?.outcome == .filed)
         #expect(notes.state.newest?.place == "inbox/2026-09-18.md, filed to todo.md and ideas.md")
         #expect(counts.reminded == 1)
+    }
+
+    /// LaBroi's Mac keeps its notes in murmur/notes (Settings, Notes, File
+    /// layout, Inbox file; build 482 check, 2026-10-18): the iPhone's same
+    /// setting puts every note there too, and its receipt says notes.
+    @Test func aChangedInboxFileIsWhereNotesLand() throws {
+        let notes = notes(sort: false, layout: NoteLayout(inbox: "murmur/notes/{date}.md", tasks: rules.layout.tasks, ideas: rules.layout.ideas))
+        #expect(notes.save("Call the dentist.", at: at) == "notes")
+        #expect(notes.keep("Email Bob.", at: at) == NoteKept(place: "notes", file: "murmur/notes/2026-09-18.md"))
+        #expect(folder.read("murmur/notes/2026-09-18.md") == "## 10:32\n\nCall the dentist.\n\n## 10:32\n\nEmail Bob.\n\n")
+        #expect(folder.read("murmur/inbox/2026-09-18.md") == nil)
+        #expect(notes.state.newest?.place == "notes/2026-09-18.md")
+        #expect(notes.inboxFile("murmur/notes/2026-09-18.md") == "murmur/notes/2026-09-18.md")
+    }
+
+    /// One that would leave the folder lands in the default, as on desktop.
+    @Test func anInboxFileThatCannotBeUsedFallsBack() throws {
+        let notes = notes(sort: false, layout: NoteLayout(inbox: "../escape/{date}.md", tasks: rules.layout.tasks, ideas: rules.layout.ideas))
+        #expect(notes.save("Call the dentist.", at: at) == "inbox")
+        #expect(folder.read("murmur/inbox/2026-09-18.md") == "## 10:32\n\nCall the dentist.\n\n")
+    }
+
+    /// A sort files into the changed tasks and ideas files, resolved at the
+    /// note's moment, with links back to the changed inbox.
+    @Test func aSortFilesIntoTheChangedFiles() async throws {
+        let chat = ScriptedChat([.content("```json\n{\"1\":\"task\",\"2\":\"idea\"}\n```")])
+        let notes = notes(chat: chat, layout: NoteLayout(inbox: "murmur/notes/{date}.md", tasks: "murmur/tasks/{date}.md", ideas: "murmur/ideas.md"))
+        notes.save("Call the dentist. Maybe the wizard asks for the vault.", at: at)
+        await notes.settle()
+        #expect(folder.read("murmur/tasks/2026-09-18.md") == "## 2026-09-18\n- [ ] Call the dentist. ([10:32](../notes/2026-09-18.md))\n")
+        #expect(folder.read("murmur/ideas.md") == "## 2026-09-18\n- Maybe the wizard asks for the vault. ([10:32](notes/2026-09-18.md))\n")
+        #expect(folder.read("murmur/todo.md") == nil)
+        #expect(notes.rules(at: at).layout.tasks == "murmur/tasks/2026-09-18.md")
+    }
+
+    /// The newest note opens from its receipt even after the layout moved
+    /// the inbox elsewhere.
+    @Test func theNewestNoteOpensAfterTheLayoutChanges() throws {
+        let box = LayoutBox(NoteLayout(inbox: "murmur/notes/{date}.md", tasks: rules.layout.tasks, ideas: rules.layout.ideas))
+        let notes = Notes(folder: folder, rules: rules, stateFile: stateFile, sortOn: { false }, ask: { nil }, timeZone: { [utc] in utc }, layout: { box.layout })
+        notes.save("Call the dentist.", at: at)
+        box.layout = nil
+        #expect(notes.inboxFile("murmur/notes/2026-09-18.md") == "murmur/notes/2026-09-18.md")
+        #expect(notes.inboxFile("murmur/notes/2026-09-17.md") == nil)
+    }
+
+    /// A held line is ticked or filed in the files of its note's day, as on
+    /// desktop, not today's, when the tasks file is dated.
+    @Test func aHeldLineTicksInItsNotesDatedTasksFile() async throws {
+        try folder.replace("murmur/tasks/2026-09-18.md", "## 2026-09-17\n- [ ] Call the dentist. ([09:00](../inbox/2026-09-17.md))\n- [ ] Email Bob. ([09:00](../inbox/2026-09-17.md))\n")
+        let chat = ScriptedChat([.content("{\"1\":\"note\",\"2\":\"task\",\"relations\":{\"1\":[2,2]}}")])
+        let notes = notes(chat: chat, layout: NoteLayout(inbox: rules.layout.inbox, tasks: "murmur/tasks/{date}.md", ideas: rules.layout.ideas))
+        notes.save("I emailed Bob. Buy stamps.", at: at)
+        await notes.settle()
+        let held = try #require(notes.held.first)
+        await notes.tick(held.id)
+        #expect(notes.refused == nil)
+        #expect(folder.read("murmur/tasks/2026-09-18.md")?.contains("- [x] Email Bob.") == true)
+    }
+
+    @MainActor final class LayoutBox {
+        var layout: NoteLayout?
+        init(_ layout: NoteLayout?) { self.layout = layout }
     }
 
     /// A sort holds background time from iOS until its files are written.
@@ -247,7 +310,7 @@ final class ScriptedChat: @unchecked Sendable {
         try folder.replace("murmur/todo.md", "- [ ] Call the dentist.\n")
         try folder.replace("murmur/inbox/2026-09-18.md", "## 10:32\n\nCall the dentist.\n\n")
         try folder.replace("murmur/inbox/2026-09-17.md", "## 09:00\n\nEmail Bob.\n\n")
-        let files = await NotesFiles.load(folder, rules: rules)
+        let files = await NotesFiles.load(folder, rules: rules, inbox: NoteInbox(rules: rules, at: NoteMoment(at, timeZone: utc)))
         #expect(files == NotesFiles(tasks: "- [ ] Call the dentist.\n", ideas: nil, days: ["murmur/inbox/2026-09-18.md", "murmur/inbox/2026-09-17.md"]))
     }
 }

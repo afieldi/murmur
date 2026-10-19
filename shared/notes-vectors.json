@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "comment": "Desktop's pure note rules (src/shared/sorter.ts, todo.ts, receipt.ts, notes.ts) over these inputs, for every platform to give the same answers (ios/prd.json IOS-023). Seams are given as their two sides and the lead words they offer. Entries render at 10:32 on 2026-09-18 with the default entry template.",
+  "comment": "Desktop's pure note rules (src/shared/sorter.ts, todo.ts, receipt.ts, notes.ts) over these inputs, for every platform to give the same answers (ios/prd.json IOS-023). Seams are given as their two sides and the lead words they offer. Entries render at 10:32 on 2026-09-18 with the default entry template, and paths resolve at the same moment.",
   "split": [
     {
       "text": "Call the dentist. Email Bob.",
@@ -1515,6 +1515,132 @@
     {
       "tail": "x\n",
       "separator": ""
+    }
+  ],
+  "paths": [
+    {
+      "template": "murmur/inbox/{date}.md",
+      "relative": "murmur/inbox/2026-09-18.md"
+    },
+    {
+      "template": "murmur/notes/{date}.md",
+      "relative": "murmur/notes/2026-09-18.md"
+    },
+    {
+      "template": "{year}/{month}/{day}.md",
+      "relative": "2026/09/18.md"
+    },
+    {
+      "template": "murmur/{datetime}.txt",
+      "relative": "murmur/2026-09-18 10-32.txt"
+    },
+    {
+      "template": "murmur/{time}.md",
+      "relative": "murmur/10-32.md"
+    },
+    {
+      "template": "murmur/{unknown}.md",
+      "relative": "murmur/{unknown}.md"
+    },
+    {
+      "template": "journal\\{date}.md",
+      "relative": "journal/2026-09-18.md"
+    },
+    {
+      "template": "  murmur//inbox/{date}.MD  ",
+      "relative": "murmur/inbox/2026-09-18.MD"
+    },
+    {
+      "template": "Café/{date}.md",
+      "relative": "Café/2026-09-18.md"
+    },
+    {
+      "template": "",
+      "problem": "empty"
+    },
+    {
+      "template": "   ",
+      "problem": "empty"
+    },
+    {
+      "template": "/etc/{date}.md",
+      "problem": "absolute"
+    },
+    {
+      "template": "~/notes/{date}.md",
+      "problem": "absolute"
+    },
+    {
+      "template": "C:/notes/{date}.md",
+      "problem": "absolute"
+    },
+    {
+      "template": "../escape/{date}.md",
+      "problem": "escapes"
+    },
+    {
+      "template": "murmur/./x.md",
+      "problem": "escapes"
+    },
+    {
+      "template": "murmur/what?.md",
+      "problem": "characters"
+    },
+    {
+      "template": "murmur/trailing./x.md",
+      "problem": "characters"
+    },
+    {
+      "template": "murmur/space /x.md",
+      "problem": "characters"
+    },
+    {
+      "template": "murmur/tab\there.md",
+      "problem": "characters"
+    },
+    {
+      "template": "murmur/con.md",
+      "problem": "reserved"
+    },
+    {
+      "template": "murmur/LPT1",
+      "problem": "reserved"
+    },
+    {
+      "template": "murmur/inbox/{date}",
+      "problem": "extension"
+    },
+    {
+      "template": "murmur/inbox/{date}.markdown",
+      "problem": "extension"
+    },
+    {
+      "template": "murmur/.md",
+      "problem": "extension"
+    },
+    {
+      "template": "../́notes/{date}.md",
+      "problem": "escapes"
+    },
+    {
+      "template": "/́x.md",
+      "problem": "absolute"
+    },
+    {
+      "template": "~́/x.md",
+      "problem": "absolute"
+    },
+    {
+      "template": "journal\\́{date}.md",
+      "relative": "journal/́2026-09-18.md"
+    },
+    {
+      "template": "ab.md",
+      "relative": "ab.md"
+    },
+    {
+      "template": "con./x.md",
+      "problem": "reserved"
     }
   ]
 }

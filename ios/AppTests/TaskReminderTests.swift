@@ -47,6 +47,41 @@ import Testing
         #expect(NotesSettings.load(defaults) == NotesSettings(sort: true, reminders: true, times: ["08:30", "12:05"]))
     }
 
+    /// Settings, Notes, File layout: nothing changed is no layout; a
+    /// changed file is kept, and setting it back to the default forgets it.
+    @Test func theFileLayoutIsKept() throws {
+        let defaults = try #require(UserDefaults(suiteName: "murmur.tests.\(UUID().uuidString)"))
+        #expect(NotesSettings.load(defaults).layout(rules) == nil)
+        var settings = NotesSettings.load(defaults)
+        settings.inboxFile = "murmur/notes/{date}.md"
+        settings.save(defaults)
+        let loaded = NotesSettings.load(defaults)
+        #expect(loaded.inboxFile == "murmur/notes/{date}.md" && loaded.tasksFile == nil && loaded.ideasFile == nil)
+        #expect(loaded.layout(rules) == NoteLayout(inbox: "murmur/notes/{date}.md", tasks: rules.layout.tasks, ideas: rules.layout.ideas))
+        settings.inboxFile = nil
+        settings.save(defaults)
+        #expect(defaults.object(forKey: NotesSettings.inboxFileKey) == nil)
+        #expect(NotesSettings.load(defaults).layout(rules) == nil)
+    }
+
+    /// What a typed path saves, as desktop's field commits it: trimmed, the
+    /// saved one kept when it is left empty, and nil for the default.
+    @Test func aTypedPathSavesAsOnDesktop() {
+        let standard = "murmur/inbox/{date}.md"
+        #expect(NotesSettings.typed("  murmur/notes/{date}.md ", standard: standard, saved: nil) == "murmur/notes/{date}.md")
+        #expect(NotesSettings.typed("   ", standard: standard, saved: "murmur/notes/{date}.md") == "murmur/notes/{date}.md")
+        #expect(NotesSettings.typed("murmur/inbox/{date}.md", standard: standard, saved: "murmur/notes/{date}.md") == nil)
+    }
+
+    /// The line under each file says where today's file is, or why the
+    /// default is used, in desktop's words.
+    @Test func eachFileSaysWhereTodaysIs() {
+        let moment = NoteMoment(date: "2026-10-18", time: "09:00")
+        #expect(NotesSettingsCopy.today("murmur/notes/{date}.md", at: moment) == "Today: murmur/notes/2026-10-18.md")
+        #expect(NotesSettingsCopy.today("../escape.md", at: moment) == "Falls back to the default because the path must stay inside your notes folder.")
+        #expect(NotesSettingsCopy.today("murmur/notes", at: moment) == "Falls back to the default because the file must end in .md or .txt.")
+    }
+
     @Test func layingDownReplacesTheWeekAndKeepsSendOneNow() async throws {
         let center = FakeCenter()
         center.pending = [ReminderPlan.prefix + "2026-09-01.09:00", ReminderPlan.now, RecapPlan.prefix + "2026-09-18"]

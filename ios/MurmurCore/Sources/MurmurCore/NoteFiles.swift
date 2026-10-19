@@ -3,7 +3,8 @@
 // reads, desktop's src/shared/notes.ts with the layout and the sorter's
 // prompts and numbers from shared/sorter.json, so both platforms keep the
 // same files: murmur/inbox/<date>.md for every note, murmur/todo.md and
-// murmur/ideas.md for what a sort files.
+// murmur/ideas.md for what a sort files, or the files a changed layout
+// names, under desktop's path guard (resolveNotePath).
 import Foundation
 
 /// shared/sorter.json.
@@ -14,6 +15,14 @@ public struct SorterRules: Decodable, Sendable, Equatable {
         public let tasks: String
         public let ideas: String
         public let heading: String
+
+        public init(inbox: String, entry: String, tasks: String, ideas: String, heading: String) {
+            self.inbox = inbox
+            self.entry = entry
+            self.tasks = tasks
+            self.ideas = ideas
+            self.heading = heading
+        }
     }
 
     public let systemPrompt: [String]
@@ -31,7 +40,7 @@ public struct SorterRules: Decodable, Sendable, Equatable {
     public let receiptLineMax: Int
     public let pillPlaceMax: Int
     public let reminderMaxChars: Int
-    public let layout: Layout
+    public var layout: Layout
 }
 
 /// A note's moment as its files read it: the local date and time.
@@ -99,4 +108,89 @@ public enum NoteFiles {
 
     private static let token = JS.regex("\\{([a-z]+)\\}")
     private static let trailingBreaks = JS.regex("\\n+\(JS.end)")
+}
+
+/// Why a path template cannot be used: desktop's NotePathProblem.
+public enum NotePathProblem: String, Error, Sendable, Equatable {
+    case empty, absolute, escapes, `extension`, characters, reserved
+}
+
+public enum NotePath {
+    /// resolveNotePath: a path template, relative to the notes folder, at a
+    /// moment, with the time tokens filename-safe (10-32, not 10:32); the
+    /// clean path it names, which can only point inside the folder, or why
+    /// it cannot be used.
+    public static func resolve(_ template: String, at moment: NoteMoment) -> Result<String, NotePathProblem> {
+        var safe = moment.values
+        safe["time"] = safe["time"].map { replaceFirst($0, ":", "-") }
+        safe["datetime"] = safe["datetime"].map { replaceFirst($0, ":", "-") }
+        // Code units, as JavaScript sees them: a slash before a combining
+        // mark is one Character in Swift, and still a slash here.
+        let units = JS.trim(NoteFiles.render(template, safe)).utf16.map { $0 == backslash ? slash : $0 }
+        guard let first = units.first else { return .failure(.empty) }
+        let rendered = String(decoding: units, as: UTF16.self)
+        if first == slash || first == tilde || Sorter.test(drive, rendered) { return .failure(.absolute) }
+        let segments = units.split(separator: slash).map { String(decoding: $0, as: UTF16.self) }
+        if segments.contains(where: { JS.same($0, ".") || JS.same($0, "..") }) { return .failure(.escapes) }
+        if segments.contains(where: { Sorter.test(badCharacters, $0) || Sorter.test(badEnding, $0) }) { return .failure(.characters) }
+        if segments.contains(where: { Sorter.test(reservedName, $0) }) { return .failure(.reserved) }
+        guard let last = segments.last, Sorter.test(allowedExtension, last) else { return .failure(.extension) }
+        return .success(segments.joined(separator: "/"))
+    }
+
+    /// String.prototype.replace with a string: the first match only.
+    private static func replaceFirst(_ text: String, _ target: String, _ replacement: String) -> String {
+        guard let range = text.range(of: target, options: .literal) else { return text }
+        return text.replacingCharacters(in: range, with: replacement)
+    }
+
+    private static let slash: UInt16 = 0x2F
+    private static let backslash: UInt16 = 0x5C
+    private static let tilde: UInt16 = 0x7E
+    private static let drive = JS.regex("^[a-zA-Z]:")
+    // Windows refuses these in any file name, so a vault synced across
+    // platforms never holds a name one side cannot read.
+    private static let badCharacters = JS.regex("[<>:\"|?*\\x{00}-\\x{1f}]")
+    private static let badEnding = JS.regex("[. ]\(JS.end)")
+    // Windows device names: an append into CON.md goes nowhere.
+    private static let reservedName = JS.regex(
+        "^(?:\(JS.caseless("con"))|\(JS.caseless("prn"))|\(JS.caseless("aux"))|\(JS.caseless("nul"))|\(JS.caseless("com"))[1-9]|\(JS.caseless("lpt"))[1-9])(?:\\.\(JS.dot)*)?\(JS.end)"
+    )
+    private static let allowedExtension = JS.regex("^\(JS.dot)+\\.(?:\(JS.caseless("md"))|\(JS.caseless("txt")))\(JS.end)")
+}
+
+/// The files Settings, Notes, File layout names, as templates: desktop's
+/// Inbox file, Tasks file, and Ideas file.
+public struct NoteLayout: Equatable, Sendable {
+    public var inbox: String
+    public var tasks: String
+    public var ideas: String
+
+    public init(inbox: String, tasks: String, ideas: String) {
+        self.inbox = inbox
+        self.tasks = tasks
+        self.ideas = ideas
+    }
+
+    /// shared/sorter.json's own layout.
+    public static func standard(_ rules: SorterRules) -> NoteLayout {
+        NoteLayout(inbox: rules.layout.inbox, tasks: rules.layout.tasks, ideas: rules.layout.ideas)
+    }
+
+    /// The rules with this layout's files resolved at the moment. A file
+    /// that cannot be used falls back to the bundled default on its own,
+    /// as desktop's resolveTemplateOrDefault does.
+    public func applied(to rules: SorterRules, at moment: NoteMoment) -> SorterRules {
+        func file(_ template: String, _ standard: String) -> String {
+            if case let .success(path) = NotePath.resolve(template, at: moment) { return path }
+            if case let .success(path) = NotePath.resolve(standard, at: moment) { return path }
+            return NoteFiles.render(standard, moment.values)
+        }
+        var applied = rules
+        applied.layout = SorterRules.Layout(
+            inbox: file(inbox, rules.layout.inbox), entry: rules.layout.entry,
+            tasks: file(tasks, rules.layout.tasks), ideas: file(ideas, rules.layout.ideas), heading: rules.layout.heading
+        )
+        return applied
+    }
 }

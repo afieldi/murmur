@@ -115,6 +115,12 @@ struct NotesVectors: Decodable {
         let separator: String
     }
 
+    struct PathCase: Decodable, Sendable {
+        let template: String
+        let relative: String?
+        let problem: String?
+    }
+
     let split: [Split]
     let seams: [SeamCase]
     let cuts: [CutCase]
@@ -126,6 +132,7 @@ struct NotesVectors: Decodable {
     let places: [PlaceCase]
     let entries: [EntryCase]
     let separators: [SeparatorCase]
+    let paths: [PathCase]
 
     static let file: NotesVectors? = try? SharedData(directory: repoShared).decode(NotesVectors.self, from: "notes-vectors.json")
     static let rules: SorterRules? = try? SharedData(directory: repoShared).decode(SorterRules.self, from: "sorter.json")
@@ -233,6 +240,35 @@ extension NotesVectors.ReplyCase: CustomTestStringConvertible {
             #expect(NoteFiles.separator(c.tail) == c.separator)
         }
         #expect(NoteFiles.inbox(moment, rules: rules) == "murmur/inbox/2026-09-18.md")
+    }
+
+    /// A path template typed in Settings, Notes, File layout resolves as
+    /// desktop's resolveNotePath does, or fails for the same reason.
+    @Test func pathsResolveAsOnDesktop() throws {
+        let file = try #require(NotesVectors.file)
+        let moment = NoteMoment(date: "2026-09-18", time: "10:32")
+        #expect(file.paths.count > 20)
+        for c in file.paths {
+            switch NotePath.resolve(c.template, at: moment) {
+            case let .success(relative): #expect(relative == c.relative && c.problem == nil, "\(c.template)")
+            case let .failure(problem): #expect(problem.rawValue == c.problem && c.relative == nil, "\(c.template)")
+            }
+        }
+    }
+
+    /// Each file of a changed layout falls back to the default on its own
+    /// when it cannot be used, as desktop's resolveTemplateOrDefault does.
+    @Test func aLayoutFallsBackFileByFile() throws {
+        let rules = try #require(NotesVectors.rules)
+        let moment = NoteMoment(date: "2026-09-18", time: "10:32")
+        let layout = NoteLayout(inbox: "murmur/notes/{date}.md", tasks: "../todo.md", ideas: "murmur/ideas/{year}.txt")
+        let applied = layout.applied(to: rules, at: moment)
+        #expect(applied.layout.inbox == "murmur/notes/2026-09-18.md")
+        #expect(applied.layout.tasks == rules.layout.tasks)
+        #expect(applied.layout.ideas == "murmur/ideas/2026.txt")
+        #expect(applied.layout.entry == rules.layout.entry && applied.layout.heading == rules.layout.heading)
+        #expect(NoteFiles.inbox(moment, rules: applied) == "murmur/notes/2026-09-18.md")
+        #expect(NoteLayout.standard(rules).applied(to: rules, at: moment).layout.inbox == "murmur/inbox/2026-09-18.md")
     }
 
     /// JavaScript's JSON.parse and Number, which the reply reading leans on.

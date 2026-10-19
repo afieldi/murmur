@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import Foundation
+import MurmurCore
 import Testing
 @testable import murmur
 
@@ -24,7 +25,74 @@ import Testing
         try folder.append("murmur/inbox/2026-09-18.md", "two\n")
         #expect(folder.read("murmur/inbox/2026-09-18.md") == "one\ntwo\n")
         #expect(try root.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true)
-        #expect(folder.inboxDays(rules: try BundledRules.sorter()) == ["murmur/inbox/2026-09-18.md"])
+        #expect(folder.inboxDays(try Self.bundledInbox()) == ["murmur/inbox/2026-09-18.md"])
+    }
+
+    static func bundledInbox() throws -> NoteInbox {
+        NoteInbox(rules: try BundledRules.sorter(), at: NoteMoment(date: "2026-10-18", time: "09:00"))
+    }
+
+    /// The Notes screen lists the days in the changed inbox's folder, the
+    /// files its template makes, and nothing else in that folder.
+    @Test func inboxDaysFollowTheLayout() throws {
+        let folder = NoteStore(root: root)
+        try folder.append("murmur/notes/2026-10-17.txt", "one\n")
+        try folder.append("murmur/notes/2026-10-18.TXT", "two\n")
+        try folder.append("murmur/notes/readme.txt", "not a day\n")
+        try folder.append("murmur/notes/murmur/todo.md", "a folder inside\n")
+        let inbox = NoteInbox(template: "murmur/notes/{date}.TXT", today: "murmur/notes/2026-10-18.TXT")
+        #expect(folder.inboxDays(inbox) == ["murmur/notes/2026-10-18.TXT", "murmur/notes/2026-10-17.txt"])
+    }
+
+    /// An inbox at the top of the folder lists its days, not every note
+    /// in the vault, so a note link opens only an inbox day (review gate,
+    /// 2026-10-18).
+    @Test func anInboxAtTheTopListsOnlyItsDays() throws {
+        let folder = NoteStore(root: root)
+        try folder.append("2026-10-18.md", "a day\n")
+        try folder.append("Brett.md", "not a day\n")
+        #expect(folder.inboxDays(NoteInbox(template: "{date}.md", today: "2026-10-18.md")) == ["2026-10-18.md"])
+    }
+
+    /// In a picked murmur folder, an inbox right in murmur/ is the folder's
+    /// top, where the notes land.
+    @Test func aPickedMurmurFolderListsDaysWhereTheyLand() throws {
+        let store = NoteStore(root: root, inside: true)
+        try store.append("murmur/2026-10-18.md", "one\n")
+        #expect(FileManager.default.fileExists(atPath: root.appending(path: "2026-10-18.md").path(percentEncoded: false)))
+        #expect(store.inboxDays(NoteInbox(template: "murmur/{date}.md", today: "murmur/2026-10-18.md")) == ["murmur/2026-10-18.md"])
+    }
+
+    /// The murmur folder is the layout's in any case, as picking it is.
+    @Test func aPickedMurmurFolderTakesItsNameInAnyCase() throws {
+        let store = NoteStore(root: root, inside: true)
+        try store.append("Murmur/notes/2026-10-18.md", "one\n")
+        #expect(FileManager.default.fileExists(atPath: root.appending(path: "notes/2026-10-18.md").path(percentEncoded: false)))
+    }
+
+    /// A folder whose path starts /private, as a picked vault's does on an
+    /// iPhone, takes a file that does not exist yet: the guard reads paths
+    /// as text and never asks the disk which spelling is shorter (review
+    /// gate, 2026-10-18).
+    @Test func aFolderUnderPrivateTakesANewFile() throws {
+        let under = URL(filePath: "/private/tmp/murmur-notes-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: under, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: under) }
+        let folder = NoteStore(root: under)
+        #expect(folder.url("murmur/inbox/2026-10-18.md") != nil)
+        try folder.append("murmur/inbox/2026-10-18.md", "one\n")
+        #expect(folder.read("murmur/inbox/2026-10-18.md") == "one\n")
+    }
+
+    /// A combining mark after a slash is still a slash to the guard, as it
+    /// is to desktop's, so no path climbs out with one (review gate,
+    /// 2026-10-18).
+    @Test func aMarkAfterASlashCannotLeaveTheFolder() throws {
+        let folder = NoteStore(root: root.appending(path: "notes", directoryHint: .isDirectory))
+        #expect(folder.url("../\u{301}escape.md") == nil)
+        #expect(folder.url("murmur/../\u{301}../escape.md") == nil)
+        #expect(throws: (any Error).self) { try folder.append("../\u{301}escape.md", "out") }
+        #expect(!FileManager.default.fileExists(atPath: root.appending(path: "\u{301}escape.md").path(percentEncoded: false)))
     }
 
     @Test func aPickedFolderIsKeptAndOpenedAgain() throws {
@@ -104,7 +172,7 @@ import Testing
         #expect(try String(contentsOf: folder.appending(path: "inbox/2026-10-18.md"), encoding: .utf8) == "one\n")
         #expect(!FileManager.default.fileExists(atPath: folder.appending(path: "murmur").path(percentEncoded: false)))
         #expect(store.read("murmur/inbox/2026-10-18.md") == "one\n")
-        #expect(store.inboxDays(rules: try BundledRules.sorter()) == ["murmur/inbox/2026-10-18.md"])
+        #expect(store.inboxDays(try Self.bundledInbox()) == ["murmur/inbox/2026-10-18.md"])
     }
 
     /// A vault that is itself named murmur nests as the Mac does.

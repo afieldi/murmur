@@ -23,7 +23,8 @@ struct NoteStore: NoteFolder, Equatable {
     var inside = false
 
     static let standard = NoteStore(root: URL.applicationSupportDirectory.appending(path: "notes", directoryHint: .isDirectory))
-    /// The folder the layout keeps every file in: murmur/inbox, murmur/todo.md.
+    /// The folder the bundled layout keeps every file in: murmur/inbox,
+    /// murmur/todo.md, murmur/ideas.md.
     static let layoutFolder = "murmur"
     /// The folder iCloud Drive keeps Obsidian's vaults in, on any device.
     static let obsidianCloud = ["iCloud~md~obsidian", "Documents"]
@@ -84,27 +85,42 @@ struct NoteStore: NoteFolder, Equatable {
         try write(relative, merging: false) { _ in Data(text.utf8) }
     }
 
-    /// The inbox days there are, newest first, as paths inside the folder.
-    func inboxDays(rules: SorterRules) -> [String] {
-        let folder = (rules.layout.inbox as NSString).deletingLastPathComponent
-        guard let dir = url(folder) else { return [] }
+    /// The inbox days there are, newest first, as paths inside the folder:
+    /// the files beside today's whose names the inbox's template makes.
+    func inboxDays(_ inbox: NoteInbox) -> [String] {
+        guard let today = url(inbox.today) else { return [] }
+        let dir = today.deletingLastPathComponent()
+        let folder = inbox.folder
         let names = reachable { try? FileManager.default.contentsOfDirectory(atPath: dir.path(percentEncoded: false)) }.flatMap { $0 } ?? []
-        return names.filter { $0.hasSuffix(".md") }.sorted(by: >).map { "\(folder)/\($0)" }
+        let day = inbox.days()
+        return names.filter(day).sorted(by: >).map { folder.isEmpty ? $0 : "\(folder)/\($0)" }
     }
 
     /// A path inside the folder, never outside it. In murmur's own folder
     /// the layout's murmur folder is the folder itself.
     func url(_ relative: String) -> URL? {
-        parts(relative)?.reduce(root) { $0.appending(path: $1) }
+        guard let parts = parts(relative) else { return nil }
+        let url = parts.reduce(root) { $0.appending(path: $1) }
+        // Whatever the parts say, the file is inside the folder. Read as
+        // text: standardizedFileURL drops a leading /private only when the
+        // shorter path exists, so a new file in a vault would look outside.
+        let base = root.standardized.path(percentEncoded: false)
+        let inside = base.hasSuffix("/") ? base : base + "/"
+        return url.standardized.path(percentEncoded: false).utf16.starts(with: inside.utf16) ? url : nil
     }
 
     /// A path's parts below the folder, nil for one that would leave it.
+    /// Split on code units, as the path guard reads them: a slash before a
+    /// combining mark is one Character in Swift, and still a slash here.
     private func parts(_ relative: String) -> [String]? {
-        var parts = relative.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
-        guard !parts.isEmpty, !parts.contains(where: { $0 == "." || $0 == ".." }) else { return nil }
-        if inside, parts.count > 1, parts[0] == Self.layoutFolder { parts.removeFirst() }
+        var parts = relative.utf16.split(separator: Self.slash).map { String(decoding: $0, as: UTF16.self) }
+        let dots = parts.contains { $0.utf16.elementsEqual(".".utf16) || $0.utf16.elementsEqual("..".utf16) }
+        guard !parts.isEmpty, !dots else { return nil }
+        if inside, parts.count > 1, parts[0].lowercased() == Self.layoutFolder { parts.removeFirst() }
         return parts
     }
+
+    private static let slash: UInt16 = 0x2F
 
     private func write(_ relative: String, merging: Bool, _ next: (Data) -> Data) throws {
         guard !lost, let url = url(relative) else { throw CocoaError(.fileWriteNoPermission) }
@@ -209,4 +225,61 @@ struct NotesFolderChoice {
         }
         return NoteStore.picked(url)
     }
+}
+
+/// The inbox as murmur lists its days: the template in use and the file it
+/// names today. A day is a file beside today's whose name the template's
+/// file part makes, so the list, and a note link, show nothing else.
+struct NoteInbox: Equatable, Sendable {
+    let template: String
+    let today: String
+
+    init(template: String, today: String) {
+        self.template = template
+        self.today = today
+    }
+
+    /// shared/sorter.json's inbox at a moment.
+    init(rules: SorterRules, at moment: NoteMoment) {
+        self.init(template: rules.layout.inbox, today: NoteFiles.inbox(moment, rules: rules))
+    }
+
+    /// Today's file's folder, as a path inside the notes folder.
+    var folder: String {
+        let units = Array(today.utf16)
+        return units.lastIndex(of: 0x2F).map { String(decoding: units[..<$0], as: UTF16.self) } ?? ""
+    }
+
+    /// Tells a day by its file name: one the template's file part makes,
+    /// each token as the digits it renders to, the rest as typed, in any
+    /// case. Built once for a listing.
+    func days() -> (String) -> Bool {
+        guard let pattern else { return { _ in false } }
+        return { name in pattern.firstMatch(in: name, range: NSRange(location: 0, length: (name as NSString).length)) != nil }
+    }
+
+    private var pattern: NSRegularExpression? {
+        // The template trimmed as a whole, as the path guard trims it, so a
+        // space at the start of the file part stays.
+        let units = Array(template.trimmingCharacters(in: .whitespacesAndNewlines).utf16)
+        let start = units.lastIndex(where: { $0 == 0x2F || $0 == 0x5C }).map { $0 + 1 } ?? 0
+        let file = String(decoding: units[start...], as: UTF16.self) as NSString
+        var regex = "^"
+        var at = 0
+        for match in Self.token.matches(in: file as String, range: NSRange(location: 0, length: file.length)) {
+            regex += NSRegularExpression.escapedPattern(for: file.substring(with: NSRange(location: at, length: match.range.location - at)))
+            let key = file.substring(with: match.range(at: 1))
+            regex += Self.digits[key] ?? NSRegularExpression.escapedPattern(for: file.substring(with: match.range))
+            at = match.range.location + match.range.length
+        }
+        regex += NSRegularExpression.escapedPattern(for: file.substring(from: at)) + "\\z"
+        return try? NSRegularExpression(pattern: regex, options: .caseInsensitive)
+    }
+
+    private static let token = try! NSRegularExpression(pattern: "\\{([a-z]+)\\}")
+    /// What each token renders to in a path (NotePath.resolve).
+    private static let digits = [
+        "date": "[0-9]{4}-[0-9]{2}-[0-9]{2}", "time": "[0-9]{2}-[0-9]{2}", "datetime": "[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}-[0-9]{2}",
+        "year": "[0-9]{4}", "month": "[0-9]{2}", "day": "[0-9]{2}"
+    ]
 }

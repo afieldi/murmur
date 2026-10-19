@@ -20,6 +20,18 @@ import UIKit
         #expect(try shots.inked(page) > 0.02)
     }
 
+    /// Settings, Notes with File layout as shipped, changed, and broken.
+    @Test(arguments: NotesSettingsPreview.Scene.allCases)
+    func notesSettingsDrawAtTheLargestTextSize(_ scene: NotesSettingsPreview.Scene) async throws {
+        let image = try await shots.render(NotesSettingsPreview(scene).dynamicTypeSize(.accessibility5))
+        try shots.save(image, "notes-settings-\(scene)-largest")
+        #expect(try shots.inked(image) > 0.02)
+        // The settings page runs long at this size; File layout is last.
+        let page = try await shots.render(NotesSettingsPreview(scene).dynamicTypeSize(.accessibility5), tall: true, height: 7_000)
+        try shots.save(page, "notes-settings-\(scene)-largest-page")
+        #expect(try shots.inked(page) > 0.02)
+    }
+
     /// Open note, the pill, and the receipt all fit the keyboard's height at
     /// the largest text the pad takes, none over another, and Open note
     /// takes a tap across 44 points.

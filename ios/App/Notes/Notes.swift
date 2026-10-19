@@ -68,7 +68,10 @@ struct NotesStateFile: Sendable {
 
     /// The folder the notes live in: murmur's own, or one you picked.
     private(set) var folder: NoteStore
-    @ObservationIgnored let rules: SorterRules
+    /// shared/sorter.json as bundled; rules(at:) lays the file layout over it.
+    @ObservationIgnored private let base: SorterRules
+    /// Settings, Notes, File layout; nil when nothing there is changed.
+    @ObservationIgnored private let layout: @MainActor () -> NoteLayout?
     @ObservationIgnored private let stateFile: NotesStateFile
     @ObservationIgnored private let sortOn: @MainActor () -> Bool
     /// The chat a sort asks, through your cleanup connection; nil without one.
@@ -84,10 +87,12 @@ struct NotesStateFile: Sendable {
     init(
         folder: NoteStore, rules: SorterRules, stateFile: NotesStateFile, sortOn: @escaping @MainActor () -> Bool,
         ask: @escaping @MainActor () -> SortAsk?, remind: @escaping @MainActor () async -> Void = {},
-        timeZone: @escaping @MainActor () -> TimeZone = { .current }, keepAlive: @escaping @MainActor () -> @MainActor () -> Void = { {} }
+        timeZone: @escaping @MainActor () -> TimeZone = { .current }, layout: @escaping @MainActor () -> NoteLayout? = { nil },
+        keepAlive: @escaping @MainActor () -> @MainActor () -> Void = { {} }
     ) {
         self.folder = folder
-        self.rules = rules
+        base = rules
+        self.layout = layout
         self.stateFile = stateFile
         self.sortOn = sortOn
         self.ask = ask
@@ -98,6 +103,33 @@ struct NotesStateFile: Sendable {
     }
 
     var held: [HeldLine] { state.memory.held }
+
+    /// The rules with the files the layout names today.
+    var rules: SorterRules { rules(at: .now) }
+
+    /// The rules with the files the layout names at a moment, each falling
+    /// back to the bundled one when it cannot be used, as on desktop.
+    func rules(at when: Date) -> SorterRules {
+        rules(at: NoteMoment(when, timeZone: timeZone()))
+    }
+
+    func rules(at moment: NoteMoment) -> SorterRules {
+        layout().map { $0.applied(to: base, at: moment) } ?? base
+    }
+
+    /// The files of the note Sort again and the held lines are for, as
+    /// desktop files them at that note's time.
+    private var heldRules: SorterRules {
+        state.memory.input.map { rules(at: $0.moment) } ?? rules
+    }
+
+    /// The inbox as its days are listed: the layout's when it can be used,
+    /// else the bundled one.
+    var inbox: NoteInbox {
+        let moment = NoteMoment(.now, timeZone: timeZone())
+        let usable = layout().map(\.inbox).flatMap { (try? NotePath.resolve($0, at: moment).get()) == nil ? nil : $0 }
+        return NoteInbox(template: usable ?? base.layout.inbox, today: NoteFiles.inbox(moment, rules: rules(at: moment)))
+    }
     /// Sort again is for the newest note's unsettled lines, and only while
     /// sorting is on: off, a note's words never leave the phone for sorting.
     var canSortAgain: Bool {
@@ -110,6 +142,9 @@ struct NotesStateFile: Sendable {
     @discardableResult
     func save(_ text: String, at when: Date = .now) -> String? {
         let moment = NoteMoment(when, timeZone: timeZone())
+        // The files as the layout names them at the note's moment, for the
+        // inbox and for the sort, as desktop resolves them at the note's time.
+        let rules = self.rules(at: when)
         let inbox = NoteFiles.inbox(moment, rules: rules)
         let entry = NoteFiles.separator(folder.read(inbox)) + NoteFiles.entry(text, at: moment, template: rules.layout.entry)
         do {
@@ -120,7 +155,7 @@ struct NotesStateFile: Sendable {
         let input = NoteSortInput(text: text, moment: moment, inbox: inbox)
         state.newest = NewestNote(id: input.id, line: Receipt.line(text, max: rules.receiptLineMax), inbox: inbox, filed: [], at: when)
         keep()
-        if sortOn() { queue { notes in await notes.run { memory, ask in await NoteSort.sort(input, memory: memory, folder: notes.folder, rules: notes.rules, ask: ask) } } }
+        if sortOn() { queue { notes in await notes.run { memory, ask in await NoteSort.sort(input, memory: memory, folder: notes.folder, rules: rules, ask: ask) } } }
         return Receipt.pillPlace(inbox, max: rules.pillPlaceMax)
     }
 
@@ -130,24 +165,25 @@ struct NotesStateFile: Sendable {
         return NoteKept(place: place, file: file)
     }
 
-    /// The file a note link names, only when it is an inbox day here.
+    /// The file a note link names, only when it is an inbox day here, or
+    /// the newest note's, wherever the layout put it.
     func inboxFile(_ file: String) -> String? {
-        folder.inboxDays(rules: rules).contains(file) ? file : nil
+        file == state.newest?.inbox || folder.inboxDays(inbox).contains(file) ? file : nil
     }
 
     /// Sends the newest note's unsettled lines again.
     func sortAgain() async {
         guard canSortAgain else { return }
-        queue { notes in await notes.run { memory, ask in await NoteSort.sortAgain(memory: memory, folder: notes.folder, rules: notes.rules, ask: ask) } }
+        queue { notes in await notes.run { memory, ask in await NoteSort.sortAgain(memory: memory, folder: notes.folder, rules: notes.heldRules, ask: ask) } }
         await last?.value
     }
 
     /// Files a held line as it was labeled.
-    func file(_ id: Int) async { await act { NoteSort.file(id, memory: $0, folder: folder, rules: rules) } }
+    func file(_ id: Int) async { await act { NoteSort.file(id, memory: $0, folder: folder, rules: heldRules) } }
     /// Lets a held line go without filing it.
     func skip(_ id: Int) async { await act { NoteSort.skip(id, memory: $0) } }
     /// Ticks the task a held line said was done.
-    func tick(_ id: Int) async { await act { NoteSort.tick(id, memory: $0, folder: folder, rules: rules) } }
+    func tick(_ id: Int) async { await act { NoteSort.tick(id, memory: $0, folder: folder, rules: heldRules) } }
 
     /// Moves to another folder once the sort running now is done. Notes
     /// already written stay where they are.
@@ -237,7 +273,8 @@ extension Notes {
                 guard let connection = settings.polishConnection(key: { (try? ring.key(for: $0)) ?? nil }) else { return nil }
                 return NoteSort.chat(connection, rules: rules, send: { try await session.data(for: $0) })
             },
-            remind: { await TaskReminders.refresh(folder: shared?.folder ?? .standard, rules: rules) },
+            remind: { await TaskReminders.refresh(folder: shared?.folder ?? .standard, rules: shared?.rules ?? rules) },
+            layout: { NotesSettings.load().layout(rules) },
             keepAlive: BackgroundTime.hold
         )
         shared = notes

@@ -11,11 +11,15 @@ import Foundation
 import MurmurCore
 import UserNotifications
 
-/// The notes' choices, kept on this iPhone: sorting, and the reminders.
+/// The notes' choices, kept on this iPhone: sorting, the reminders, and
+/// the file layout.
 struct NotesSettings: Equatable {
     static let sortKey = "notes.sort"
     static let remindersKey = "notes.reminders"
     static let timesKey = "notes.reminderTimes"
+    static let inboxFileKey = "notes.inboxFile"
+    static let tasksFileKey = "notes.tasksFile"
+    static let ideasFileKey = "notes.ideasFile"
     /// Desktop's defaults (src/shared/settings.ts): sorting off, and
     /// reminders, once on, at 8:30, 13:00, and 17:30.
     static let standardSort = false
@@ -25,13 +29,21 @@ struct NotesSettings: Equatable {
     var reminders: Bool
     /// HH:mm, in the order you set them.
     var times: [String]
+    /// Desktop's Inbox file, Tasks file, and Ideas file (Settings, Notes,
+    /// File layout), as templates; nil is shared/sorter.json's own.
+    var inboxFile: String? = nil
+    var tasksFile: String? = nil
+    var ideasFile: String? = nil
 
     static func load(_ defaults: UserDefaults = .standard) -> NotesSettings {
         let times = (defaults.stringArray(forKey: timesKey) ?? standardTimes).filter(isTime)
         return NotesSettings(
             sort: defaults.object(forKey: sortKey) as? Bool ?? standardSort,
             reminders: defaults.bool(forKey: remindersKey),
-            times: times.isEmpty ? standardTimes : times
+            times: times.isEmpty ? standardTimes : times,
+            inboxFile: defaults.string(forKey: inboxFileKey),
+            tasksFile: defaults.string(forKey: tasksFileKey),
+            ideasFile: defaults.string(forKey: ideasFileKey)
         )
     }
 
@@ -39,6 +51,26 @@ struct NotesSettings: Equatable {
         defaults.set(sort, forKey: Self.sortKey)
         defaults.set(reminders, forKey: Self.remindersKey)
         defaults.set(times.filter(Self.isTime), forKey: Self.timesKey)
+        for (file, key) in [(inboxFile, Self.inboxFileKey), (tasksFile, Self.tasksFileKey), (ideasFile, Self.ideasFileKey)] {
+            if let file { defaults.set(file, forKey: key) } else { defaults.removeObject(forKey: key) }
+        }
+    }
+
+    var changesLayout: Bool { inboxFile != nil || tasksFile != nil || ideasFile != nil }
+
+    /// The layout these files make over the bundled one; nil when none is
+    /// changed.
+    func layout(_ rules: SorterRules) -> NoteLayout? {
+        guard changesLayout else { return nil }
+        return NoteLayout(inbox: inboxFile ?? rules.layout.inbox, tasks: tasksFile ?? rules.layout.tasks, ideas: ideasFile ?? rules.layout.ideas)
+    }
+
+    /// What a typed path saves, as desktop's field commits it: trimmed;
+    /// left empty, the saved one stays; the default saves as nil.
+    static func typed(_ draft: String, standard: String, saved: String?) -> String? {
+        let next = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if next.isEmpty { return saved }
+        return next == standard ? nil : next
     }
 
     static func isTime(_ text: String) -> Bool {

@@ -13,10 +13,41 @@ import SwiftUI
 #Preview("New note, noted") { NoteTakePreview(.noted) }
 #Preview("New note, noted in a vault") { NoteTakePreview(.notedInVault) }
 #Preview("New note, not saved") { NoteTakePreview(.notSaved) }
-#Preview("Settings, notes") {
-    NavigationStack { NotesSettingsScreen() }
-        .tint(Tokens.brand)
-        .preferredColorScheme(.dark)
+#Preview("Settings, notes") { NotesSettingsPreview(.standard) }
+#Preview("Settings, notes, files changed") { NotesSettingsPreview(.changed) }
+#Preview("Settings, notes, a file that cannot be used") { NotesSettingsPreview(.broken) }
+
+/// Settings, Notes with its file layout as shipped, changed the way
+/// LaBroi's Mac has it, or with files that cannot be used, from a scratch
+/// set of choices.
+struct NotesSettingsPreview: View {
+    enum Scene: CaseIterable { case standard, changed, broken }
+
+    private let defaults: UserDefaults
+
+    init(_ scene: Scene) {
+        let name = "murmur.preview.notes-settings.\(scene)"
+        let defaults = UserDefaults(suiteName: name) ?? .standard
+        defaults.removePersistentDomain(forName: name)
+        var settings = NotesSettings(sort: scene != .standard, reminders: false, times: NotesSettings.standardTimes)
+        switch scene {
+        case .standard: break
+        case .changed:
+            settings.inboxFile = "murmur/notes/{date}.md"
+            settings.tasksFile = "murmur/tasks/{year}-{month}.md"
+        case .broken:
+            settings.inboxFile = "../notes/{date}.md"
+            settings.ideasFile = "murmur/ideas"
+        }
+        settings.save(defaults)
+        self.defaults = defaults
+    }
+
+    var body: some View {
+        NavigationStack { NotesSettingsScreen(defaults: defaults) }
+            .tint(Tokens.brand)
+            .preferredColorScheme(.dark)
+    }
 }
 
 /// A chat that answers from a script.
