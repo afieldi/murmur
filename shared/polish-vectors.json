@@ -649,6 +649,294 @@
       "corrections": true,
       "ok": true,
       "text": "Send the invoice to Mark on Wednesday."
+    },
+    {
+      "name": "corrections: a No the speaker paused after takes back the sentence before",
+      "input": "Put the meeting on Monday at nine. No, put it on Wednesday after lunch.",
+      "candidate": "Put the meeting on Wednesday after lunch.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Put the meeting on Wednesday after lunch."
+    },
+    {
+      "name": "corrections: a No before a period counts",
+      "input": "Put the meeting on Monday at nine. No. Put it on Wednesday after lunch.",
+      "candidate": "Put the meeting on Wednesday after lunch.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Put the meeting on Wednesday after lunch."
+    },
+    {
+      "name": "corrections: a No before an exclamation mark counts",
+      "input": "Put the meeting on Monday at nine. No! Put it on Wednesday after lunch.",
+      "candidate": "Put the meeting on Wednesday after lunch.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Put the meeting on Wednesday after lunch."
+    },
+    {
+      "name": "corrections: a No in curly quotes counts",
+      "input": "Put the meeting on Monday at nine. “No,” put it on Wednesday after lunch.",
+      "candidate": "Put the meeting on Wednesday after lunch.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Put the meeting on Wednesday after lunch."
+    },
+    {
+      "name": "corrections: a capital NO counts",
+      "input": "Put the meeting on Monday at nine. NO, put it on Wednesday after lunch.",
+      "candidate": "Put the meeting on Wednesday after lunch.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Put the meeting on Wednesday after lunch."
+    },
+    {
+      "name": "corrections: a paused No counts with smart lists on",
+      "input": "Put the meeting on Monday at nine. No, put it on Wednesday after lunch.",
+      "candidate": "Put the meeting on Wednesday after lunch.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": true,
+      "text": "Put the meeting on Wednesday after lunch."
+    },
+    {
+      "name": "corrections: a paused No earns nothing with corrections off",
+      "input": "Put the meeting on Monday at nine. No, put it on Wednesday after lunch.",
+      "candidate": "Put the meeting on Wednesday after lunch.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a No without a pause never counts",
+      "input": "Put the meeting on Monday at nine. No put it on Wednesday after lunch.",
+      "candidate": "Put the meeting on Wednesday after lunch.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a questioning No never counts",
+      "input": "Put the meeting on Monday at nine. No? put it on Wednesday after lunch.",
+      "candidate": "Put the meeting on Wednesday after lunch.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a word that starts with no never counts",
+      "input": "Put the meeting on Monday at nine. Nobody, put it on Wednesday after lunch.",
+      "candidate": "Put the meeting on Wednesday after lunch.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a No with a letter after its pause never counts",
+      "input": "Put the meeting on Monday at nine. No,put it on Wednesday after lunch.",
+      "candidate": "Put the meeting on Wednesday after lunch.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: an answer that keeps its No stays on the strict floor",
+      "input": "The report for the board meeting is not done yet. No, it still needs the charts.",
+      "candidate": "Not done yet. No, it still needs the charts.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a No beside another cue adds nothing to the cap",
+      "input": "Book the large room on the third floor for the whole team on Monday morning after the planning call. Sorry, no, book the small room for the team on Tuesday.",
+      "candidate": "Book the small room on the third floor for the whole team on Tuesday.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a No kept without its comma took nothing back",
+      "input": "Put the meeting on Monday at nine. No, put it on Wednesday after lunch.",
+      "candidate": "No put the meeting on Wednesday after lunch.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a No after a question mark never counts",
+      "input": "Put the meeting on Monday at nine? No, put it on Wednesday after lunch.",
+      "candidate": "Put the meeting on Wednesday after lunch.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a No after a no-break space counts",
+      "input": "Put the meeting on Monday at nine. No, put it on Wednesday after lunch.",
+      "candidate": "Put the meeting on Wednesday after lunch.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Put the meeting on Wednesday after lunch."
+    },
+    {
+      "name": "corrections: a No after an emoji in its piece counts",
+      "input": "Put the meeting on Monday at nine. 🙂No, put it on Wednesday after lunch.",
+      "candidate": "Put the meeting on Wednesday after lunch.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Put the meeting on Wednesday after lunch."
+    },
+    {
+      "name": "corrections: a No that answers a question never counts",
+      "input": "Is the report ready for the board? No, it still needs the charts and the summary from finance.",
+      "candidate": "It still needs the charts and the summary from finance.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a No that opens the take never counts",
+      "input": "No, I don't think that's right, the numbers look off to me.",
+      "candidate": "The numbers look off to me.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a No after a word never counts",
+      "input": "Oh no, the build failed again on the release branch and the demo for the client starts in ten minutes.",
+      "candidate": "The build failed again on the release branch.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a No that ends a statement never counts",
+      "input": "I asked the landlord about fixing the heater before winter and he said no.",
+      "candidate": "I asked the landlord about fixing the heater.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a run of Nos counts once",
+      "input": "Tell them this. No, no, no, that is not what we agreed at all. We agreed the vendor would ship the first batch in March and the second batch in May, and we would pay half up front.",
+      "candidate": "Tell them this. That is not what we agreed at all. We agreed the vendor would ship the second batch in May.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: each separate No adds its own share to the cap",
+      "input": "Book the large room on the third floor for Monday morning. No, book the small room. Invite the whole design team and the sales team. No, just the sales team.",
+      "candidate": "Book the small room on the third floor for Monday morning. Invite just the sales team.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Book the small room on the third floor for Monday morning. Invite just the sales team."
+    },
+    {
+      "name": "corrections: a paused No with smart lists on still needs a pause before it",
+      "input": "Put the meeting on Monday at nine No, put it on Wednesday after lunch.",
+      "candidate": "Put the meeting on Wednesday after lunch.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a kept No earns nothing when an everyday no goes",
+      "input": "I checked the logs this morning. No, nothing failed overnight, but I have no idea why the import took three hours again.",
+      "candidate": "I checked the logs this morning. No, nothing failed overnight.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a kept No earns nothing when no budget goes",
+      "input": "The report for the board meeting is not done yet. No, it still needs the charts, and there is no budget for the design review this quarter.",
+      "candidate": "The report for the board meeting is not done yet. No, it still needs the charts.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a No after marks alone never counts",
+      "input": "Is the report ready for the board? ... No, it still needs the charts and the summary from finance.",
+      "candidate": "It still needs the charts and the summary from finance.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a No after marks that open the text never counts",
+      "input": "... No, I don't think that's right, the numbers look off to me today.",
+      "candidate": "The numbers look off to me today.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a No after a word that opens a sentence never counts",
+      "input": "Is the report ready for the board? Well, no, it still needs the charts and the summary from finance.",
+      "candidate": "It still needs the charts and the summary from finance.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a No after the word that opens the text never counts",
+      "input": "Unfortunately, no, we can't make it to the dinner on Friday because the kids have a recital that evening.",
+      "candidate": "We can't make it to the dinner on Friday.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a No after a comma inside a sentence counts",
+      "input": "Put it on the shared drive in the finance folder for the quarter, no, the legal folder.",
+      "candidate": "Put it on the shared drive in the legal folder.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Put it on the shared drive in the legal folder."
+    },
+    {
+      "name": "corrections: a No after a piece of marks alone inside a sentence never counts",
+      "input": "Put the meeting on Monday at nine ... No, put it on Wednesday after lunch.",
+      "candidate": "Put the meeting on Wednesday after lunch.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
     }
   ],
   "hints": [

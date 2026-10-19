@@ -254,13 +254,133 @@ describe('validatePolish with corrections', () => {
 
   it('never lets an everyday no earn the deeper cut', () => {
     // No problem is content, and so common that dropping it must not
-    // unlock a deep cut; no as a fix stays a prompt cue only.
+    // unlock a deep cut; no counts only as a paused cue (No, after a pause).
     const v = validatePolish(
       'No problem, I can cover the Thursday shift. Tell the team I will be in early on Friday too.',
       'I can cover the Thursday shift. Tell the team.',
       { corrections: true }
     )
     expect(v).toMatchObject({ ok: false, reason: 'length ratio' })
+  })
+
+  describe('a No that takes back the last sentence (IOS-030)', () => {
+    // Twelve words to seven, between the floors: only a paused No can
+    // be the cue that earns the deeper cut.
+    const fix = 'Put the meeting on Wednesday after lunch.'
+    const cut = (input: string): ReturnType<typeof validatePolish> =>
+      validatePolish(input, fix, { corrections: true })
+
+    it('counts a No the speaker paused after', () => {
+      expect(cut('Put the meeting on Monday. No, put it on Wednesday after lunch.')).toEqual({ ok: true, text: fix })
+      expect(cut('Put the meeting on Monday. No. Put it on Wednesday after lunch.')).toEqual({ ok: true, text: fix })
+    })
+
+    it('never counts a No without a pause, a questioning No, or a word that starts with no', () => {
+      expect(cut('Put the meeting on Monday. No put it on Wednesday after lunch.')).toMatchObject({
+        ok: false,
+        reason: 'length ratio'
+      })
+      expect(cut('Put the meeting on Monday. No? Put it on Wednesday after lunch.')).toMatchObject({
+        ok: false,
+        reason: 'length ratio'
+      })
+      expect(cut('Put the meeting on Monday, nobody, put it on Wednesday after lunch.')).toMatchObject({
+        ok: false,
+        reason: 'length ratio'
+      })
+    })
+
+    it('credits a dropped No only when the word left the answer, not just its comma', () => {
+      // Fourteen words to eight, the No kept with its comma gone.
+      expect(
+        validatePolish('Put the meeting on Monday at nine. No, put it on Wednesday after lunch.', 'No put the meeting on Wednesday after lunch.', {
+          corrections: true
+        })
+      ).toMatchObject({ ok: false, reason: 'length ratio' })
+    })
+
+    it('never counts a No that answers a question, opens the take, or follows a word', () => {
+      const cuts: Array<[string, string]> = [
+        ['Is the report ready for the board? No, it still needs the charts and the summary from finance.', 'It still needs the charts and the summary from finance.'],
+        ["No, I don't think that's right, the numbers look off to me.", 'The numbers look off to me.'],
+        ['Oh no, the build failed again on the release branch and the demo for the client starts in ten minutes.', 'The build failed again on the release branch.'],
+        ['I asked the landlord about fixing the heater before winter and he said no.', 'I asked the landlord about fixing the heater.']
+      ]
+      for (const [input, answer] of cuts) {
+        expect(validatePolish(input, answer, { corrections: true })).toMatchObject({ ok: false, reason: 'length ratio' })
+      }
+    })
+
+    it('never credits a kept No for an everyday no the answer dropped', () => {
+      const cuts: Array<[string, string]> = [
+        [
+          'I checked the logs this morning. No, nothing failed overnight, but I have no idea why the import took three hours again.',
+          'I checked the logs this morning. No, nothing failed overnight.'
+        ],
+        [
+          'The report for the board meeting is not done yet. No, it still needs the charts, and there is no budget for the design review this quarter.',
+          'The report for the board meeting is not done yet. No, it still needs the charts.'
+        ]
+      ]
+      for (const [input, answer] of cuts) {
+        expect(validatePolish(input, answer, { corrections: true })).toMatchObject({ ok: false, reason: 'length ratio' })
+      }
+    })
+
+    it('never counts a No after marks alone or after a word that opens a sentence', () => {
+      const cuts: Array<[string, string]> = [
+        ['Is the report ready for the board? ... No, it still needs the charts and the summary from finance.', 'It still needs the charts and the summary from finance.'],
+        ["... No, I don't think that's right, the numbers look off to me today.", 'The numbers look off to me today.'],
+        ['Is the report ready for the board? Well, no, it still needs the charts and the summary from finance.', 'It still needs the charts and the summary from finance.'],
+        ["Unfortunately, no, we can't make it to the dinner on Friday because the kids have a recital that evening.", "We can't make it to the dinner on Friday."]
+      ]
+      for (const [input, answer] of cuts) {
+        expect(validatePolish(input, answer, { corrections: true })).toMatchObject({ ok: false, reason: 'length ratio' })
+      }
+    })
+
+    it('counts a No after a comma inside a sentence', () => {
+      // Seventeen words to ten: the deeper floor, earned by the No.
+      expect(
+        validatePolish(
+          'Put it on the shared drive in the finance folder for the quarter, no, the legal folder.',
+          'Put it on the shared drive in the legal folder.',
+          { corrections: true }
+        )
+      ).toEqual({ ok: true, text: 'Put it on the shared drive in the legal folder.' })
+    })
+
+    it('counts a run of Nos, or a No beside another cue, as one take-back', () => {
+      // Thirty-nine words to nineteen: a cut of twenty, past the twelve
+      // one cue allows, though three Nos would allow twenty-eight.
+      expect(
+        validatePolish(
+          'No, no, no, that is not what we agreed at all. We agreed the vendor would ship the first batch in March and the second batch in May, and we would pay half up front and half on delivery.',
+          'That is not what we agreed at all. We agreed the vendor would ship the second batch in May.',
+          { corrections: true }
+        )
+      ).toMatchObject({ ok: false, reason: 'length ratio' })
+      // Thirty words to fourteen with Sorry, no: one take-back, a cut of
+      // sixteen past its twelve.
+      expect(
+        validatePolish(
+          'Book the large room on the third floor for the whole team on Monday morning after the planning call. Sorry, no, book the small room for the team on Tuesday.',
+          'Book the small room on the third floor for the whole team on Tuesday.',
+          { corrections: true }
+        )
+      ).toMatchObject({ ok: false, reason: 'length ratio' })
+    })
+
+    it('gives each separate No its own share of the cap', () => {
+      // Thirty words to sixteen: a cut of fourteen, which two Nos allow.
+      expect(
+        validatePolish(
+          'Book the large room on the third floor for Monday morning. No, book the small room. Invite the whole design team and the sales team. No, just the sales team.',
+          'Book the small room on the third floor for Monday morning. Invite just the sales team.',
+          { corrections: true }
+        )
+      ).toMatchObject({ ok: true })
+    })
   })
 
   it('never cuts below the 0.4 floor', () => {

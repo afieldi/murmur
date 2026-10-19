@@ -11,6 +11,9 @@ vi.mock('../../../shared/polish.json', () => ({
     correctionsPrompt: ['Corrections line.', 'Second line.'],
     correctionCues: ['kiwi', 'make it', 'sorry'],
     correctionCut: { slack: 1, perCue: 1 },
+    pausedCorrectionCues: ['plum'],
+    correctionPause: ';',
+    sentenceEnd: '|',
     metaOpeners: ['banana'],
     refusals: ['kumquat'],
     hintSentinel: 'zebra',
@@ -43,6 +46,36 @@ describe('cleanup rules from shared/polish.json', () => {
     expect(validatePolish('one two wait three four five', 'one two four five', { corrections: true })).toEqual({
       ok: false,
       reason: 'length ratio'
+    })
+  })
+
+  it('counts a shared paused cue only between shared pause marks', () => {
+    // Six words to four, as above.
+    expect(validatePolish('one two; plum; three four five', 'one two four five', { corrections: true })).toEqual({
+      ok: true,
+      text: 'one two four five'
+    })
+    // A comma is not a pause mark in this file, before the cue or after
+    // it, and desktop's own No, no longer counts once the shared list
+    // drops it.
+    for (const input of ['one two; plum, three four five', 'one two, plum; three four five', 'one two; no, three four five']) {
+      expect(validatePolish(input, 'one two four five', { corrections: true })).toEqual({
+        ok: false,
+        reason: 'length ratio'
+      })
+    }
+  })
+
+  it('never counts a shared paused cue after a word that opens a shared sentence', () => {
+    // Seven words to five; a word after a | opens a sentence here, and a
+    // period does not.
+    expect(validatePolish('zero one| two; plum; three four', 'zero one| two; four', { corrections: true })).toEqual({
+      ok: false,
+      reason: 'length ratio'
+    })
+    expect(validatePolish('zero one. two; plum; three four', 'zero one. two; four', { corrections: true })).toEqual({
+      ok: true,
+      text: 'zero one. two; four'
     })
   })
 

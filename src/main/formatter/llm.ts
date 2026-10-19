@@ -56,9 +56,10 @@ export const CORRECTIONS_PROMPT = polish.correctionsPrompt.join(' ')
 // The cue words a spoken correction turns on (correctionCues), matched
 // whole and case blind, each escaped so it is always the words it says.
 // A correction cut has to remove at least one of them; that is how
-// validation tells a correction from a model deleting content. No
-// stays a prompt cue only: no problem and no one are so common that
-// dropping one must never unlock a deep cut (review gate, 2026-10-17).
+// validation tells a correction from a model deleting content. No is
+// not one: no problem and no one are so common that dropping one must
+// never unlock a deep cut (review gate, 2026-10-17), so no counts only as
+// a paused cue, set off by pauses (pausedCueCount, IOS-030).
 const CORRECTION_CUE = new RegExp(
   `\\b(?:${polish.correctionCues.map((cue) => cue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`,
   'g'
@@ -127,6 +128,61 @@ function spokenWords(value: string): string[] {
 
 function cueCount(value: string): number {
   return spokenWords(value).join(' ').match(CORRECTION_CUE)?.length ?? 0
+}
+
+// A piece of the text that is anything but letters and numbers, the
+// paused cue, a correctionPause mark, then anything but letters and
+// numbers: No, and "No." are, No? and nobody, are not.
+function isPausedCue(piece: string): boolean {
+  const start = piece.search(/[\p{L}\p{N}]/u)
+  if (start < 0) return false
+  const rest = piece.slice(start)
+  return polish.pausedCorrectionCues.some(
+    (cue) =>
+      rest.startsWith(cue) &&
+      rest.length > cue.length &&
+      polish.correctionPause.includes(rest[cue.length]) &&
+      !/[\p{L}\p{N}]/u.test(rest.slice(cue.length + 1))
+  )
+}
+
+// A paused cue is everyday speech (no problem, Is it done? No, Well, no,
+// he said no.) unless it takes back what came just before, so it counts
+// only with a pause on both sides: after a word that ends in a
+// correctionPause mark and does not open a sentence, and once for a run
+// (No, no, no,) (IOS-030).
+function pausedCueCount(value: string): number {
+  const pieces = value
+    .toLowerCase()
+    .replace(/[‘’]/g, "'")
+    .split(/\s+/)
+    .filter((piece) => piece.length > 0)
+  const paused = pieces.map(isPausedCue)
+  const last = (piece: string): string => piece[piece.length - 1]
+  let count = 0
+  for (let i = 2; i < pieces.length; i++) {
+    const before = pieces[i - 1]
+    if (
+      paused[i] &&
+      !paused[i - 1] &&
+      /[\p{L}\p{N}]/u.test(before) &&
+      polish.correctionPause.includes(last(before)) &&
+      !polish.sentenceEnd.includes(last(pieces[i - 2]))
+    )
+      count++
+  }
+  return count
+}
+
+// The cues the answer dropped. A paused cue counts only when the listed
+// cues all stayed (Sorry, no, takes back one thing, not two), less every
+// time the answer still says the cue word: a No kept without its comma
+// took nothing back, and neither did one kept while an everyday no went.
+function correctionCuesDropped(input: string, answer: string): number {
+  const listed = cueCount(input) - cueCount(answer)
+  if (listed !== 0) return listed
+  const kept = spokenWords(answer).filter((word) => polish.pausedCorrectionCues.includes(word)).length
+  return Math.max(0, pausedCueCount(input) - kept)
 }
 
 // Every output word was spoken, counted as a multiset: a correction
@@ -209,7 +265,7 @@ export function validatePolish(
   // explains one wrong phrase and the cue itself, about 8 words
   // (correctionCut.perCue), plus 4 of slack for a restart
   // (correctionCut.slack); a bigger cut is content, not a fix.
-  const cuesDropped = opts.corrections ? cueCount(input) - cueCount(countable) : 0
+  const cuesDropped = opts.corrections ? correctionCuesDropped(input, countable) : 0
   const earnedCorrectionFloor =
     cuesDropped > 0 && inputWords - outputWords <= polish.correctionCut.slack + polish.correctionCut.perCue * cuesDropped &&
     onlySpokenWords(input, countable)

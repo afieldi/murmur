@@ -30,6 +30,12 @@ public struct PolishRules: Decodable, Sendable, Equatable {
     public let correctionsPrompt: [String]
     public let correctionCues: [String]
     public let correctionCut: CorrectionCut
+    /// Cues that count only where the speaker paused after them (No,).
+    public let pausedCorrectionCues: [String]
+    /// The marks that make that pause.
+    public let correctionPause: String
+    /// The marks that end a sentence, so the word after one opens the next.
+    public let sentenceEnd: String
     public let metaOpeners: [String]
     public let refusals: [String]
     public let hintLead: String
@@ -235,8 +241,7 @@ public enum Polish {
     static func isCorrection(_ input: String, _ answer: String, cut: Int, rules: PolishRules) -> Bool {
         let spoken = spokenWords(input)
         let kept = spokenWords(answer)
-        let cue = cuePattern(rules.correctionCues)
-        let dropped = cueCount(spoken, cue) - cueCount(kept, cue)
+        let dropped = cuesDropped(input, spoken, kept, rules)
         return dropped > 0 && cut <= rules.correctionCut.slack + rules.correctionCut.perCue * dropped && onlySpoken(spoken, kept)
     }
 
@@ -271,6 +276,59 @@ public enum Polish {
     private static func cueCount(_ words: [[UInt16]], _ cue: NSRegularExpression) -> Int {
         let joined = String(decoding: Array(words.joined(separator: [0x20])), as: UTF16.self)
         return cue.numberOfMatches(in: joined, range: NSRange(location: 0, length: (joined as NSString).length))
+    }
+
+    /// Desktop's correctionCuesDropped: the cues the answer dropped. A
+    /// paused cue counts only when the listed drop is exactly zero (Sorry,
+    /// no, takes back one thing, not two), less every time the answer still
+    /// says the cue word: a No kept without its comma took nothing back, and
+    /// neither did one kept while an everyday no went.
+    private static func cuesDropped(_ input: String, _ spoken: [[UInt16]], _ kept: [[UInt16]], _ rules: PolishRules) -> Int {
+        let cue = cuePattern(rules.correctionCues)
+        let listed = cueCount(spoken, cue) - cueCount(kept, cue)
+        guard listed == 0 else { return listed }
+        let cues = rules.pausedCorrectionCues.map { Array($0.utf16) }
+        return max(0, pausedCueCount(input, rules) - kept.filter { cues.contains($0) }.count)
+    }
+
+    /// Desktop's pausedCueCount: a paused cue is everyday speech (no
+    /// problem, Is it done? No, Well, no, he said no.) unless it takes back
+    /// what came just before, so it counts only with a pause on both sides:
+    /// after a piece (the text lowercased as JavaScript does, curly
+    /// apostrophes made straight, split on whitespace) that has a letter or
+    /// number, ends in a correctionPause mark, and does not open a sentence,
+    /// and once for a run (No, no, no,).
+    static func pausedCueCount(_ value: String, _ rules: PolishRules) -> Int {
+        let units = JS.lowercase(value).utf16.map { $0 == 0x2018 || $0 == 0x2019 ? 0x27 : $0 }
+        let pause = Set(rules.correctionPause.utf16)
+        let sentenceEnd = Set(rules.sentenceEnd.utf16)
+        let pieces = units.split(whereSeparator: JS.isSpace)
+        let paused = pieces.map { isPausedCue($0, rules) }
+        var count = 0
+        for i in pieces.indices.dropFirst(2) where paused[i] && !paused[i - 1] {
+            let before = pieces[i - 1]
+            let words = String(decoding: before, as: UTF16.self).unicodeScalars.contains(where: isLetterOrNumber)
+            if words, let end = before.last, pause.contains(end), let opener = pieces[i - 2].last, !sentenceEnd.contains(opener) {
+                count += 1
+            }
+        }
+        return count
+    }
+
+    /// A piece that is anything but letters and numbers, the paused cue, a
+    /// correctionPause mark, then anything but letters and numbers: No, and
+    /// "No." are, No? and nobody, are not.
+    private static func isPausedCue(_ piece: ArraySlice<UInt16>, _ rules: PolishRules) -> Bool {
+        let scalars = Array(String(decoding: piece, as: UTF16.self).unicodeScalars)
+        guard let start = scalars.firstIndex(where: isLetterOrNumber) else { return false }
+        let rest = Array(String(String.UnicodeScalarView(scalars[start...])).utf16)
+        let pause = Set(rules.correctionPause.utf16)
+        return rules.pausedCorrectionCues.contains { word in
+            let cue = Array(word.utf16)
+            let after = String(decoding: rest.dropFirst(cue.count + 1), as: UTF16.self)
+            return rest.count > cue.count && rest.starts(with: cue) && pause.contains(rest[cue.count])
+                && !after.unicodeScalars.contains(where: isLetterOrNumber)
+        }
     }
 
     /// Every answer word was spoken, each no more often than it was.

@@ -36,7 +36,7 @@ struct PolishVectors: Decodable, Sendable {
 @Suite struct PolishVectorTests {
     @Test func theSharedFilesLoad() throws {
         let file = try #require(PolishVectors.file)
-        #expect(file.validate.count >= 66 && file.hints.count >= 5)
+        #expect(file.validate.count >= 103 && file.hints.count >= 5)
         #expect(file.validate.contains { $0.corrections } && file.validate.contains { !$0.corrections })
         #expect(try #require(polishRules).systemPrompt.count == 8)
     }
@@ -121,10 +121,11 @@ struct PolishVectors: Decodable, Sendable {
     /// Apply corrections (IOS-030): desktop's rules, from shared/polish.json.
     @Test func theCorrectionRulesAreDesktops() throws {
         let rules = try rules()
-        #expect(rules.correctionsPrompt.count == 10)
+        #expect(rules.correctionsPrompt.count == 11)
         #expect(rules.correctionsPrompt.first?.hasPrefix("Self-corrections: when the speaker says something and then corrects it") == true)
         #expect(rules.correctionCues == ["wait", "actually", "sorry", "rather", "make that", "i mean", "i meant", "let me rephrase"])
         #expect(rules.correctionCut.slack == 4 && rules.correctionCut.perCue == 8)
+        #expect(rules.pausedCorrectionCues == ["no"] && rules.correctionPause == ",.;:!" && rules.sentenceEnd == ".!?")
     }
 
     /// The prompt is the system lines, then smart lists, then corrections,
