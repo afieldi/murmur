@@ -12,6 +12,7 @@ struct PolishVectors: Decodable, Sendable {
         let input: String
         let candidate: String
         let smartLists: Bool
+        let corrections: Bool
         let ok: Bool
         let text: String?
         let reason: String?
@@ -35,14 +36,18 @@ struct PolishVectors: Decodable, Sendable {
 @Suite struct PolishVectorTests {
     @Test func theSharedFilesLoad() throws {
         let file = try #require(PolishVectors.file)
-        #expect(file.validate.count >= 28 && file.hints.count >= 5)
+        #expect(file.validate.count >= 66 && file.hints.count >= 5)
+        #expect(file.validate.contains { $0.corrections } && file.validate.contains { !$0.corrections })
         #expect(try #require(polishRules).systemPrompt.count == 8)
     }
 
     @Test(arguments: PolishVectors.file?.validate ?? [])
     func answersMatchDesktop(_ v: PolishVectors.Validate) throws {
         let expected: PolishVerdict = v.ok ? .keep(try #require(v.text)) : .reject(try #require(v.reason))
-        let verdict = Polish.validate(v.input, v.candidate, smartLists: v.smartLists, rules: try #require(polishRules), hallucinations: try #require(hallucinationList))
+        let verdict = Polish.validate(
+            v.input, v.candidate, smartLists: v.smartLists, corrections: v.corrections, rules: try #require(polishRules),
+            hallucinations: try #require(hallucinationList)
+        )
         #expect(verdict == expected)
     }
 
@@ -64,8 +69,19 @@ struct PolishVectors: Decodable, Sendable {
         return { request in (body, HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!) }
     }
 
-    func run(_ text: String, send: @escaping ConnectionTest.Send, smartLists: Bool = false, hints: [String] = []) async throws -> PolishResult {
-        await Polish.run(text, baseUrl: "https://api.example.com/v1/", model: "cleanup-model", key: key, smartLists: smartLists, hints: hints, rules: try rules(), hallucinations: try #require(hallucinationList), send: send)
+    func run(_ text: String, send: @escaping ConnectionTest.Send, smartLists: Bool = false, corrections: Bool = false, hints: [String] = []) async throws -> PolishResult {
+        await Polish.run(
+            text, baseUrl: "https://api.example.com/v1/", model: "cleanup-model", key: key, smartLists: smartLists, corrections: corrections,
+            hints: hints, rules: try rules(), hallucinations: try #require(hallucinationList), send: send
+        )
+    }
+
+    func system(smartLists: Bool, corrections: Bool, hints: [String]) throws -> String {
+        let request = Polish.request(
+            input, baseUrl: "https://api.example.com/v1", model: "m", key: key, smartLists: smartLists, corrections: corrections, hints: hints,
+            rules: try rules()
+        )
+        return try sent(try #require(request)).messages[0].content
     }
 
     struct Sent: Decodable {
@@ -80,7 +96,7 @@ struct PolishVectors: Decodable, Sendable {
     }
 
     @Test func itAsksTheCleanupModelWithTheSharedPrompt() throws {
-        let request = try #require(Polish.request(input, baseUrl: "https://api.example.com/v1/", model: "cleanup-model", key: key, smartLists: false, hints: [], rules: try rules()))
+        let request = try #require(Polish.request(input, baseUrl: "https://api.example.com/v1/", model: "cleanup-model", key: key, smartLists: false, corrections: false, hints: [], rules: try rules()))
         #expect(request.url?.absoluteString == "https://api.example.com/v1/chat/completions")
         #expect(request.httpMethod == "POST")
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer gsk_abcdefgh1234")
@@ -96,21 +112,55 @@ struct PolishVectors: Decodable, Sendable {
     }
 
     @Test func listInstructionsGoOnlyWithSmartLists() throws {
-        let on = try #require(Polish.request(input, baseUrl: "https://api.example.com/v1", model: "m", key: key, smartLists: true, hints: [], rules: try rules()))
-        let off = try #require(Polish.request(input, baseUrl: "https://api.example.com/v1", model: "m", key: key, smartLists: false, hints: [], rules: try rules()))
+        let on = try #require(Polish.request(input, baseUrl: "https://api.example.com/v1", model: "m", key: key, smartLists: true, corrections: false, hints: [], rules: try rules()))
+        let off = try #require(Polish.request(input, baseUrl: "https://api.example.com/v1", model: "m", key: key, smartLists: false, corrections: false, hints: [], rules: try rules()))
         #expect(try sent(on).messages[0].content.contains("numbered list"))
         #expect(!(try sent(off).messages[0].content.contains("numbered list")))
     }
 
+    /// Apply corrections (IOS-030): desktop's rules, from shared/polish.json.
+    @Test func theCorrectionRulesAreDesktops() throws {
+        let rules = try rules()
+        #expect(rules.correctionsPrompt.count == 10)
+        #expect(rules.correctionsPrompt.first?.hasPrefix("Self-corrections: when the speaker says something and then corrects it") == true)
+        #expect(rules.correctionCues == ["wait", "actually", "sorry", "rather", "make that", "i mean", "i meant", "let me rephrase"])
+        #expect(rules.correctionCut.slack == 4 && rules.correctionCut.perCue == 8)
+    }
+
+    /// The prompt is the system lines, then smart lists, then corrections,
+    /// then hints, one space apart, as desktop builds it; off is exactly
+    /// the prompt without corrections.
+    @Test func correctionInstructionsGoOnlyWithCorrections() throws {
+        let rules = try rules()
+        let hint = #"Preferred spellings, apply ONLY where these words already occur: "labroy" is written "LaBroi"."#
+        #expect(try system(smartLists: false, corrections: false, hints: []) == rules.systemPrompt.joined(separator: " "))
+        #expect(try system(smartLists: false, corrections: true, hints: []) == (rules.systemPrompt + rules.correctionsPrompt).joined(separator: " "))
+        #expect(
+            try system(smartLists: true, corrections: true, hints: [hint])
+                == (rules.systemPrompt + rules.smartListsPrompt + rules.correctionsPrompt + [hint]).joined(separator: " ")
+        )
+        #expect(try system(smartLists: true, corrections: false, hints: [hint]) == (rules.systemPrompt + rules.smartListsPrompt + [hint]).joined(separator: " "))
+    }
+
+    /// Desktop's check sentence: on, only the fix comes back; off, the cut
+    /// is too deep and the formatted text stands.
+    @Test func aCorrectionIsKeptOnlyWithCorrections() async throws {
+        let slip = "Send the invoice to Mark on Tuesday. Oh wait, actually what I mean is Wednesday."
+        let fix = "Send the invoice to Mark on Wednesday."
+        #expect(try await run(slip, send: says(fix), corrections: true) == .polished(fix))
+        #expect(try await run(slip, send: says(fix), smartLists: true, corrections: true) == .polished(fix))
+        #expect(try await run(slip, send: says(fix)) == .fellBack("validate: length ratio"))
+    }
+
     @Test func hintsGoInTheSystemPromptOnly() throws {
         let hint = #"Preferred spellings, apply ONLY where these words already occur: "labroy" is written "LaBroi"."#
-        let request = try #require(Polish.request(input, baseUrl: "https://api.example.com/v1", model: "m", key: key, smartLists: false, hints: [hint], rules: try rules()))
+        let request = try #require(Polish.request(input, baseUrl: "https://api.example.com/v1", model: "m", key: key, smartLists: false, corrections: false, hints: [hint], rules: try rules()))
         #expect(try sent(request).messages[0].content.hasSuffix(hint))
         #expect(try sent(request).messages[1].content == input)
     }
 
     @Test func anAddressTheIPhoneCannotCallSendsNothing() async throws {
-        #expect(Polish.request(input, baseUrl: "http://192.168.1.5:8000/v1", model: "m", key: key, smartLists: false, hints: [], rules: try rules()) == nil)
+        #expect(Polish.request(input, baseUrl: "http://192.168.1.5:8000/v1", model: "m", key: key, smartLists: false, corrections: false, hints: [], rules: try rules()) == nil)
         #expect(try await run(input, send: says(cleaned)) == .polished(cleaned))
     }
 

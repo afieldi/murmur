@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // A local stand-in provider for the smoke (ios/prd.json IOS-005, IOS-006,
-// IOS-007): it answers Test connection, transcriptions, polish, the notes'
-// sort (IOS-023), and transforms (IOS-024) inside the app, through the real
-// URLSession, without a network or a server.
+// IOS-007): it answers Test connection, transcriptions, polish (with apply
+// corrections, IOS-030), the notes' sort (IOS-023), and transforms
+// (IOS-024) inside the app, through the real URLSession, without a network
+// or a server.
 import Foundation
 import MurmurCore
 import Synchronization
@@ -34,6 +35,12 @@ final class StubProtocol: URLProtocol {
     /// The cleanup stand-ins (IOS-007): one that errors, one that chats.
     static let chatErrorBaseUrl = "https://chaterror.stub.invalid/v1"
     static let chattyBaseUrl = "https://chatty.stub.invalid/v1"
+
+    /// Apply corrections' stand-in (IOS-030): it answers every polish
+    /// request with the fix to desktop's check sentence.
+    static let fixerBaseUrl = "https://fixer.stub.invalid/v1"
+    static let slip = "Send the invoice to Mark on Tuesday. Oh wait, actually what I mean is Wednesday."
+    static let fix = "Send the invoice to Mark on Wednesday."
 
     /// The note sorter's stand-in (IOS-023): it answers with the replies the
     /// smoke scripted, in order, and keeps what it was asked.
@@ -94,6 +101,8 @@ final class StubProtocol: URLProtocol {
             (status, body) = authorized ? Self.sortAnswer(request) : (401, "{}")
         case ("rewrite", _):
             (status, body) = authorized ? Self.rewriteAnswer(request) : (401, "{}")
+        case ("fixer", _):
+            (status, body) = authorized ? (200, #"{"choices":[{"message":{"content":"\#(Self.fix)"}}]}"#) : (401, "{}")
         case ("chatty", _):
             (status, body) = (200, #"{"choices":[{"message":{"content":"Sure! Here is the cleaned text: send the report."}}]}"#)
         case (_, .offline?):

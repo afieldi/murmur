@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // The Cleanup screen's state (ios/prd.json IOS-007): the level, polish,
-// smart lists, and numbers, saved as they change. The screen binds by
+// smart lists, apply corrections (IOS-030), and numbers, saved as they
+// change. The screen binds by
 // key path ($model.level), never through a closure (Swift 6.3, 27146b7).
 import Foundation
 import MurmurCore
@@ -30,6 +31,11 @@ import MurmurCore
     var smartLists: Bool {
         get { settings.smartLists }
         set { update { $0.smartLists = newValue } }
+    }
+
+    var corrections: Bool {
+        get { settings.corrections }
+        set { update { $0.corrections = newValue } }
     }
 
     var numbers: FormatOptions.Numbers {

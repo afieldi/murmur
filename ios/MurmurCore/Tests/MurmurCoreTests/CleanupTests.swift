@@ -48,6 +48,7 @@ final class FakeChat: Sendable {
     @Test func theDefaultsAreDesktops() {
         let settings = CleanupSettings()
         #expect(settings.level == .full && settings.numbers == .auto && !settings.smartLists && settings.polish)
+        #expect(!settings.corrections)
         #expect(settings.dictionary.isEmpty && settings.expansions.isEmpty)
     }
 
@@ -58,6 +59,34 @@ final class FakeChat: Sendable {
         #expect(try JSONDecoder().decode(CleanupSettings.self, from: Data("{}".utf8)) == CleanupSettings())
         let full = CleanupSettings(level: .off, numbers: .digits, smartLists: true, polish: false, dictionary: [DictionaryEntry(from: "a", to: "b")], expansions: [ExpansionEntry(trigger: "c", text: "d")])
         #expect(try JSONDecoder().decode(CleanupSettings.self, from: JSONEncoder().encode(full)) == full)
+        let fixing = CleanupSettings(corrections: true)
+        #expect(try JSONDecoder().decode(CleanupSettings.self, from: JSONEncoder().encode(fixing)) == fixing)
+    }
+
+    /// Settings as build 485 saved them, before Apply corrections: it reads off.
+    @Test func settingsSavedBeforeCorrectionsReadItOff() throws {
+        let saved = #"{"level":"full","numbers":"digits","smartLists":true,"polish":true,"dictionary":[],"expansions":[]}"#
+        let settings = try JSONDecoder().decode(CleanupSettings.self, from: Data(saved.utf8))
+        #expect(!settings.corrections)
+        #expect(settings == CleanupSettings(numbers: .digits, smartLists: true))
+    }
+
+    /// Apply corrections (IOS-030) reaches polish: its lines go in the
+    /// prompt and a correction cut is kept; off, neither.
+    @Test func finishAppliesCorrectionsOnlyWhenOn() async throws {
+        let slip = "Send the invoice to Mark on Tuesday. Oh wait, actually what I mean is Wednesday."
+        let fix = "Send the invoice to Mark on Wednesday."
+        let corrections = try #require(polishRules).correctionsPrompt.joined(separator: " ")
+        func system(_ chat: FakeChat) throws -> String {
+            let sent = try JSONSerialization.jsonObject(with: try #require(chat.asked.withLock { $0.first?.httpBody })) as? [String: Any]
+            return try #require(((sent?["messages"] as? [[String: String]])?.first)?["content"])
+        }
+        let on = FakeChat.says(fix)
+        #expect(try await finish(CleanupSettings(corrections: true), connection: groq, chat: on, text: slip) == fix)
+        #expect(try system(on).hasSuffix(corrections))
+        let off = FakeChat.says(fix)
+        #expect(try await finish(CleanupSettings(), connection: groq, chat: off, text: slip) == (try formatted(slip, CleanupSettings())))
+        #expect(!(try system(off).contains(corrections)))
     }
 
     @Test func fullPolishesTheFormattedText() async throws {

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // The Cleanup screen (ios/prd.json IOS-007): how much murmur tidies your
 // words, each setting with one plain line on what it does. Polish, smart
-// lists, and numbers only act at Full, so they show there.
+// lists, apply corrections (IOS-030), and numbers only act at Full, so
+// they show there.
 import MurmurCore
 import SwiftUI
 
@@ -36,6 +37,13 @@ struct CleanupScreen: View {
                     Toggle("Smart lists", isOn: $model.smartLists)
                 } footer: {
                     Text(CleanupCopy.smartLists).foregroundStyle(Tokens.textDim)
+                }
+                .listRowBackground(Tokens.panel)
+
+                Section {
+                    Toggle("Apply corrections", isOn: $model.corrections)
+                } footer: {
+                    Text(CleanupCopy.corrections(polish: model.polish)).foregroundStyle(Tokens.textDim)
                 }
                 .listRowBackground(Tokens.panel)
 
@@ -95,12 +103,29 @@ struct CleanupRoute: View {
 #Preview("Full") { CleanupPreview(CleanupSettings()) }
 #Preview("Light") { CleanupPreview(CleanupSettings(level: .light)) }
 #Preview("Full, lists and digits") { CleanupPreview(CleanupSettings(numbers: .digits, smartLists: true, polish: false)) }
+#Preview("Full, Apply corrections on") { CleanupPreview(.correctionsOn) }
+#Preview("Full, Apply corrections on, Polish off") { CleanupPreview(.correctionsWithoutPolish) }
 
 /// The Cleanup screen over its own scratch settings.
 struct CleanupPreview: View {
+    /// Apply corrections at Full: off, on, and on with Polish off.
+    enum Scene: String, CaseIterable, Sendable {
+        case correctionsOff, correctionsOn, correctionsWithoutPolish
+
+        var settings: CleanupSettings {
+            switch self {
+            case .correctionsOff: CleanupSettings()
+            case .correctionsOn: CleanupSettings(corrections: true)
+            case .correctionsWithoutPolish: CleanupSettings(corrections: true, polish: false)
+            }
+        }
+    }
+
     let settings: CleanupSettings
 
     init(_ settings: CleanupSettings) { self.settings = settings }
+
+    init(_ scene: Scene) { settings = scene.settings }
 
     var body: some View {
         NavigationStack { CleanupScreen(model: Self.model(settings)) }

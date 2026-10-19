@@ -18,8 +18,18 @@ public struct PolishRules: Decodable, Sendable, Equatable {
         public let shortDelta: Int
     }
 
+    /// How deep a correction may cut: slack words, plus perCue for each
+    /// correction cue the answer dropped.
+    public struct CorrectionCut: Decodable, Sendable, Equatable {
+        public let slack: Int
+        public let perCue: Int
+    }
+
     public let systemPrompt: [String]
     public let smartListsPrompt: [String]
+    public let correctionsPrompt: [String]
+    public let correctionCues: [String]
+    public let correctionCut: CorrectionCut
     public let metaOpeners: [String]
     public let refusals: [String]
     public let hintLead: String
@@ -44,7 +54,9 @@ public enum PolishResult: Equatable, Sendable {
 public enum Polish {
     /// Decide whether a model's answer is a faithful cleanup of the input.
     /// Strict: when in doubt, reject, and the caller keeps its text.
-    public static func validate(_ input: String, _ candidate: String, smartLists: Bool, rules: PolishRules, hallucinations: HallucinationList) -> PolishVerdict {
+    public static func validate(
+        _ input: String, _ candidate: String, smartLists: Bool, corrections: Bool, rules: PolishRules, hallucinations: HallucinationList
+    ) -> PolishVerdict {
         var text = JS.trim(candidate)
         if text.isEmpty { return .reject("empty") }
 
@@ -80,9 +92,14 @@ public enum Polish {
         let implied = smartLists && isListShaped(lines) ? impliedEntryCount(input) : 0
         let earnedListFloor = implied >= 2
         if earnedListFloor && lines.filter(isListLine).count < implied { return .reject("missing entries") }
+        // With apply corrections on, a cut that is a correction earns the
+        // same deeper floor: the speech said a cue the answer dropped, the
+        // cut is no deeper than the dropped cues explain, and every word
+        // left was spoken (IOS-030, desktop's US-105).
+        let earnedCorrectionFloor = corrections && isCorrection(input, countable, cut: inputWords - outputWords, rules: rules)
         if inputWords >= rules.length.ratioFromWords {
             let ratio = Double(outputWords) / Double(inputWords)
-            let floor = earnedListFloor ? rules.length.listFloor : rules.length.floor
+            let floor = earnedListFloor || earnedCorrectionFloor ? rules.length.listFloor : rules.length.floor
             if ratio < floor || ratio > rules.length.ceiling { return .reject("length ratio") }
         } else if abs(outputWords - inputWords) > rules.length.shortDelta {
             return .reject("length delta")
@@ -97,11 +114,14 @@ public enum Polish {
     }
 
     /// The request, or nil when the address is not one the iPhone can call.
-    public static func request(_ text: String, baseUrl: String, model: String, key: APIKey, smartLists: Bool, hints: [String], rules: PolishRules) -> URLRequest? {
+    public static func request(
+        _ text: String, baseUrl: String, model: String, key: APIKey, smartLists: Bool, corrections: Bool, hints: [String], rules: PolishRules
+    ) -> URLRequest? {
         guard BaseURL.problem(baseUrl) == nil,
               let url = URL(string: BaseURL.normalized(baseUrl.trimmingCharacters(in: .whitespaces)) + "/chat/completions")
         else { return nil }
-        let system = (rules.systemPrompt + (smartLists ? rules.smartListsPrompt : []) + hints).joined(separator: " ")
+        let system = (rules.systemPrompt + (smartLists ? rules.smartListsPrompt : []) + (corrections ? rules.correctionsPrompt : []) + hints)
+            .joined(separator: " ")
         let body = Chat(model: model, temperature: rules.temperature, messages: [
             Chat.Message(role: "system", content: system),
             Chat.Message(role: "user", content: text)
@@ -118,8 +138,11 @@ public enum Polish {
 
     /// Runs the cleanup model over formatted text. Never retries: dictation
     /// latency matters more than a second opinion.
-    public static func run(_ text: String, baseUrl: String, model: String, key: APIKey, smartLists: Bool, hints: [String], rules: PolishRules, hallucinations: HallucinationList, send: ConnectionTest.Send) async -> PolishResult {
-        guard let request = request(text, baseUrl: baseUrl, model: model, key: key, smartLists: smartLists, hints: hints, rules: rules) else {
+    public static func run(
+        _ text: String, baseUrl: String, model: String, key: APIKey, smartLists: Bool, corrections: Bool, hints: [String], rules: PolishRules,
+        hallucinations: HallucinationList, send: ConnectionTest.Send
+    ) async -> PolishResult {
+        guard let request = request(text, baseUrl: baseUrl, model: model, key: key, smartLists: smartLists, corrections: corrections, hints: hints, rules: rules) else {
             return .fellBack("network")
         }
         let body: Data
@@ -138,7 +161,7 @@ public enum Polish {
         guard let content = (((object as? [String: Any])?["choices"] as? [Any])?.first as? [String: Any])
             .flatMap({ ($0["message"] as? [String: Any])?["content"] as? String })
         else { return .fellBack("response missing text") }
-        switch validate(text, content, smartLists: smartLists, rules: rules, hallucinations: hallucinations) {
+        switch validate(text, content, smartLists: smartLists, corrections: corrections, rules: rules, hallucinations: hallucinations) {
         case .reject(let reason):
             return .fellBack("validate: \(reason)")
         case .keep(let kept):
@@ -203,6 +226,62 @@ public enum Polish {
         let commas = input.utf16.filter { $0 == 0x2C }.count
         let itemCommas = max(0, commas - clauseCommas.numberOfMatches(in: input, range: whole))
         return max(enums, itemCommas >= 2 ? itemCommas + 1 : 0)
+    }
+
+    /// Whether a cut is a spoken correction: the answer says fewer cues
+    /// than the speech, cuts no more than correctionCut allows for the
+    /// cues it dropped, and holds only words that were spoken. A cut that
+    /// keeps every cue, or adds a word, is content, never a fix.
+    static func isCorrection(_ input: String, _ answer: String, cut: Int, rules: PolishRules) -> Bool {
+        let spoken = spokenWords(input)
+        let kept = spokenWords(answer)
+        let cue = cuePattern(rules.correctionCues)
+        let dropped = cueCount(spoken, cue) - cueCount(kept, cue)
+        return dropped > 0 && cut <= rules.correctionCut.slack + rules.correctionCut.perCue * dropped && onlySpoken(spoken, kept)
+    }
+
+    /// Desktop's spokenWords: lowercased as JavaScript does, curly
+    /// apostrophes made straight, split on whitespace, anything but letters
+    /// and numbers taken off both ends, empty words dropped. Each word is
+    /// its UTF-16 code units, since JavaScript compares those (é written as
+    /// one code point is not é written as two).
+    static func spokenWords(_ value: String) -> [[UInt16]] {
+        let units = JS.lowercase(value).utf16.map { $0 == 0x2018 || $0 == 0x2019 ? 0x27 : $0 }
+        return units.split(whereSeparator: JS.isSpace).compactMap { piece in
+            let scalars = Array(String(decoding: piece, as: UTF16.self).unicodeScalars)
+            guard let first = scalars.firstIndex(where: isLetterOrNumber), let last = scalars.lastIndex(where: isLetterOrNumber) else { return nil }
+            return Array(String(String.UnicodeScalarView(scalars[first...last])).utf16)
+        }
+    }
+
+    /// \p{L} or \p{N}.
+    private static func isLetterOrNumber(_ scalar: Unicode.Scalar) -> Bool {
+        switch scalar.properties.generalCategory {
+        case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter, .otherLetter, .decimalNumber, .letterNumber, .otherNumber: true
+        default: false
+        }
+    }
+
+    /// The cues as whole words, each escaped, as desktop builds the pattern.
+    private static func cuePattern(_ cues: [String]) -> NSRegularExpression {
+        JS.regex(JS.boundary + "(?:" + cues.map(JS.escape).joined(separator: "|") + ")" + JS.boundary)
+    }
+
+    /// How many cues the words say, read over the words joined by spaces.
+    private static func cueCount(_ words: [[UInt16]], _ cue: NSRegularExpression) -> Int {
+        let joined = String(decoding: Array(words.joined(separator: [0x20])), as: UTF16.self)
+        return cue.numberOfMatches(in: joined, range: NSRange(location: 0, length: (joined as NSString).length))
+    }
+
+    /// Every answer word was spoken, each no more often than it was.
+    private static func onlySpoken(_ spoken: [[UInt16]], _ kept: [[UInt16]]) -> Bool {
+        var left: [[UInt16]: Int] = [:]
+        for word in spoken { left[word, default: 0] += 1 }
+        for word in kept {
+            guard let count = left[word], count > 0 else { return false }
+            left[word] = count - 1
+        }
+        return true
     }
 
     private static let sentenceBreak = JS.regex("(?<=[.!?])\(JS.space)+")

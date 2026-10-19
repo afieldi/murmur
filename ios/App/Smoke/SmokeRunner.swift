@@ -44,6 +44,7 @@ enum SmokeRunner {
             ("transcription", checkTranscription),
             ("waitingTakes", checkWaitingTakes),
             ("polish", checkPolish),
+            ("corrections", checkCorrections),
             ("mailbox", checkMailbox),
             ("session", checkSession),
             ("pill", checkPill),
@@ -219,6 +220,32 @@ enum SmokeRunner {
             }
             guard text == formatted else { throw SmokeFailure("\(baseUrl) changed the text to \(text)") }
             guard reasons.list.withLock({ $0.count }) == 1 else { throw SmokeFailure("polish at \(baseUrl) did not fall back") }
+        }
+    }
+
+    /// Apply corrections (IOS-030): desktop's check sentence through a
+    /// stand-in that answers the fix. On, the fix comes back; off, the cut is
+    /// too deep, so the formatted text comes back unchanged, and says why.
+    static func checkCorrections() throws {
+        guard let key = APIKey(StubProtocol.key) else { throw SmokeFailure("the dummy key did not parse") }
+        let rules = try BundledRules.takeRules()
+        let session = StubProtocol.session()
+        let connection = PolishConnection(baseUrl: StubProtocol.fixerBaseUrl, model: "smoke-model", key: key)
+        for on in [true, false] {
+            let settings = CleanupSettings(corrections: on)
+            let reasons = Reasons()
+            let text = waitFor {
+                await Cleanup.finish(StubProtocol.slip, settings: settings, rules: rules.cleanup, connection: connection, send: { try await session.data(for: $0) }) { reason in
+                    reasons.list.withLock { $0.append(reason) }
+                }
+            }
+            let formatted = formatTranscript(StubProtocol.slip, options: settings.options, spec: rules.format)
+            let fellBack = reasons.list.withLock { $0 }
+            if on {
+                guard text == StubProtocol.fix, fellBack.isEmpty else { throw SmokeFailure("with corrections on, polish gave \(text) and \(fellBack)") }
+            } else {
+                guard text == formatted, fellBack == ["validate: length ratio"] else { throw SmokeFailure("with corrections off, polish gave \(text) and \(fellBack)") }
+            }
         }
     }
 

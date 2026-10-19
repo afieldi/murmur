@@ -31,6 +31,7 @@ struct DiagnosticsFacts: Sendable {
     var level: String
     var numbers: String
     var smartLists: Bool
+    var corrections: Bool
     var polish: Bool
     var dictionaryEntries: Int
     var expansionEntries: Int
@@ -60,7 +61,7 @@ enum DiagnosticsReport {
             "transcription: \(facts.provider), model \(facts.sttModel)",
             "cleanup: \(facts.cleanupProvider), model \(facts.cleanupModel)",
             "keySaved: \(facts.keySaved ? "yes" : "no")",
-            "formatting: level=\(facts.level) numbers=\(facts.numbers) smartLists=\(facts.smartLists) polish=\(facts.polish)",
+            "formatting: level=\(facts.level) numbers=\(facts.numbers) smartLists=\(facts.smartLists) corrections=\(facts.corrections) polish=\(facts.polish)",
             "dictionaryEntries: \(facts.dictionaryEntries)",
             "expansionEntries: \(facts.expansionEntries)",
             "waitingTakes: \(facts.waitingTakes)",
@@ -120,6 +121,7 @@ enum DiagnosticsReport {
             level: settings.level.rawValue,
             numbers: settings.numbers.rawValue,
             smartLists: settings.smartLists,
+            corrections: settings.corrections,
             polish: settings.polish,
             dictionaryEntries: settings.dictionary.count,
             expansionEntries: settings.expansions.count,

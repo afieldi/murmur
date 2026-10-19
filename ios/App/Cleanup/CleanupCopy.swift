@@ -20,6 +20,14 @@ enum CleanupCopy {
 
     static let smartLists = "Spoken sequences (first, then, then) become numbered lists, and saying bullet point or next item starts a dash line."
 
+    /// Desktop's line for Apply corrections, without its At Full formatting,
+    /// since the switch shows only at Full. It works through polish, so
+    /// with Polish off the line says it does nothing (IOS-030).
+    static func corrections(polish: Bool) -> String {
+        let line = "When you correct yourself (Tuesday, oh wait, I mean Wednesday), only the fix is typed. Off keeps the slip-up in."
+        return polish ? line : line + " It works through Polish, so it does nothing while Polish is off."
+    }
+
     static func numbers(_ numbers: FormatOptions.Numbers) -> String {
         switch numbers {
         case .auto: "Numbers stay as your provider wrote them."

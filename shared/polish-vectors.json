@@ -1,12 +1,13 @@
 {
   "version": 1,
-  "comment": "Model answers the cleanup pass keeps or rejects, and the dictionary hint it sends, with desktop's answers (ios/prd.json IOS-007). Every platform runs these: validate gives input, the model's candidate answer, and whether smart lists is on, then ok with the text kept, or the reason it was rejected; hints gives dictionary entries and the hint line, or null for none.",
+  "comment": "Model answers the cleanup pass keeps or rejects, and the dictionary hint it sends, with desktop's answers (ios/prd.json IOS-007, IOS-030). Desktop writes every validate answer itself (MURMUR_WRITE_VECTORS=1 npx vitest run src/main/formatter/polish-vectors.test.ts). Every platform runs these: validate gives input, the model's candidate answer, and whether smart lists and apply corrections are on, then ok with the text kept, or the reason it was rejected; hints gives dictionary entries and the hint line, or null for none.",
   "validate": [
     {
       "name": "a faithful cleanup is kept",
       "input": "Send the report tomorrow and copy the whole team on it please.",
       "candidate": "Send the report tomorrow, and copy the whole team on it, please.",
       "smartLists": false,
+      "corrections": false,
       "ok": true,
       "text": "Send the report tomorrow, and copy the whole team on it, please."
     },
@@ -15,6 +16,7 @@
       "input": "Send the report tomorrow and copy the whole team on it please.",
       "candidate": "   ",
       "smartLists": false,
+      "corrections": false,
       "ok": false,
       "reason": "empty"
     },
@@ -23,6 +25,7 @@
       "input": "Send the report tomorrow and copy the whole team on it please.",
       "candidate": "Here is the cleaned text: send it.",
       "smartLists": false,
+      "corrections": false,
       "ok": false,
       "reason": "meta chatter"
     },
@@ -31,6 +34,7 @@
       "input": "Send the report tomorrow and copy the whole team on it please.",
       "candidate": "I'm sorry, I can't help with that.",
       "smartLists": false,
+      "corrections": false,
       "ok": false,
       "reason": "meta chatter"
     },
@@ -39,6 +43,7 @@
       "input": "Send the report tomorrow and copy the whole team on it please.",
       "candidate": "Cleaned text:\nSend the report tomorrow.",
       "smartLists": false,
+      "corrections": false,
       "ok": false,
       "reason": "meta chatter"
     },
@@ -47,6 +52,7 @@
       "input": "Send the report tomorrow and copy the whole team on it please.",
       "candidate": "Well, as an AI I would send the report tomorrow and copy the team.",
       "smartLists": false,
+      "corrections": false,
       "ok": false,
       "reason": "refusal"
     },
@@ -55,6 +61,7 @@
       "input": "Send the report tomorrow and copy the whole team on it please.",
       "candidate": "Sent.",
       "smartLists": false,
+      "corrections": false,
       "ok": false,
       "reason": "length ratio"
     },
@@ -63,6 +70,7 @@
       "input": "Send the report tomorrow and copy the whole team on it please.",
       "candidate": "Send the report tomorrow and copy the whole team on it please. extra words appended far beyond the original dictation extra words appended far beyond the original dictation extra words appended far beyond the original dictation extra words appended far beyond the original dictation ",
       "smartLists": false,
+      "corrections": false,
       "ok": false,
       "reason": "length ratio"
     },
@@ -71,6 +79,7 @@
       "input": "Send the report tomorrow and copy the whole team on it please.",
       "candidate": "\"Send the report tomorrow and copy the whole team on it please.\"",
       "smartLists": false,
+      "corrections": false,
       "ok": true,
       "text": "Send the report tomorrow and copy the whole team on it please."
     },
@@ -79,6 +88,7 @@
       "input": "Send the report tomorrow and copy the whole team on it please.",
       "candidate": "“Send the report tomorrow and copy the whole team on it please.”",
       "smartLists": false,
+      "corrections": false,
       "ok": true,
       "text": "Send the report tomorrow and copy the whole team on it please."
     },
@@ -87,6 +97,7 @@
       "input": "Are we going to use something else entirely in the meantime? Okay.",
       "candidate": "Are we going to use something else entirely in the meantime?",
       "smartLists": false,
+      "corrections": false,
       "ok": true,
       "text": "Are we going to use something else entirely in the meantime?"
     },
@@ -95,6 +106,7 @@
       "input": "Send the deck by noon and copy the whole team on it. I will follow up tomorrow.",
       "candidate": "Send the deck by noon.",
       "smartLists": false,
+      "corrections": false,
       "ok": false,
       "reason": "length ratio"
     },
@@ -103,6 +115,7 @@
       "input": "sounds good",
       "candidate": "Sounds good!",
       "smartLists": false,
+      "corrections": false,
       "ok": true,
       "text": "Sounds good!"
     },
@@ -111,6 +124,7 @@
       "input": "sounds good",
       "candidate": "Sounds good, and here are nine more words that were never spoken at all today",
       "smartLists": false,
+      "corrections": false,
       "ok": false,
       "reason": "length delta"
     },
@@ -119,6 +133,7 @@
       "input": "Send the report tomorrow and copy the whole team on it please.",
       "candidate": "Send the report tomorrow and copy the whole team on it, please. Thank you.",
       "smartLists": false,
+      "corrections": false,
       "ok": false,
       "reason": "appended chatter"
     },
@@ -127,6 +142,7 @@
       "input": "I need to pack socks shirts shoes pants a charger and my headphones okay",
       "candidate": "I need to pack:\n- socks\n- shirts\n- shoes\n- pants\n- a charger\n- my headphones",
       "smartLists": true,
+      "corrections": false,
       "ok": true,
       "text": "I need to pack:\n- socks\n- shirts\n- shoes\n- pants\n- a charger\n- my headphones"
     },
@@ -135,6 +151,7 @@
       "input": "I need to pack socks shirts shoes pants a charger and my headphones okay",
       "candidate": "I need to pack:\n- socks\n- shirts\n- shoes\n- pants\n- a charger\n- my headphones",
       "smartLists": false,
+      "corrections": false,
       "ok": false,
       "reason": "preamble line"
     },
@@ -143,6 +160,7 @@
       "input": "first email the team then update the deck then send it to the client",
       "candidate": "1. Email the team.\n2. Update the deck.\n3. Send it to the client.",
       "smartLists": true,
+      "corrections": false,
       "ok": true,
       "text": "1. Email the team.\n2. Update the deck.\n3. Send it to the client."
     },
@@ -151,6 +169,7 @@
       "input": "Send the report tomorrow and copy the whole team on it please.",
       "candidate": "Here is the cleaned text: send it.",
       "smartLists": true,
+      "corrections": false,
       "ok": false,
       "reason": "meta chatter"
     },
@@ -159,6 +178,7 @@
       "input": "Send the report tomorrow and copy the whole team on it please.",
       "candidate": "The following:\nSend the report tomorrow and copy the team.",
       "smartLists": true,
+      "corrections": false,
       "ok": false,
       "reason": "preamble line"
     },
@@ -167,6 +187,7 @@
       "input": "Send the report tomorrow and copy the whole team on it please.",
       "candidate": "Send the report tomorrow and copy the whole team on it please. extra words appended far beyond the original dictation extra words appended far beyond the original dictation extra words appended far beyond the original dictation extra words appended far beyond the original dictation ",
       "smartLists": true,
+      "corrections": false,
       "ok": false,
       "reason": "length ratio"
     },
@@ -175,6 +196,7 @@
       "input": "I want to make a list. First I want to add eggs, then bacon, then toast.",
       "candidate": "I want to make a list:\n1. eggs\n2. bacon\n3. toast",
       "smartLists": true,
+      "corrections": false,
       "ok": true,
       "text": "I want to make a list:\n1. eggs\n2. bacon\n3. toast"
     },
@@ -183,6 +205,7 @@
       "input": "Send the deck by noon and copy the whole team on it. I will follow up tomorrow.",
       "candidate": "Send the deck by noon.",
       "smartLists": true,
+      "corrections": false,
       "ok": false,
       "reason": "length ratio"
     },
@@ -191,6 +214,7 @@
       "input": "I need to pack socks shirts shoes pants a charger and my headphones okay",
       "candidate": "Packing:\n- socks\n- shirts",
       "smartLists": true,
+      "corrections": false,
       "ok": false,
       "reason": "length ratio"
     },
@@ -199,6 +223,7 @@
       "input": "For my grocery list, I want eggs, bacon, and toast, and then sausage.",
       "candidate": "For my grocery list:\n1. eggs\n2. bacon\n3. toast\n4. sausage",
       "smartLists": true,
+      "corrections": false,
       "ok": true,
       "text": "For my grocery list:\n1. eggs\n2. bacon\n3. toast\n4. sausage"
     },
@@ -207,6 +232,7 @@
       "input": "So today for my grocery list I definitely need to remember to grab apples, bananas, cherries, dates, and bread",
       "candidate": "So today for my grocery list I definitely need to remember to grab:\n1. apples\n2. bananas\n3. cherries\n4. dates",
       "smartLists": true,
+      "corrections": false,
       "ok": false,
       "reason": "missing entries"
     },
@@ -215,6 +241,7 @@
       "input": "I want to make a list. First I want to add eggs, then bacon, then toast.",
       "candidate": "I want to make a list:\n1. eggs\n2. bacon",
       "smartLists": true,
+      "corrections": false,
       "ok": false,
       "reason": "missing entries"
     },
@@ -223,6 +250,7 @@
       "input": "Send the deck by noon and copy the whole team on it because I will follow up tomorrow",
       "candidate": "Deck:\n- send by noon\n- copy the team",
       "smartLists": true,
+      "corrections": false,
       "ok": false,
       "reason": "length ratio"
     },
@@ -231,6 +259,7 @@
       "input": "Send the report to the whole team today please",
       "candidate": "Result:\r\nSend the report to the whole team today, please.",
       "smartLists": false,
+      "corrections": false,
       "ok": false,
       "reason": "preamble line"
     },
@@ -239,6 +268,7 @@
       "input": "I want to make a list. First I want to add eggs, then bacon, then toast.",
       "candidate": "I want to make a list:\r\n1. eggs\r\n2. bacon",
       "smartLists": true,
+      "corrections": false,
       "ok": false,
       "reason": "missing entries"
     },
@@ -247,6 +277,7 @@
       "input": "first email the team then update the deck then send it to the client",
       "candidate": "To do:\n١. Email the team.\n٢. Update the deck.\n٣. Send it to the client.",
       "smartLists": true,
+      "corrections": false,
       "ok": false,
       "reason": "preamble line"
     },
@@ -255,6 +286,7 @@
       "input": "firſt eggs then bacon then toast",
       "candidate": "1. eggs\n2. bacon",
       "smartLists": true,
+      "corrections": false,
       "ok": true,
       "text": "1. eggs\n2. bacon"
     },
@@ -263,6 +295,7 @@
       "input": "first eggs then bacon then toast",
       "candidate": "1. eggs\n2. bacon",
       "smartLists": true,
+      "corrections": false,
       "ok": false,
       "reason": "missing entries"
     },
@@ -271,6 +304,7 @@
       "input": "Note:́ send the report to the whole team today",
       "candidate": "Note:\nSend the report to the whole team today.",
       "smartLists": false,
+      "corrections": false,
       "ok": true,
       "text": "Note:\nSend the report to the whole team today."
     },
@@ -279,8 +313,342 @@
       "input": "Send it. Thank you.",
       "candidate": "\"\"",
       "smartLists": false,
+      "corrections": false,
       "ok": false,
       "reason": "empty"
+    },
+    {
+      "name": "corrections: a correction is kept with apply corrections on",
+      "input": "Send the invoice to Mark on Tuesday. Oh wait, actually what I mean is Wednesday.",
+      "candidate": "Send the invoice to Mark on Wednesday.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Send the invoice to Mark on Wednesday."
+    },
+    {
+      "name": "corrections: a correction is kept with apply corrections on, smart lists on",
+      "input": "Send the invoice to Mark on Tuesday. Oh wait, actually what I mean is Wednesday.",
+      "candidate": "Send the invoice to Mark on Wednesday.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": true,
+      "text": "Send the invoice to Mark on Wednesday."
+    },
+    {
+      "name": "corrections: the same correction with apply corrections off",
+      "input": "Send the invoice to Mark on Tuesday. Oh wait, actually what I mean is Wednesday.",
+      "candidate": "Send the invoice to Mark on Wednesday.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: the same correction with apply corrections off, smart lists on",
+      "input": "Send the invoice to Mark on Tuesday. Oh wait, actually what I mean is Wednesday.",
+      "candidate": "Send the invoice to Mark on Wednesday.",
+      "smartLists": true,
+      "corrections": false,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a correction in the next sentence moves the fix into place",
+      "input": "The color should be teal for the buttons. Oh wait, actually what I mean is orange instead of teal.",
+      "candidate": "The color should be orange for the buttons.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "The color should be orange for the buttons."
+    },
+    {
+      "name": "corrections: a correction in the next sentence moves the fix into place, smart lists on",
+      "input": "The color should be teal for the buttons. Oh wait, actually what I mean is orange instead of teal.",
+      "candidate": "The color should be orange for the buttons.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": true,
+      "text": "The color should be orange for the buttons."
+    },
+    {
+      "name": "corrections: curly and straight apostrophes are the same spoken word",
+      "input": "Let's meet at the office on Tuesday. Sorry, no, I mean on Wednesday instead.",
+      "candidate": "Let’s meet at the office on Wednesday.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Let’s meet at the office on Wednesday."
+    },
+    {
+      "name": "corrections: curly and straight apostrophes are the same spoken word, smart lists on",
+      "input": "Let's meet at the office on Tuesday. Sorry, no, I mean on Wednesday instead.",
+      "candidate": "Let’s meet at the office on Wednesday.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": true,
+      "text": "Let’s meet at the office on Wednesday."
+    },
+    {
+      "name": "corrections: a deep cut that keeps every cue",
+      "input": "Send the deck by noon and copy the whole team on it. Actually I will follow up tomorrow.",
+      "candidate": "Send the deck by noon. Actually I will follow up.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a deep cut that keeps every cue, smart lists on",
+      "input": "Send the deck by noon and copy the whole team on it. Actually I will follow up tomorrow.",
+      "candidate": "Send the deck by noon. Actually I will follow up.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a deep cut with no cue in the speech",
+      "input": "Send the deck by noon and copy the whole team on it. I will follow up tomorrow.",
+      "candidate": "Send the deck by noon. I will follow up.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a deep cut with no cue in the speech, smart lists on",
+      "input": "Send the deck by noon and copy the whole team on it. I will follow up tomorrow.",
+      "candidate": "Send the deck by noon. I will follow up.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a deep cut that adds a word nobody said",
+      "input": "Send the invoice to Mark on Tuesday. Oh wait, actually what I mean is Wednesday.",
+      "candidate": "Please send the invoice to Mark on Wednesday.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a deep cut that adds a word nobody said, smart lists on",
+      "input": "Send the invoice to Mark on Tuesday. Oh wait, actually what I mean is Wednesday.",
+      "candidate": "Please send the invoice to Mark on Wednesday.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a cut bigger than its cues allow",
+      "input": "Send the deck by noon and copy the whole team on it. Actually I will follow up tomorrow morning with the pricing notes and the launch timeline for everyone.",
+      "candidate": "Send the deck by noon and copy the whole team on it.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a cut bigger than its cues allow, smart lists on",
+      "input": "Send the deck by noon and copy the whole team on it. Actually I will follow up tomorrow morning with the pricing notes and the launch timeline for everyone.",
+      "candidate": "Send the deck by noon and copy the whole team on it.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: an everyday no problem never earns the deeper cut",
+      "input": "No problem, I can cover the Thursday shift. Tell the team I will be in early on Friday too.",
+      "candidate": "I can cover the Thursday shift. Tell the team.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: an everyday no problem never earns the deeper cut, smart lists on",
+      "input": "No problem, I can cover the Thursday shift. Tell the team I will be in early on Friday too.",
+      "candidate": "I can cover the Thursday shift. Tell the team.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a correction may cut to the deeper floor",
+      "input": "Send the invoice to Mark on Tuesday. Oh wait, actually what I mean is Wednesday.",
+      "candidate": "Send the invoice to Mark Wednesday.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Send the invoice to Mark Wednesday."
+    },
+    {
+      "name": "corrections: a correction may cut to the deeper floor, smart lists on",
+      "input": "Send the invoice to Mark on Tuesday. Oh wait, actually what I mean is Wednesday.",
+      "candidate": "Send the invoice to Mark Wednesday.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": true,
+      "text": "Send the invoice to Mark Wednesday."
+    },
+    {
+      "name": "corrections: a correction never cuts below the deeper floor",
+      "input": "Send the invoice to Mark on Tuesday. Oh wait, actually, sorry, what I mean is Wednesday.",
+      "candidate": "Send the invoice to Mark Wednesday.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a correction never cuts below the deeper floor, smart lists on",
+      "input": "Send the invoice to Mark on Tuesday. Oh wait, actually, sorry, what I mean is Wednesday.",
+      "candidate": "Send the invoice to Mark Wednesday.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a correction cut to almost nothing",
+      "input": "Send the invoice to Mark on Tuesday. Oh wait, actually what I mean is Wednesday.",
+      "candidate": "Mark, Wednesday.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a correction cut to almost nothing, smart lists on",
+      "input": "Send the invoice to Mark on Tuesday. Oh wait, actually what I mean is Wednesday.",
+      "candidate": "Mark, Wednesday.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a cue inside a word is not a cue",
+      "input": "The team awaited the results on Tuesday and then shipped the build.",
+      "candidate": "The team shipped the build.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a cue inside a word is not a cue, smart lists on",
+      "input": "The team awaited the results on Tuesday and then shipped the build.",
+      "candidate": "The team shipped the build.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: make that is a cue on its own",
+      "input": "Meet me at the coffee shop next to the old train station tomorrow at noon, make that the library.",
+      "candidate": "Meet me at the library tomorrow at noon.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Meet me at the library tomorrow at noon."
+    },
+    {
+      "name": "corrections: make that is a cue on its own, smart lists on",
+      "input": "Meet me at the coffee shop next to the old train station tomorrow at noon, make that the library.",
+      "candidate": "Meet me at the library tomorrow at noon.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": true,
+      "text": "Meet me at the library tomorrow at noon."
+    },
+    {
+      "name": "corrections: make that is a cue on its own, with apply corrections off",
+      "input": "Meet me at the coffee shop next to the old train station tomorrow at noon, make that the library.",
+      "candidate": "Meet me at the library tomorrow at noon.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: make that is a cue on its own, with apply corrections off, smart lists on",
+      "input": "Meet me at the coffee shop next to the old train station tomorrow at noon, make that the library.",
+      "candidate": "Meet me at the library tomorrow at noon.",
+      "smartLists": true,
+      "corrections": false,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: a list is still a list with apply corrections on",
+      "input": "I want to make a list. First I want to add eggs, then bacon, then toast.",
+      "candidate": "I want to make a list:\n1. eggs\n2. bacon\n3. toast",
+      "smartLists": true,
+      "corrections": true,
+      "ok": true,
+      "text": "I want to make a list:\n1. eggs\n2. bacon\n3. toast"
+    },
+    {
+      "name": "corrections: a Greek word ending in a capital sigma is the word spoken",
+      "input": "Meet me on ΟΔΟΣ street at noon on Tuesday. Oh wait, actually, sorry, what I mean is Wednesday.",
+      "candidate": "Meet me on οδος street at noon on Wednesday.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Meet me on οδος street at noon on Wednesday."
+    },
+    {
+      "name": "corrections: an accent written as two code points is not the one spoken",
+      "input": "Tell the señor the table is for six on Friday. Oh wait, sorry, actually, what I mean is Saturday.",
+      "candidate": "Tell the señor the table is for six on Saturday.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": false,
+      "reason": "length ratio"
+    },
+    {
+      "name": "corrections: the same accent written the same way is the word spoken",
+      "input": "Tell the señor the table is for six on Friday. Oh wait, sorry, actually, what I mean is Saturday.",
+      "candidate": "Tell the señor the table is for six on Saturday.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Tell the señor the table is for six on Saturday."
+    },
+    {
+      "name": "corrections: a cue after a letter outside ASCII counts, as JavaScript sees a word edge",
+      "input": "Send the invoice to Mark on Tuesday. Oh éwait, what we said is Wednesday.",
+      "candidate": "Send the invoice to Mark on Wednesday.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Send the invoice to Mark on Wednesday."
+    },
+    {
+      "name": "corrections: a cue joined to a word by dots counts",
+      "input": "Send the invoice to Mark on Tuesday...wait, the date we said is Wednesday.",
+      "candidate": "Send the invoice to Mark on Wednesday.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Send the invoice to Mark on Wednesday."
+    },
+    {
+      "name": "corrections: a mark taken off the end of a word leaves the word",
+      "input": "Send the invoice to «Mark» on Tuesday. Oh wait, actually what I mean is Wednesday.",
+      "candidate": "Send the invoice to Mark on Wednesday.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Send the invoice to Mark on Wednesday."
     }
   ],
   "hints": [

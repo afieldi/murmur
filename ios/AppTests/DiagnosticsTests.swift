@@ -35,6 +35,7 @@ import Testing
         var settings = CleanupStore(defaults: defaults).load()
         settings.dictionary = [DictionaryEntry(from: "la broy", to: "LaBroi"), DictionaryEntry(from: "eze", to: "Eze")]
         settings.expansions = [ExpansionEntry(trigger: "my address", text: "1 Main Street")]
+        settings.corrections = true
         CleanupStore(defaults: defaults).save(settings)
         defaults.set(60, forKey: Session.lengthKey)
         log.write(.words(count: 3, retried: false), at: at)
@@ -43,7 +44,8 @@ import Testing
             "murmur diagnostics report", "generated: 2026-09-21T14:13:20Z", "version: ", "system: iOS ", "device: ",
             "keyboard: reported with Full Access, last 2026-09-21T14:13:20Z", "session: 60 minutes, running",
             "transcription: Groq, model whisper-large-v3-turbo", "keySaved: yes", "dictionaryEntries: 2", "expansionEntries: 1",
-            "waitingTakes: 0", "historyTakes: 0", "pill: bars", "2026-09-21T14:13:20Z take words count=3"
+            "waitingTakes: 0", "historyTakes: 0", "pill: bars", "2026-09-21T14:13:20Z take words count=3",
+            "formatting: level=full numbers=auto smartLists=false corrections=true polish=true"
         ] {
             #expect(text.contains(line), "missing \(line)")
         }

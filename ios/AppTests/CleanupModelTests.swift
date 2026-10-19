@@ -25,8 +25,9 @@ import Testing
         first.level = .light
         first.polish = false
         first.smartLists = true
+        first.corrections = true
         first.numbers = .digits
-        #expect(model().settings == CleanupSettings(level: .light, numbers: .digits, smartLists: true, polish: false))
+        #expect(model().settings == CleanupSettings(level: .light, numbers: .digits, smartLists: true, corrections: true, polish: false))
     }
 
     @Test func unreadableSavedSettingsFallBackToDefaults() {
@@ -61,12 +62,45 @@ import Testing
         #expect(line.contains("much longer or shorter"))
     }
 
-    /// The product name stays lowercase even where a sentence starts.
+    /// Apply corrections says what it does in desktop's words, and with
+    /// Polish off, that it does nothing until Polish is on (IOS-030).
+    @Test func correctionsSaysWhatItDoes() {
+        #expect(CleanupCopy.corrections(polish: true) == "When you correct yourself (Tuesday, oh wait, I mean Wednesday), only the fix is typed. Off keeps the slip-up in.")
+        #expect(CleanupCopy.corrections(polish: false) == CleanupCopy.corrections(polish: true) + " It works through Polish, so it does nothing while Polish is off.")
+    }
+
+    /// The product name stays lowercase even where a sentence starts, and
+    /// no line uses a dash between clauses.
     @Test func murmurStaysLowercase() {
         let lines = [FormatOptions.Level.off, .light, .full].map(CleanupCopy.level) + [CleanupCopy.polish(model: "m"), CleanupCopy.smartLists]
-            + [FormatOptions.Numbers.auto, .digits, .words].map(CleanupCopy.numbers)
+            + [FormatOptions.Numbers.auto, .digits, .words].map(CleanupCopy.numbers) + [true, false].map(CleanupCopy.corrections)
         for line in lines {
             #expect(!line.contains("Murmur"))
+            #expect(!line.contains("\u{2014}") && !line.contains("--"))
         }
+    }
+}
+
+/// The Cleanup screen at Full with Apply corrections off, on, and on with
+/// Polish off, at the largest text size (ios/prd.json conventions.design,
+/// IOS-030): each draws, and with MURMUR_SHOTS set, saves pictures to read
+/// for clipping, the screen as it opens and the whole page.
+@MainActor @Suite struct CleanupRenderTests {
+    let shots = FirstRunRenderTests()
+
+    @Test(arguments: CleanupPreview.Scene.allCases)
+    func cleanupDrawsAtTheLargestTextSize(_ scene: CleanupPreview.Scene) async throws {
+        let image = try await shots.render(CleanupPreview(scene).dynamicTypeSize(.accessibility5))
+        try shots.save(image, "cleanup-\(scene)-largest")
+        #expect(try shots.inked(image) > 0.02)
+        let page = try await shots.render(CleanupPreview(scene).dynamicTypeSize(.accessibility5), tall: true)
+        try shots.save(page, "cleanup-\(scene)-largest-page")
+        #expect(try shots.inked(page) > 0.02)
+    }
+
+    @Test func eachSceneIsItsSettings() {
+        #expect(CleanupPreview.Scene.correctionsOff.settings == CleanupSettings())
+        #expect(CleanupPreview.Scene.correctionsOn.settings == CleanupSettings(corrections: true))
+        #expect(CleanupPreview.Scene.correctionsWithoutPolish.settings == CleanupSettings(corrections: true, polish: false))
     }
 }

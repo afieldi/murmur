@@ -100,6 +100,34 @@ enum JS {
         }
     }
 
+    /// String.prototype.toLowerCase: each scalar's own lowercase, as Swift's
+    /// lowercased() gives, except a capital sigma that ends a word, which
+    /// is final sigma (Unicode's Final_Sigma) where lowercased() leaves σ.
+    static func lowercase(_ text: String) -> String {
+        let scalars = Array(text.unicodeScalars)
+        var out = String.UnicodeScalarView()
+        for (at, scalar) in scalars.enumerated() {
+            if scalar.value == 0x3A3, endsAWord(scalars, at) {
+                out.append(Unicode.Scalar(0x3C2)!)
+            } else {
+                out.append(contentsOf: scalar.properties.lowercaseMapping.unicodeScalars)
+            }
+        }
+        return String(out)
+    }
+
+    /// Final_Sigma: a cased letter before it and none after it, looking
+    /// past case-ignorable marks and punctuation either way. A scalar that
+    /// is both is passed over, as ICU, which node uses, does.
+    private static func endsAWord(_ scalars: [Unicode.Scalar], _ at: Int) -> Bool {
+        var before = at - 1
+        while before >= 0, scalars[before].properties.isCaseIgnorable { before -= 1 }
+        guard before >= 0, scalars[before].properties.isCased else { return false }
+        var after = at + 1
+        while after < scalars.count, scalars[after].properties.isCaseIgnorable { after += 1 }
+        return after == scalars.count || !scalars[after].properties.isCased
+    }
+
     /// String.prototype.trim.
     static func trim(_ text: String) -> String {
         let units = Array(text.utf16)

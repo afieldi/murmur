@@ -12,18 +12,22 @@ public struct CleanupSettings: Codable, Sendable, Equatable {
     public var level: FormatOptions.Level
     public var numbers: FormatOptions.Numbers
     public var smartLists: Bool
+    /// Apply corrections (IOS-030): a spoken slip-up and its fix come out
+    /// as the fix alone. It works through polish.
+    public var corrections: Bool
     /// Polish runs at Full only, and only when this is on.
     public var polish: Bool
     public var dictionary: [DictionaryEntry]
     public var expansions: [ExpansionEntry]
 
     public init(
-        level: FormatOptions.Level = .full, numbers: FormatOptions.Numbers = .auto, smartLists: Bool = false,
+        level: FormatOptions.Level = .full, numbers: FormatOptions.Numbers = .auto, smartLists: Bool = false, corrections: Bool = false,
         polish: Bool = true, dictionary: [DictionaryEntry] = [], expansions: [ExpansionEntry] = []
     ) {
         self.level = level
         self.numbers = numbers
         self.smartLists = smartLists
+        self.corrections = corrections
         self.polish = polish
         self.dictionary = dictionary
         self.expansions = expansions
@@ -37,6 +41,7 @@ public struct CleanupSettings: Codable, Sendable, Equatable {
         level = try saved.decodeIfPresent(FormatOptions.Level.self, forKey: .level) ?? defaults.level
         numbers = try saved.decodeIfPresent(FormatOptions.Numbers.self, forKey: .numbers) ?? defaults.numbers
         smartLists = try saved.decodeIfPresent(Bool.self, forKey: .smartLists) ?? defaults.smartLists
+        corrections = try saved.decodeIfPresent(Bool.self, forKey: .corrections) ?? defaults.corrections
         polish = try saved.decodeIfPresent(Bool.self, forKey: .polish) ?? defaults.polish
         dictionary = try saved.decodeIfPresent([DictionaryEntry].self, forKey: .dictionary) ?? defaults.dictionary
         expansions = try saved.decodeIfPresent([ExpansionEntry].self, forKey: .expansions) ?? defaults.expansions
@@ -100,7 +105,7 @@ public enum Cleanup {
             let hints = dictionaryHint(settings.dictionary, rules: rules.polish).map { [$0] } ?? []
             switch await Polish.run(
                 formatted, baseUrl: connection.baseUrl, model: connection.model, key: connection.key, smartLists: settings.smartLists,
-                hints: hints, rules: rules.polish, hallucinations: rules.hallucinations, send: send
+                corrections: settings.corrections, hints: hints, rules: rules.polish, hallucinations: rules.hallucinations, send: send
             ) {
             case .polished(let text): polished = text
             case .fellBack(let reason): onFallback(reason)
