@@ -1,6 +1,6 @@
 # murmur for iPhone Roadmap
 
-> Generated from ios/prd.json (6/29 stories verified). Do not edit by hand: change ios/prd.json, then run `npm run roadmap`.
+> Generated from ios/prd.json (6/30 stories verified). Do not edit by hand: change ios/prd.json, then run `npm run roadmap`.
 
 ## Done and verified
 
@@ -37,6 +37,7 @@ Automated criteria pass; the remaining step is a human loop noted in ios/prd.jso
 - [ ] **IOS-022** Analytics, time back, and the recap
 - [ ] **IOS-023** Notes
 - [ ] **IOS-024** Transform selected text by voice
+- [ ] **IOS-030** Apply corrections on iPhone
 - [ ] **IOS-025** murmur Pro on iPhone
 - [ ] **IOS-026** App Store launch
 - [ ] **IOS-027** iPad
