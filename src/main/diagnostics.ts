@@ -49,7 +49,7 @@ export function buildDiagnosticsReport(): string {
     `savedKeyProviders: ${listSavedKeyBaseUrls().join(', ') || '(none)'}`,
     `polish.enabled: ${settings.polish.enabled}`,
     `polish.baseUrl: ${settings.polish.baseUrl || '(unset)'}`,
-    `formatting: level=${settings.formatting.level} numbers=${settings.formatting.numbers} smartLists=${settings.formatting.smartLists}`,
+    `formatting: level=${settings.formatting.level} numbers=${settings.formatting.numbers} smartLists=${settings.formatting.smartLists} corrections=${settings.formatting.corrections}`,
     `insertion.mode: ${settings.insertion.mode}`,
     `hotkey: mode=${settings.hotkey.mode} binding=${settings.hotkey.binding} pasteLast=${settings.hotkey.pasteLastBinding || '(unset)'}`,
     `dictionaryEntries: ${settings.dictionary.length}`,

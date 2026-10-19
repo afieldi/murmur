@@ -69,6 +69,7 @@ export async function maybePolish(text: string): Promise<string> {
   const hint = dictionaryHint(settings.dictionary)
   const polished = await polishTranscript(text, connection, {
     smartLists: settings.formatting.smartLists,
+    corrections: settings.formatting.corrections,
     // Fail open AND say why: without the reason in the log, a rejected
     // list and a network blip look identical (2026-09-15, a perfect
     // grocery list was silently rejected for days of debugging).
@@ -165,7 +166,19 @@ export function initFormatter(): void {
       cfg,
       { fetchImpl: ok('Deleted.') }
     )
+    // US-105: a correction-sized cut passes only with apply corrections on.
+    const slip = 'Send the invoice to Mark on Tuesday. Oh wait, actually what I mean is Wednesday.'
+    const fixed = ok('Send the invoice to Mark on Wednesday.')
+    const corrected = await polishTranscript(slip, cfg, { fetchImpl: fixed, corrections: true })
+    const uncorrected = await polishTranscript(slip, cfg, { fetchImpl: fixed })
 
-    return clean !== null && chatty === null && failed === null && obeyed === null
+    return (
+      clean !== null &&
+      chatty === null &&
+      failed === null &&
+      obeyed === null &&
+      corrected === 'Send the invoice to Mark on Wednesday.' &&
+      uncorrected === null
+    )
   })
 }

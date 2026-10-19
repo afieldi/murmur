@@ -50,6 +50,10 @@ export interface Settings {
      *  (polish prompt plus spoken list commands). Off keeps today's
      *  behavior exactly. */
     smartLists: boolean
+    /** Apply corrections (US-105): a spoken slip-up and its fix (Tuesday,
+     *  oh wait, I mean Wednesday) come out as the fix alone. Off keeps
+     *  today's behavior exactly. */
+    corrections: boolean
   }
   insertion: {
     mode: 'paste' | 'copy'
@@ -207,7 +211,8 @@ export const DEFAULT_SETTINGS: Settings = {
   formatting: {
     level: 'full',
     numbers: 'auto',
-    smartLists: false
+    smartLists: false,
+    corrections: false
   },
   insertion: {
     mode: 'paste'

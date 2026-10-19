@@ -142,7 +142,7 @@ const DOCS = [
   [
     'settings',
     'Settings',
-    'Every murmur setting explained: hotkeys, hold to talk or toggle, insert modes, formatting levels, Smart lists, the dictionary, history, sounds, and more.'
+    'Every murmur setting explained: hotkeys, hold to talk or toggle, insert modes, formatting levels, Smart lists, Apply corrections, the dictionary, history, sounds, and more.'
   ],
   [
     'providers',
