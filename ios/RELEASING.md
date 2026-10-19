@@ -58,6 +58,10 @@ Build 485 (TestFlight 6, uploaded 2026-10-18, the fixes from LaBroi's re-check o
 
 > Fixes from your re-check of build 482: the New note control in Control Center and on the Action Button now opens murmur on New note, listening. Settings, Notes has File layout at the bottom, as on the Mac: Inbox file, Tasks file, and Ideas file. Type the same as your Mac's (yours is murmur/notes/{date}.md) so both write the same files. Everything from build 482 still applies. If something goes wrong, Settings, Diagnostics, Save report makes a report you can read and then share.
 
+Build 493 (TestFlight 7, uploaded 2026-10-19, IOS-030 Apply corrections; set the same way):
+
+> New in this build: Apply corrections, as on the Mac. In Settings, Cleanup, with Cleanup level Full and Polish on, turn on Apply corrections under Smart lists. When you correct yourself (Tuesday, oh wait, I mean Wednesday), only the fix is typed; off, the slip-up stays in. It is off until you turn it on. Everything from build 485 still applies. If something goes wrong, Settings, Diagnostics, Save report makes a report you can read and then share.
+
 ## Internal testing
 
 - The internal group is murmur team, with lbwalton@gmail.com in it (IOS-004). In App Store Connect, murmur voice dictation, TestFlight, Internal Testing, murmur team: if automatic distribution is on, each processed build joins the group by itself. If the new build is not listed under Builds, click the plus next to Builds and add it.
