@@ -1,6 +1,6 @@
 # murmur Roadmap
 
-> Generated from prd.json (86/105 stories verified). Do not edit by hand: change prd.json, then run `npm run roadmap`.
+> Generated from prd.json (86/106 stories verified). Do not edit by hand: change prd.json, then run `npm run roadmap`.
 
 ## Done and verified
 
@@ -117,3 +117,4 @@ Automated criteria pass; the remaining step is a human loop noted in prd.json an
 - [ ] **US-089** Empty states that say what to do
 - [ ] **US-091** A long wait still reads as working
 - [ ] **US-092** One header on every page, the docs on the site, and a Wispr Flow comparison
+- [ ] **US-106** A changelog page on the site, built from CHANGELOG.md
