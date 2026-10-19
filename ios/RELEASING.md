@@ -50,6 +50,10 @@ Build 479 (TestFlight 4, uploaded 2026-10-17, the keyboard and Full Access as on
 
 > Fixes from your look at build 477: the keyboard and Full Access are now one first-run step, Add the murmur keyboard, since both switches are on the same page in Settings. It checks itself once you pick murmur in the box with Full Access on, and the I added it button is gone. Everything from build 477 still applies: Add your key opens Provider and key, first run asks for your key before the keyboard and the first take, the key sheet has Done, and Notes, Transform, and murmur Pro are in Settings (purchases in TestFlight are free). If something goes wrong, Settings, Diagnostics, Save report makes a report you can read and then share.
 
+Build 482 (TestFlight 5, uploaded 2026-10-18, the fixes from LaBroi's notes check on build 479; set the same way):
+
+> Fixes from your notes check on build 479: in New note, tap Noted to inbox to open the note, in Obsidian when your notes folder is in a vault and Obsidian is on the phone, and in murmur otherwise. After the keyboard keeps a note, Open note shows above the pill; it opens murmur, which hands the note to Obsidian, since Apple lets a keyboard open no other app. Note in the pill's menu is one switch with a checkmark, and picking the murmur folder in your vault writes into it, not into a second murmur folder. Everything from build 479 still applies. If something goes wrong, Settings, Diagnostics, Save report makes a report you can read and then share.
+
 ## Internal testing
 
 - The internal group is murmur team, with lbwalton@gmail.com in it (IOS-004). In App Store Connect, murmur voice dictation, TestFlight, Internal Testing, murmur team: if automatic distribution is on, each processed build joins the group by itself. If the new build is not listed under Builds, click the plus next to Builds and add it.
