@@ -51,35 +51,18 @@ export const SMART_LISTS_PROMPT = polish.smartListsPrompt.join(' ')
 // 50 spoken corrections. A definition that reaches into the next
 // sentence, the cue words, and examples on both sides (one where the
 // cue is real content) are what made the same model fix them.
-export const CORRECTIONS_PROMPT = [
-  'Self-corrections: when the speaker says something and then corrects it, keep only the corrected version. Delete the wrong words and the correction cue (oh wait, wait, actually, I mean, sorry, no, rather, make that, what I meant was, let me rephrase that), and merge the fix into the original sentence so it reads as if they had said it right the first time, keeping every other word of that sentence. This applies even when the correction comes in the next sentence.',
-  'Also drop a phrase the speaker started, abandoned, and restarted, and words they stumbled into repeating.',
-  'Those cue words are a correction only when they take back something just said. When nothing is being taken back, they are part of what the speaker means: keep them, including a sentence that opens with Actually or I mean.',
-  'Corrections are an exception to keeping every word; everything else keeps the speaker’s words exactly.',
-  'Example: Send it to Mark on Tuesday. Oh wait, actually I mean Wednesday. becomes: Send it to Mark on Wednesday.',
-  'Example: The header should be blue on every page. Wait, I mean green instead of blue. becomes: The header should be green on every page.',
-  'Example: The budget is fifteen thousand, sorry, fifty thousand for the quarter. becomes: The budget is fifty thousand for the quarter.',
-  'Example: Grab two coffees, make that three, on the way in. becomes: Grab three coffees on the way in.',
-  'Example: I think we should, we should ship on Friday. becomes: I think we should ship on Friday.',
-  'Example: I mean, it works, but it could be faster. stays exactly as it is.'
-].join(' ')
+export const CORRECTIONS_PROMPT = polish.correctionsPrompt.join(' ')
 
-// The cue words a spoken correction turns on, matched whole and case
-// blind. A correction cut has to remove at least one of them; that is
-// how validation tells a correction from a model deleting content. No
+// The cue words a spoken correction turns on (correctionCues), matched
+// whole and case blind, each escaped so it is always the words it says.
+// A correction cut has to remove at least one of them; that is how
+// validation tells a correction from a model deleting content. No
 // stays a prompt cue only: no problem and no one are so common that
 // dropping one must never unlock a deep cut (review gate, 2026-10-17).
-const CORRECTION_CUES = [
-  'wait',
-  'actually',
-  'sorry',
-  'rather',
-  'make that',
-  'i mean',
-  'i meant',
-  'let me rephrase'
-]
-const CORRECTION_CUE = new RegExp(`\\b(?:${CORRECTION_CUES.join('|')})\\b`, 'g')
+const CORRECTION_CUE = new RegExp(
+  `\\b(?:${polish.correctionCues.map((cue) => cue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`,
+  'g'
+)
 
 const META_OPENERS = polish.metaOpeners
 
@@ -223,11 +206,13 @@ export function validatePolish(
   // correction: the speech carried a cue, the output dropped one, and
   // every output word was spoken. A cut that keeps every cue, or adds
   // words, is held to the strict floor (US-105). Each dropped cue
-  // explains one wrong phrase and the cue itself, about 8 words, plus
-  // 4 of slack for a restart; a bigger cut is content, not a fix.
+  // explains one wrong phrase and the cue itself, about 8 words
+  // (correctionCut.perCue), plus 4 of slack for a restart
+  // (correctionCut.slack); a bigger cut is content, not a fix.
   const cuesDropped = opts.corrections ? cueCount(input) - cueCount(countable) : 0
   const earnedCorrectionFloor =
-    cuesDropped > 0 && inputWords - outputWords <= 4 + 8 * cuesDropped && onlySpokenWords(input, countable)
+    cuesDropped > 0 && inputWords - outputWords <= polish.correctionCut.slack + polish.correctionCut.perCue * cuesDropped &&
+    onlySpokenWords(input, countable)
   if (inputWords >= polish.length.ratioFromWords) {
     const ratio = outputWords / inputWords
     const floor = earnedListFloor || earnedCorrectionFloor ? polish.length.listFloor : polish.length.floor

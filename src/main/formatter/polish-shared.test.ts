@@ -2,16 +2,19 @@
 // The cleanup pass's words and numbers come from shared/polish.json
 // (ios/prd.json IOS-007): with other values swapped in, desktop follows.
 import { describe, expect, it, vi } from 'vitest'
-import { POLISH_SYSTEM_PROMPT, SMART_LISTS_PROMPT, polishTranscript, validatePolish } from './llm'
+import { CORRECTIONS_PROMPT, POLISH_SYSTEM_PROMPT, SMART_LISTS_PROMPT, polishTranscript, validatePolish } from './llm'
 
 vi.mock('../../../shared/polish.json', () => ({
   default: {
     systemPrompt: ['Line one.', 'Line two.'],
     smartListsPrompt: ['Lists line.'],
+    correctionsPrompt: ['Corrections line.', 'Second line.'],
+    correctionCues: ['kiwi', 'make it', 'sorry'],
+    correctionCut: { slack: 1, perCue: 1 },
     metaOpeners: ['banana'],
     refusals: ['kumquat'],
     hintSentinel: 'zebra',
-    length: { ratioFromWords: 4, floor: 0.9, listFloor: 0.8, ceiling: 1.1, shortDelta: 1 },
+    length: { ratioFromWords: 4, floor: 0.9, listFloor: 0.5, ceiling: 1.1, shortDelta: 1 },
     temperature: 0.7,
     timeoutMs: 5000
   }
@@ -23,6 +26,32 @@ describe('cleanup rules from shared/polish.json', () => {
   it('builds the prompts from the shared lines', () => {
     expect(POLISH_SYSTEM_PROMPT).toBe('Line one. Line two.')
     expect(SMART_LISTS_PROMPT).toBe('Lists line.')
+    expect(CORRECTIONS_PROMPT).toBe('Corrections line. Second line.')
+  })
+
+  it('earns the deeper cut only for a shared correction cue', () => {
+    // Six words to four: under the 0.9 floor, over the 0.5 one.
+    expect(validatePolish('one two kiwi three four five', 'one two four five', { corrections: true })).toEqual({
+      ok: true,
+      text: 'one two four five'
+    })
+    expect(validatePolish('one two make it three four', 'one two three four', { corrections: true })).toEqual({
+      ok: true,
+      text: 'one two three four'
+    })
+    // Desktop's own cue no longer counts once the shared list drops it.
+    expect(validatePolish('one two wait three four five', 'one two four five', { corrections: true })).toEqual({
+      ok: false,
+      reason: 'length ratio'
+    })
+  })
+
+  it('caps a correction cut by the shared slack and per cue', () => {
+    // Eight words to four drops one cue: a cut of four, past 1 + 1,
+    // though desktop's own 4 + 8 would allow it.
+    expect(
+      validatePolish('one two sorry three four five six seven', 'one two six seven', { corrections: true })
+    ).toEqual({ ok: false, reason: 'length ratio' })
   })
 
   it('uses the shared openers and refusals', () => {
