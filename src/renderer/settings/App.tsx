@@ -998,6 +998,18 @@ export function App(): React.JSX.Element {
             </Row>
 
             <Row
+              label="Apply corrections"
+              keywords="self-correction slip-up verbatim actually wait i mean"
+              desc="At Full formatting, when you correct yourself (Tuesday, oh wait, I mean Wednesday), only the fix is typed. Off keeps the slip-up in."
+            >
+              <Switch
+                checked={settings.formatting.corrections}
+                label="Apply corrections"
+                onChange={(corrections) => void update({ formatting: { ...settings.formatting, corrections } })}
+              />
+            </Row>
+
+            <Row
               label="Paste last dictation"
               keywords="repeat again chord"
               desc={

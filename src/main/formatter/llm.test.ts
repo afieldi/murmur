@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { describe, expect, it } from 'vitest'
-import { type PolishConfig, polishTranscript, validatePolish } from './llm'
+import { CORRECTIONS_PROMPT, POLISH_SYSTEM_PROMPT, type PolishConfig, polishTranscript, validatePolish } from './llm'
 
 const cfg: PolishConfig = {
   baseUrl: 'https://api.example.com/v1/',
@@ -179,6 +179,109 @@ describe('validatePolish with smart lists', () => {
   })
 })
 
+describe('validatePolish with corrections', () => {
+  // Fifteen words down to seven: a true correction is half the speech.
+  // Every reject case below lands between the 0.4 and 0.6 floors, so
+  // only the one condition it names can be what rejects it.
+  const MARK_IN = 'Send the invoice to Mark on Tuesday. Oh wait, actually what I mean is Wednesday.'
+  const MARK_FIX = 'Send the invoice to Mark on Wednesday.'
+
+  it('rejects a correction cut when the setting is off, exactly as before', () => {
+    expect(validatePolish(MARK_IN, MARK_FIX)).toMatchObject({ ok: false, reason: 'length ratio' })
+  })
+
+  it('accepts a correction cut when the setting is on', () => {
+    expect(validatePolish(MARK_IN, MARK_FIX, { corrections: true })).toEqual({ ok: true, text: MARK_FIX })
+  })
+
+  it('accepts a next-sentence correction that moves the fix into place', () => {
+    const v = validatePolish(
+      'The color should be teal for the buttons. Oh wait, actually what I mean is orange instead of teal.',
+      'The color should be orange for the buttons.',
+      { corrections: true }
+    )
+    expect(v).toMatchObject({ ok: true })
+  })
+
+  it('treats curly and straight apostrophes as the same spoken word', () => {
+    const v = validatePolish(
+      "Let's meet at the office on Tuesday. Sorry, no, let’s meet Wednesday instead.",
+      'Let’s meet at the office on Wednesday.',
+      { corrections: true }
+    )
+    expect(v).toMatchObject({ ok: true })
+  })
+
+  it('still rejects a deep cut that keeps every correction cue', () => {
+    // The model cut real content and left the cue standing: nothing
+    // was corrected, so the cut earns nothing.
+    // 18 words to 10, all spoken, the Actually still there.
+    const v = validatePolish(
+      'Send the deck by noon and copy the whole team on it. Actually I will follow up tomorrow.',
+      'Send the deck by noon. Actually I will follow up.',
+      { corrections: true }
+    )
+    expect(v).toMatchObject({ ok: false, reason: 'length ratio' })
+  })
+
+  it('still rejects a deep cut when the speech has no correction cue', () => {
+    // 17 words to 9, all spoken, but nothing was ever taken back.
+    const v = validatePolish(
+      'Send the deck by noon and copy the whole team on it. I will follow up tomorrow.',
+      'Send the deck by noon. I will follow up.',
+      { corrections: true }
+    )
+    expect(v).toMatchObject({ ok: false, reason: 'length ratio' })
+  })
+
+  it('still rejects a deep cut that adds words the speaker never said', () => {
+    // MARK_FIX plus one word nobody said: 15 words to 8, cues dropped.
+    expect(
+      validatePolish(MARK_IN, 'Please send the invoice to Mark on Wednesday.', { corrections: true })
+    ).toMatchObject({ ok: false, reason: 'length ratio' })
+  })
+
+  it('caps a correction cut by the cues it removed', () => {
+    // One cue dropped explains one wrong phrase, never a whole lost
+    // sentence: 29 words cut to 12 removes 17, past the 12 one cue allows.
+    const v = validatePolish(
+      'Send the deck by noon and copy the whole team on it. Actually I will follow up tomorrow morning with the pricing notes and the launch timeline for everyone.',
+      'Send the deck by noon and copy the whole team on it.',
+      { corrections: true }
+    )
+    expect(v).toMatchObject({ ok: false, reason: 'length ratio' })
+  })
+
+  it('never lets an everyday no earn the deeper cut', () => {
+    // No problem is content, and so common that dropping it must not
+    // unlock a deep cut; no as a fix stays a prompt cue only.
+    const v = validatePolish(
+      'No problem, I can cover the Thursday shift. Tell the team I will be in early on Friday too.',
+      'I can cover the Thursday shift. Tell the team.',
+      { corrections: true }
+    )
+    expect(v).toMatchObject({ ok: false, reason: 'length ratio' })
+  })
+
+  it('never cuts below the 0.4 floor', () => {
+    expect(validatePolish(MARK_IN, 'Mark, Wednesday.', { corrections: true })).toMatchObject({
+      ok: false,
+      reason: 'length ratio'
+    })
+  })
+
+  it('works alongside smart lists', () => {
+    expect(validatePolish(MARK_IN, MARK_FIX, { smartLists: true, corrections: true })).toMatchObject({ ok: true })
+    expect(
+      validatePolish(
+        'I want to make a list. First I want to add eggs, then bacon, then toast.',
+        'I want to make a list:\n1. eggs\n2. bacon\n3. toast',
+        { smartLists: true, corrections: true }
+      )
+    ).toMatchObject({ ok: true })
+  })
+})
+
 describe('polishTranscript', () => {
   it('returns validated cleaned text and sends the strict prompt', async () => {
     let sent: { url: string; body: Record<string, unknown> } | null = null
@@ -208,6 +311,29 @@ describe('polishTranscript', () => {
     expect(system).toContain('numbered list')
     await polishTranscript(INPUT, cfg, { fetchImpl })
     expect(system).not.toContain('numbered list')
+  })
+
+  it('sends correction instructions only when corrections is on', async () => {
+    let system = ''
+    const fetchImpl = (async (_url: unknown, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { messages: Array<{ content: string }> }
+      system = body.messages[0].content
+      return chatResponse('Send the report tomorrow and copy the whole team on it, please.')
+    }) as typeof fetch
+
+    await polishTranscript(INPUT, cfg, { fetchImpl, corrections: true })
+    expect(system).toBe(`${POLISH_SYSTEM_PROMPT} ${CORRECTIONS_PROMPT}`)
+    await polishTranscript(INPUT, cfg, { fetchImpl })
+    expect(system).toBe(POLISH_SYSTEM_PROMPT)
+  })
+
+  it('passes a correction cut through only when corrections is on', async () => {
+    const dictation = 'Send the invoice to Mark on Tuesday. Oh wait, actually what I mean is Wednesday.'
+    const fetchImpl = (async () => chatResponse('Send the invoice to Mark on Wednesday.')) as typeof fetch
+    expect(await polishTranscript(dictation, cfg, { fetchImpl, corrections: true })).toBe(
+      'Send the invoice to Mark on Wednesday.'
+    )
+    expect(await polishTranscript(dictation, cfg, { fetchImpl })).toBeNull()
   })
 
   it('fails open on API errors', async () => {

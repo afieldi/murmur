@@ -1,6 +1,6 @@
 # murmur Roadmap
 
-> Generated from prd.json (86/104 stories verified). Do not edit by hand: change prd.json, then run `npm run roadmap`.
+> Generated from prd.json (87/105 stories verified). Do not edit by hand: change prd.json, then run `npm run roadmap`.
 
 ## Done and verified
 
@@ -90,6 +90,7 @@
 - [x] **US-102** Save the week
 - [x] **US-103** Narrow card titles
 - [x] **US-104** Build tool security alerts, October
+- [x] **US-105** Apply corrections: spoken slip-ups come out fixed, behind a switch
 
 ## Built, awaiting live verification
 

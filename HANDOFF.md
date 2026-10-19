@@ -51,6 +51,8 @@ Live-verification items land here as stories complete. Check them off, then tell
 
 ## Live verification queue
 
+- [x] US-105 apply corrections: live-verified by LaBroi 2026-10-18 on the test build (both correction shapes fixed, Actually kept, off keeps the slip-up). Merged to main; ships in the next release. Until then the Mac runs the test build, which still reports 0.1.10.
+
 - [x] US-100 the light of the hours you painted in: live-verified by LaBroi 2026-10-09 on the test build. Ships with 0.1.10.
 - [x] US-101 the seal in your belt's color: live-verified by LaBroi 2026-10-09 on the test build. Ships with 0.1.10.
 - [x] US-102 Save the week: live-verified by LaBroi 2026-10-09 on the test build. Ships with 0.1.10.
@@ -179,6 +181,8 @@ The brain dump branch (US-050 to US-052 and US-055 to US-058) merged to main 202
 - [x] US-020 recap, two quick steps in the installed app: (1) click the recap Test button once more now that notifications are allowed; a murmur recap banner with today's numbers should appear instantly. (2) For the full loop: turn Daily recap on, set a time two minutes out, wait for the banner, click it, confirm you land on the wrap-up tab.
 
 ## Known follow-ups (not blocking)
+
+- [ ] When the iPhone branch (feature/ios, PR #11) merges with main (added 2026-10-18): main now carries US-105 Apply corrections, while feature/ios moves the cleanup prompt into shared/polish.json, so src/main/formatter/llm.ts will conflict. Resolve it by moving CORRECTIONS_PROMPT, the correction cue list, and the 4 + 8 per cue cap into shared/polish.json, keep llm.test.ts green (it asserts the exact prompt with the switch on and off), and rerun the corrections probe. The iPhone app gets the switch only through its own IOS story: a switch on the Cleanup screen, the same deep floor rule in MurmurCore Polish.swift, and shared test vectors so both apps check the same cases.
 
 - [ ] Seen in the US-091 review (2026-10-04), not new: nothing watches the processing phase in main, so an unexpected throw after it starts would leave the pill processing until the next press. The sheen now stops after two minutes so it never animates forever; a main-side watchdog that ends such a take in an error would close the gap.
 

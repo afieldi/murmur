@@ -162,6 +162,14 @@ describe('sanitized entry lists', () => {
     expect(merged.provider.keySavedForBaseUrl).toBe('')
   })
 
+  it('lands apply corrections off for a profile saved before the switch existed', () => {
+    // US-105: an update must never change how existing dictation reads.
+    const merged = mergeSettings(DEFAULT_SETTINGS, {
+      formatting: { level: 'full', numbers: 'auto', smartLists: true }
+    })
+    expect(merged.formatting).toEqual({ level: 'full', numbers: 'auto', smartLists: true, corrections: false })
+  })
+
   it('drops malformed provider profiles the same way', () => {
     const merged = mergeSettings(DEFAULT_SETTINGS, {
       provider: { profiles: [
