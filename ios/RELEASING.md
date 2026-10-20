@@ -62,6 +62,10 @@ Build 493 (TestFlight 7, uploaded 2026-10-19, IOS-030 Apply corrections; set the
 
 > New in this build: Apply corrections, as on the Mac. In Settings, Cleanup, with Cleanup level Full and Polish on, turn on Apply corrections under Smart lists. When you correct yourself (Tuesday, oh wait, I mean Wednesday), only the fix is typed; off, the slip-up stays in. It is off until you turn it on. Everything from build 485 still applies. If something goes wrong, Settings, Diagnostics, Save report makes a report you can read and then share.
 
+Build 500 (TestFlight 8, uploaded 2026-10-19, the fix from LaBroi's first IOS-030 try on build 493; set the same way):
+
+> New in this build: Apply corrections now catches a No that takes back the sentence before it. Say Let's go to Italy. No, let's go to Japan and stay for a week, and only Let's go to Japan and stay for a week is typed. A plain No, like the answer to a question, stays as you said it. To try it: Settings, Cleanup, with Cleanup level Full and Polish on, turn on Apply corrections under Smart lists. Everything from build 493 still applies. If something goes wrong, Settings, Diagnostics, Save report makes a report you can read and then share.
+
 ## Internal testing
 
 - The internal group is murmur team, with lbwalton@gmail.com in it (IOS-004). In App Store Connect, murmur voice dictation, TestFlight, Internal Testing, murmur team: if automatic distribution is on, each processed build joins the group by itself. If the new build is not listed under Builds, click the plus next to Builds and add it.
