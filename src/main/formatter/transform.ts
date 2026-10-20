@@ -5,6 +5,7 @@
 // The two travel in separate messages, the selection fenced so nothing
 // inside it can close the fence, and a reply that is empty, chatty, or
 // refused is rejected so the caller leaves the selection untouched.
+import { appFetch } from '../net'
 import type { PolishConfig } from './llm'
 
 /** Longest selection a transform will send (characters). Longer ones
@@ -94,7 +95,7 @@ export async function transformText(
   cfg: PolishConfig,
   options: TransformOptions = {}
 ): Promise<TransformResult> {
-  const { fetchImpl = fetch, timeoutMs = 30_000 } = options
+  const { fetchImpl = appFetch, timeoutMs = 30_000 } = options
   if (instruction.trim().length === 0) return { ok: false, reason: 'no instruction' }
   if (selection.length > TRANSFORM_MAX_CHARS) return { ok: false, reason: 'selection too long' }
   const controller = new AbortController()

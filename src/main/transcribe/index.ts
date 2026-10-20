@@ -2,9 +2,12 @@
 // App-level transcription: reads settings and the key, calls the
 // provider, saves recovery audio on failure. Smoke mode short-circuits
 // with a canned transcript so no network or key is ever needed.
+import { type IncomingMessage, type ServerResponse, createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { app } from 'electron'
 import { getApiKey, getSettings } from '../settings'
+import { appFetch } from '../net'
 import { isSmoke, registerSmokeCheck } from '../smoke'
 import { type TranscribeResult, transcribe } from './provider'
 import { type TakeKind, saveRecovery } from './recovery'
@@ -100,5 +103,84 @@ export function initTranscribe(): void {
       authResult.kind === 'auth' &&
       authCalls === 1
     )
+  })
+
+  registerSmokeCheck('chromiumNet', async () => {
+    // The real request path (US-109): transcribe with its default fetch
+    // against a server on 127.0.0.1, so the request rides Chromium's
+    // network stack exactly as a live dictation does. Loopback only.
+    const seen: { agent: string; auth: string; multipart: boolean; cookie: string | undefined }[] = []
+    let modelLists = 0
+    const handle = (req: IncomingMessage, res: ServerResponse): void => {
+      if (req.url?.startsWith('/stall')) return
+      if (req.url?.endsWith('/models')) {
+        // Cacheable on purpose: a second ask must still reach the server.
+        modelLists += 1
+        res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'max-age=600' })
+        res.end('{"data":[]}')
+        return
+      }
+      let body = ''
+      req.setEncoding('latin1')
+      req.on('data', (chunk: string) => (body += chunk))
+      req.on('end', () => {
+        seen.push({
+          agent: req.headers['user-agent'] ?? '',
+          auth: req.headers.authorization ?? '',
+          multipart: /name="file"; filename="audio\.wav"/.test(body) && /name="model"\r\n\r\nm\r\n/.test(body),
+          cookie: req.headers.cookie
+        })
+        res.writeHead(200, { 'content-type': 'application/json', 'set-cookie': 'smoke=1; Path=/' })
+        res.end(JSON.stringify({ text: 'via chromium' }))
+      })
+    }
+    const listen = async (): Promise<ReturnType<typeof createServer>> => {
+      const server = createServer(handle)
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+      return server
+    }
+    const portOf = (server: ReturnType<typeof createServer>): number => (server.address() as AddressInfo).port
+
+    // The live server first, so the closed port can never be handed to it.
+    const server = await listen()
+    const closed = await listen()
+    const closedPort = portOf(closed)
+    await new Promise<void>((resolve) => closed.close(() => resolve()))
+    try {
+      const cfg = { baseUrl: `http://127.0.0.1:${portOf(server)}/v1`, model: 'm', apiKey: 'k' }
+      const wav = new Uint8Array([1, 2, 3])
+      const first = await transcribe(wav, cfg)
+      const second = await transcribe(wav, cfg)
+      const stalled = await transcribe(
+        wav,
+        { ...cfg, baseUrl: `http://127.0.0.1:${portOf(server)}/stall` },
+        { timeoutMs: 300, retries: 0 }
+      )
+      const refused = await transcribe(wav, { ...cfg, baseUrl: `http://127.0.0.1:${closedPort}/v1` }, { retries: 0 })
+      for (let i = 0; i < 2; i++) await (await appFetch(`${cfg.baseUrl}/models`)).text()
+      const conditions = {
+        transcribed: first.ok && first.text === 'via chromium' && second.ok,
+        chromiumAgent: seen.length === 2 && seen.every((s) => / Chrome\/\d/.test(s.agent)),
+        keySent: seen.every((s) => s.auth === 'Bearer k'),
+        multipartAudio: seen.every((s) => s.multipart),
+        noCookies: seen.every((s) => s.cookie === undefined),
+        noCache: modelLists === 2,
+        stallTimedOut: !stalled.ok && stalled.kind === 'timeout',
+        refusedNamed: !refused.ok && refused.kind === 'network' && refused.detail.includes('ERR_CONNECTION_REFUSED')
+      }
+      const failed = Object.entries(conditions)
+        .filter(([, ok]) => !ok)
+        .map(([name]) => name)
+      if (failed.length > 0) {
+        const detail = (r: TranscribeResult): string => (r.ok ? 'ok' : `${r.kind}:${r.detail}`)
+        console.error(
+          `smoke chromiumNet: failed=${failed.join(',')} agent=${seen[0]?.agent ?? 'none'} stalled=${detail(stalled)} refused=${detail(refused)}`
+        )
+      }
+      return failed.length === 0
+    } finally {
+      server.closeAllConnections()
+      server.close()
+    }
   })
 }

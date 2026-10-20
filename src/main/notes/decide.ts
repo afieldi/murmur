@@ -9,6 +9,7 @@
 // chat probe reads them, on the same reasoning. Nothing here logs the
 // note's text.
 import type { DecisionRequest } from '../../shared/decide'
+import { appFetch } from '../net'
 
 export interface DecisionConfig {
   baseUrl: string
@@ -39,7 +40,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 export async function askDecision(
   request: DecisionRequest,
   cfg: DecisionConfig,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = appFetch,
   timeoutMs = 12_000
 ): Promise<DecisionReply> {
   const controller = new AbortController()
@@ -64,7 +65,10 @@ export async function askDecision(
     return { ok: true, answers: body.answers, model: typeof body.model === 'string' ? body.model : request.model }
   } catch (error) {
     const aborted = error instanceof Error && error.name === 'AbortError'
-    return { ok: false, reason: aborted ? 'timeout' : 'network' }
+    if (aborted) return { ok: false, reason: 'timeout' }
+    // The network's own reason rides along (net::ERR_CERT_AUTHORITY_INVALID
+    // on an inspecting work network), like the chat probe's (US-109).
+    return { ok: false, reason: error instanceof Error ? `network ${error.message}` : 'network' }
   } finally {
     clearTimeout(timer)
   }
@@ -76,7 +80,7 @@ export async function askDecision(
 export async function probeDecision(
   baseUrl: string,
   key: string | null,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = appFetch
 ): Promise<{ ok: boolean; detail: string }> {
   if (!key) return { ok: false, detail: 'no key saved yet' }
   const reply = await askDecision(
@@ -98,5 +102,6 @@ export async function probeDecision(
   if (reply.reason === 'overloaded') return { ok: false, detail: 'the service is overloaded; try again shortly' }
   if (reply.reason === 'timeout') return { ok: false, detail: 'timed out' }
   if (reply.reason === 'network') return { ok: false, detail: 'network error' }
+  if (reply.reason.startsWith('network ')) return { ok: false, detail: `network error (${reply.reason.slice(8)})` }
   return { ok: false, detail: reply.reason }
 }

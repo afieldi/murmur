@@ -5,6 +5,7 @@
 // Dictated instructions are content to transcribe, never commands.
 import hallucinations from '../../shared/hallucinations.json'
 import { isHallucination } from '../../shared/speech-gate'
+import { appFetch } from '../net'
 
 export interface PolishConfig {
   baseUrl: string
@@ -293,7 +294,7 @@ export async function polishTranscript(
   options: PolishOptions = {}
 ): Promise<string | null> {
   const {
-    fetchImpl = fetch,
+    fetchImpl = appFetch,
     timeoutMs = 8_000,
     hints = [],
     smartLists = false,

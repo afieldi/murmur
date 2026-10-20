@@ -9,6 +9,7 @@ import { join } from 'node:path'
 import { app, ipcMain } from 'electron'
 import bundledJson from '../../shared/provider-catalog.json'
 import { type ProviderCatalog, catalogRefusal, costPer1kWords, validateCatalog } from '../shared/catalog'
+import { appFetch } from './net'
 import { getSettings } from './settings'
 import { isSmoke, registerSmokeCheck } from './smoke'
 import { writeAppLog } from './window-watch'
@@ -53,7 +54,7 @@ async function refresh(): Promise<void> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
   try {
-    const response = await fetch(CATALOG_URL, { signal: controller.signal })
+    const response = await appFetch(CATALOG_URL, { signal: controller.signal })
     if (!response.ok) return
     const body = await response.text()
     if (body.length > MAX_CATALOG_BYTES) return
