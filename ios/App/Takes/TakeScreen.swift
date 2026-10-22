@@ -8,11 +8,15 @@ import UIKit
 
 struct TakeScreen: View {
     @State var model: TakeModel
+    /// The pill's look and voice; nil reads the saved look and the take
+    /// (previews hand in their own).
+    var look: PillLook?
+    var level: (@MainActor () -> Float)?
 
     var body: some View {
         List {
             Section {
-                TakeButton(model: model)
+                TakeButton(model: model, look: look, level: level)
             }
             .listRowBackground(Tokens.panel)
 
@@ -38,11 +42,17 @@ struct TakeScreen: View {
     }
 }
 
-/// Start a take, and stop it: red to record, amber while live.
+/// Start a take, and stop it: red to record, amber while live. The live
+/// pill sits under the button in the chosen look, moving with the voice,
+/// so you can see murmur hears you (IOS-031).
 struct TakeButton: View {
     let model: TakeModel
     /// New note's button starts note takes (IOS-023).
     var purpose: TakeModel.Purpose = .words
+    /// The pill's look and voice; nil reads the saved look and the take.
+    var look: PillLook?
+    var level: (@MainActor () -> Float)?
+    @State private var saved = PillLook.read()
     @ScaledMetric(relativeTo: .largeTitle) private var size: CGFloat = 72
 
     var body: some View {
@@ -54,16 +64,39 @@ struct TakeButton: View {
                     .font(.system(size: size))
                     .foregroundStyle(model.isRecording ? Tokens.amber : Tokens.red)
                     .accessibilityHidden(true)
+                    .opacity(model.isBusy ? 0.5 : 1)
+                // The pill stays bright while busy: its drying sheen is the news.
+                pill
                 status
+                    .opacity(model.isBusy ? 0.5 : 1)
             }
             .frame(maxWidth: .infinity, minHeight: 44)
             .padding(.vertical, 20)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(TakeButtonStyle())
         .disabled(model.isBusy)
-        .opacity(model.isBusy ? 0.5 : 1)
         .accessibilityLabel(model.isRecording ? "Stop the take" : "Start a take")
+        // A look changed in Settings shows when you come back.
+        .onAppear { saved = PillLook.read() }
+    }
+
+    /// A plain button that leaves dimming to the button: the plain style
+    /// fades a disabled label whole, and the pill's drying sheen would fade
+    /// with it.
+    private struct TakeButtonStyle: ButtonStyle {
+        func makeBody(configuration: Configuration) -> some View {
+            configuration.label.opacity(configuration.isPressed ? 0.7 : 1)
+        }
+    }
+
+    /// The same pill the keyboard draws, at its own size, following the take.
+    private var pill: some View {
+        let shown = look ?? saved
+        let model = model
+        return PillCanvas(style: shown.style, stage: model.pillStage, level: level ?? { model.level }, palette: shown.palette)
+            .frame(width: 236, height: 56)
+            .accessibilityHidden(true)
     }
 
     @ViewBuilder private var status: some View {
@@ -330,6 +363,8 @@ struct TakeRoute: View {
 #if DEBUG
 #Preview("Ready") { TakePreview(.ready) }
 #Preview("Recording") { TakePreview(.recording) }
+#Preview("Recording, ribbon") { TakePreview(.recording, style: .ribbon) }
+#Preview("Transcribing") { TakePreview(.transcribing) }
 #Preview("Words") { TakePreview(.words) }
 #Preview("Heard nothing") { TakePreview(.silence) }
 #Preview("Provider heard silence") { TakePreview(.inventedPhrase) }
@@ -338,18 +373,25 @@ struct TakeRoute: View {
 #Preview("No microphone") { TakePreview(.micOff) }
 
 /// The take screen in one of its states, driven by a scripted microphone
-/// and a stand-in provider, so nothing records or leaves the Mac.
+/// and a stand-in provider, so nothing records or leaves the Mac. The pill
+/// draws in the style given, and while recording it hears the demo voice.
 struct TakePreview: View {
-    enum Scene { case ready, recording, words, silence, inventedPhrase, failed, armed, micOff }
+    enum Scene { case ready, recording, transcribing, words, silence, inventedPhrase, failed, armed, micOff }
 
     let scene: Scene
+    let style: PillStyle
     @State private var model: TakeModel?
 
-    init(_ scene: Scene) { self.scene = scene }
+    init(_ scene: Scene, style: PillStyle = .bars) {
+        self.scene = scene
+        self.style = style
+    }
 
     var body: some View {
         NavigationStack {
-            if let model { TakeScreen(model: model) }
+            if let model {
+                TakeScreen(model: model, look: PillLook(style: style), level: scene == .recording ? DemoVoice.level : nil)
+            }
         }
         .tint(Tokens.brand)
         .preferredColorScheme(.dark)
@@ -372,9 +414,12 @@ struct TakePreview: View {
         if let key = APIKey("gsk_previewpreview1234") { try? ring.save(key, for: "https://api.groq.com/openai/v1") }
         let status = scene == .failed ? 503 : 200
         let words = scene == .inventedPhrase ? "Thank you." : "Send the invoice to Dana tomorrow morning, and copy the team on the thread."
+        // Transcribing holds the send, so the screen stays in it.
+        let holds = scene == .transcribing
         let model = TakeModel(
             microphone: microphone, store: store, rules: rules, catalog: catalog, connections: ConnectionStore(defaults: defaults), cleanup: CleanupStore(defaults: defaults), ring: ring,
             send: { request in
+                if holds { try await Task.sleep(for: .seconds(3600)) }
                 let body = Data(#"{"text":"\#(words)"}"#.utf8)
                 return (body, HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!)
             },
@@ -386,6 +431,12 @@ struct TakePreview: View {
             await model.stop()
         case .recording, .micOff:
             await model.start()
+        case .transcribing:
+            await model.start()
+            Task { await model.stop() }
+            for _ in 0..<200 where model.state != .transcribing {
+                try? await Task.sleep(for: .milliseconds(10))
+            }
         case .armed:
             if let id = model.waiting.first?.id { model.discard(id) }
         case .ready:

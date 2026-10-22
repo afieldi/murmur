@@ -12,27 +12,35 @@ import UIKit
 @MainActor @Suite struct FirstRunRenderTests {
     /// Shows the view in a window, as the app does, tall when the whole page
     /// should show, and draws it once something is on screen, looking every
-    /// tenth of a second for up to three seconds.
-    func render(_ view: some View, tall: Bool = false, height: CGFloat = 3_200) async throws -> UIImage {
+    /// tenth of a second for up to three seconds. A settle draws it again
+    /// that many seconds later, for a screen whose motion should show.
+    func render(_ view: some View, tall: Bool = false, height: CGFloat = 3_200, settle: Double = 0) async throws -> UIImage {
         let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let window = UIWindow(windowScene: scene)
         if tall { window.frame.size.height = height }
         window.rootViewController = UIHostingController(rootView: view)
         window.isHidden = false
         defer { window.isHidden = true }
-        var image = UIImage()
-        for _ in 0..<30 {
-            try await Task.sleep(for: .seconds(0.1))
-            // A window taller than the screen draws nothing as a snapshot,
-            // so the whole page draws its layers instead.
-            image = UIGraphicsImageRenderer(bounds: window.bounds).image { renderer in
+        // A window taller than the screen draws nothing as a snapshot, so
+        // the whole page draws its layers instead.
+        let draw = {
+            UIGraphicsImageRenderer(bounds: window.bounds).image { renderer in
                 if tall {
                     window.layer.render(in: renderer.cgContext)
                 } else {
                     _ = window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
                 }
             }
+        }
+        var image = UIImage()
+        for _ in 0..<30 {
+            try await Task.sleep(for: .seconds(0.1))
+            image = draw()
             if try inked(image) > 0.02 { break }
+        }
+        if settle > 0 {
+            try await Task.sleep(for: .seconds(settle))
+            image = draw()
         }
         return image
     }
