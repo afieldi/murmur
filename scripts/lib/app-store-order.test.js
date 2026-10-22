@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { generateKeyPairSync, verify } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { orderVerdict, serverToken } from './app-store-order'
+import { issuedFor, orderVerdict, serverToken } from './app-store-order'
 
 const bundleId = 'com.lbwalton.murmur.ios'
 const productId = `${bundleId}.pro`
@@ -64,10 +64,43 @@ describe('orderVerdict', () => {
     expect(orderVerdict({ status: 0, signedTransactions: [] }, ids)).toMatchObject({ confirmed: false })
   })
 
+  // Found by the review gate: a free code given to a desktop buyer unlocks
+  // Pro here, and must never earn a second desktop key.
+  it('turns down Pro unlocked with an offer code, naming the code', () => {
+    const coded = pro({ offerType: 3, offerIdentifier: 'founders' })
+    const verdict = orderVerdict({ status: 0, signedTransactions: [coded] }, ids)
+    expect(verdict.confirmed).toBe(false)
+    expect(verdict.reason).toContain('founders')
+    expect(verdict.reason).toContain('desktop order')
+  })
+
+  it('confirms a paid purchase even when Apple leaves out its date', () => {
+    const undated = jws({ transactionId: '7', bundleId, productId })
+    expect(() => orderVerdict({ status: 0, signedTransactions: [undated] }, ids)).not.toThrow()
+    expect(orderVerdict({ status: 0, signedTransactions: [undated] }, ids).confirmed).toBe(true)
+  })
+
   it('reads past a transaction it cannot decode', () => {
     expect(orderVerdict({ status: 0, signedTransactions: ['not-a-jws', pro()] }, ids).confirmed).toBe(true)
     const verdict = orderVerdict({ status: 0, signedTransactions: ['e30.!!!.c2ln'] }, ids)
     expect(verdict.confirmed).toBe(false)
     expect(verdict.reason).toContain('could not be read')
+  })
+})
+
+describe('issuedFor', () => {
+  const ledger = [
+    JSON.stringify({ id: 'cs_live_abc', to: 'a@example.com', founder: true, at: Date.UTC(2026, 8, 30), key: 'MURMUR-x' }),
+    'not json',
+    JSON.stringify({ id: 'MLYB2C3D4E', to: 'b@example.com', founder: false, at: Date.UTC(2026, 10, 3), key: 'MURMUR-y' })
+  ].join('\n')
+
+  it('finds a key already issued for the order, with its day', () => {
+    expect(issuedFor(ledger, 'MLYB2C3D4E')).toBe('2026-11-03')
+  })
+
+  it('finds nothing for a new order or an empty ledger', () => {
+    expect(issuedFor(ledger, 'MLYZZZZZZZ')).toBeNull()
+    expect(issuedFor('', 'MLYB2C3D4E')).toBeNull()
   })
 })

@@ -41,14 +41,40 @@ function orderVerdict(answer, { bundleId, productId }) {
   if (signed.length === 0) return { confirmed: false, reason: 'Apple found the order, but it holds no purchases.' }
   const payloads = signed.map(payloadOf)
   const ours = payloads.filter((p) => p && p.bundleId === bundleId && p.productId === productId)
-  const paid = ours.find((p) => !p.revocationDate)
+  const held = ours.filter((p) => !p.revocationDate)
+  // offerType 3 is an offer code: Pro came free from a desktop order, so it
+  // never earns a second desktop key.
+  const paid = held.find((p) => p.offerType !== 3)
   if (paid) {
-    const purchased = new Date(Number(paid.purchaseDate)).toISOString().slice(0, 10)
+    const when = new Date(Number(paid.purchaseDate))
+    const purchased = Number.isNaN(when.getTime()) ? 'an unknown day' : when.toISOString().slice(0, 10)
     return { confirmed: true, reason: `murmur Pro, bought ${purchased}, not refunded.`, purchased, transactionId: String(paid.transactionId) }
+  }
+  if (held.length > 0) {
+    const code = held[0].offerIdentifier ? `the ${held[0].offerIdentifier} code` : 'an offer code'
+    return { confirmed: false, reason: `murmur Pro here was redeemed with ${code}, so it came from a desktop order, which already has its key.` }
   }
   if (ours.length > 0) return { confirmed: false, reason: 'murmur Pro was bought in this order, then refunded.' }
   if (payloads.every((p) => p === null)) return { confirmed: false, reason: 'Apple answered, but its purchases could not be read.' }
   return { confirmed: false, reason: 'This order holds no murmur Pro purchase.' }
 }
 
-module.exports = { orderVerdict, serverToken }
+/** The day a key was already issued for this order id, from the license
+ *  ledger issue-license.js keeps (one JSON line per key), or null. */
+function issuedFor(ledger, orderId) {
+  for (const line of String(ledger).split('\n')) {
+    let entry
+    try {
+      entry = JSON.parse(line)
+    } catch {
+      continue
+    }
+    if (entry && entry.id === orderId) {
+      const when = new Date(Number(entry.at))
+      return Number.isNaN(when.getTime()) ? 'an unknown day' : when.toISOString().slice(0, 10)
+    }
+  }
+  return null
+}
+
+module.exports = { issuedFor, orderVerdict, serverToken }

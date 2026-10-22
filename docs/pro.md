@@ -48,6 +48,8 @@ Yes, either way you buy it. Apple does not let an iPhone app unlock anything wit
 - **Bought Pro on your Mac or PC?** Email support@murmurapp.app with your order id, from the address on your license. You get a one-time App Store code for murmur Pro on iPhone at no cost; on your iPhone, open murmur, tap the gear, then murmur Pro, and tap Redeem a code. Apple's codes last at most 6 months, so ask when you are ready. Founding members get a founders code, so their iPhone shows Founding member too.
 - **Bought Pro on your iPhone?** Email support@murmurapp.app with the order id from Apple's email receipt. Once Apple confirms the purchase, you get a license key for the Mac and Windows app.
 
+(Checked 2026-10-22 against Apple's App Review Guidelines, 3.1.1, and App Store Connect Help on offer codes.)
+
 ## How do license keys work?
 
 Your key is a cryptographic signature that murmur verifies on your machine, offline. There is no licensing server, no account, and no phone-home: if murmur's servers vanished tomorrow, your key would keep working forever. Activate it under Settings, murmur Pro by pasting the key and clicking Activate.
