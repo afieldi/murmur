@@ -174,6 +174,23 @@ export interface Settings {
   onboarding: {
     completed: boolean
   }
+  /** When murmur was installed (US-107), ms since epoch. 0 until main
+   *  records it on the first launch of a build that knows it. */
+  installedAt: number
+  /** murmur Pro's quiet touches (US-107). */
+  pro: {
+    /** Paint the mark each day: the first window open of a day paints
+     *  the header mark in with brush strokes and lifts it close. Off
+     *  keeps the day's brushwork still. */
+    dailyPaint: boolean
+    /** Local day key (YYYY-MM-DD) the daily fill last played on. */
+    lastPaintDay: string
+    /** The once-ever Home offer is answered: See Pro, No thanks, or a
+     *  purchase. It never comes back. */
+    offerDone: boolean
+    /** An activation happened; the next Home visit says thank you once. */
+    thanksPending: boolean
+  }
 }
 
 // This module loads in main AND in sandboxed renderers, where the node
@@ -282,6 +299,13 @@ export const DEFAULT_SETTINGS: Settings = {
   whatsNewSeenVersion: '',
   onboarding: {
     completed: false
+  },
+  installedAt: 0,
+  pro: {
+    dailyPaint: true,
+    lastPaintDay: '',
+    offerDone: false,
+    thanksPending: false
   }
 }
 

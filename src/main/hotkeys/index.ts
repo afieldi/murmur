@@ -81,7 +81,7 @@ function chordProblem(bindingString: string, takenStrings: string[]): ChordProbl
 /**
  * Why a candidate paste-last chord cannot be saved, or null when it
  * can. Checked against the CURRENT dictation binding and note chord at
- * capture time; apply() re-checks on every settings change, so a later
+ * capture time; apply() re-checks whenever a chord changes, so a later
  * dictation rebind that creates a collision just disarms the chord.
  */
 export function pasteBindingProblem(bindingString: string): ChordProblem {
@@ -135,7 +135,22 @@ export interface HotkeyCallbacks extends DictationCallbacks {
   transform?: DictationCallbacks
 }
 
+/** Everything apply() reads. Any other settings write (a Pro mark's day,
+ *  a dismissed line) leaves the chords armed and a live take running;
+ *  re-arming used to stop a take in progress on every save. */
+function chordsKey(settings: Settings): string {
+  return JSON.stringify([
+    settings.hotkey.mode,
+    settings.hotkey.binding,
+    settings.hotkey.pasteLastBinding,
+    settings.notes.binding,
+    settings.transform.binding
+  ])
+}
+let appliedChords = ''
+
 function apply(settings: Settings, callbacks: HotkeyCallbacks): void {
+  appliedChords = chordsKey(settings)
   // A live hold must not leak a stuck recording across a rebind.
   if (machine?.isActive()) callbacks.stop()
   if (noteMachine?.isActive()) callbacks.note?.stop()
@@ -204,7 +219,9 @@ function transformBindingValid(): boolean {
 
 export function initHotkeys(callbacks: HotkeyCallbacks): HotkeysStatus {
   apply(getSettings(), callbacks)
-  onSettingsChanged((settings) => apply(settings, callbacks))
+  onSettingsChanged((settings) => {
+    if (chordsKey(settings) !== appliedChords) apply(settings, callbacks)
+  })
 
   uIOhook.on('keydown', (event) => {
     if (MODIFIER_BY_CODE.has(event.keycode)) heldModifiers.add(event.keycode)

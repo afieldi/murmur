@@ -10,6 +10,33 @@ A one-time purchase that supports murmur's development. The free app is complete
 - Early access: new conveniences unlock for Pro first in official builds, then go free for everyone after a window. The source is public the entire time.
 - Priority support and, if you like, your name in SUPPORTERS.md.
 
+## Where does the Pro mark appear, and what does it mean?
+
+The Pro mark is a small gold pill that says PRO. **Filled means Pro is yours; outlined means Pro offers something there.**
+
+- **With Pro:** a filled mark sits right after the murmur wordmark at the top of the window, before your belt, beside murmur Pro in the settings rail and in the murmur Pro section title, and on the Profiles row under Provider and keys. Founding members wear the same mark, and their Pro section says Founding member.
+- **Without Pro:** an outlined mark appears only where Pro adds something: the Profiles row under Provider and keys, the murmur Pro entry in the rail, and the murmur Pro section title. There is no mark at the top of the window. A deactivated key counts as free until you reactivate it.
+
+Nothing else in the app grows a mark, and Home never shows a standing one.
+
+## What happens to the Pro mark when I open murmur each day?
+
+The first time each day the murmur window opens in front of you, the Pro mark at the top lifts to twice its size, 3 or 4 slashing brush strokes paint its gold in from different angles, and it settles back into place. It takes about 4 seconds, and your belt steps aside while the mark is big. In a narrow window, the mark grows only as far as the room before the tabs. The strokes stay exactly as they landed, dry ends and small gaps showing, as that day's badge; each day's strokes are different, seeded by the date.
+
+- Opening the window again the same day shows today's badge still.
+- A click, a key press, or switching to another app skips straight to the end.
+- Press the mark anytime to see today's strokes painted close up again (with reduce motion on, pressing it does nothing).
+- To turn it off, go to Settings, murmur Pro, and switch off **Paint the mark each day**. Off keeps today's brushwork still.
+- With reduce motion turned on in your system settings, the mark shows the day's finished brushwork with no lift and no animation.
+
+## What happens when I activate Pro?
+
+When Activate or Reactivate succeeds, the outlined marks fill with gold one after another, and the mark at the top arrives with its brush fill (that counts as the day's fill). The next time you open Home, it says thank you, once.
+
+## Will murmur ask me to buy Pro?
+
+Once, quietly. 30 calendar days after you install murmur, Home shows one line under back today with how much time murmur has given you back so far, and two buttons: **See Pro** and **No thanks**. Either one, or buying Pro, dismisses it for good, and it never shows to anyone with a key, active or deactivated. Installs from before murmur kept an install date count from their earliest dictation on record.
+
 ## What is a founding member?
 
 Everyone who buys Pro during the founders window (the FOUNDERS code era) is a founding member forever. Founding members keep a permanent ten percent discount on every future paid product, including the cloud subscription and any paid iOS offering, and their license shows the founding member mark in settings.

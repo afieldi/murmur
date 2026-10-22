@@ -12,6 +12,7 @@ import type {
   SettingsApi
 } from '../../preload/settings'
 import proConfig from '../../../shared/pro.json'
+import { markFor } from '../../shared/proMark'
 import { type ProviderCatalog, costPer1kWords, providerForBaseUrl } from '../../shared/catalog'
 import { DEFAULT_SETTINGS, type Settings } from '../../shared/settings'
 import { type OverlayLook, normalizeOverlayLook } from '../../shared/overlay-state'
@@ -29,6 +30,7 @@ import { TransformPanel } from './TransformPanel'
 import { type RailSection, SettingsRail } from './SettingsRail'
 import { WaveTiles } from './WaveTiles'
 import { Insignia, TabStroke } from './HeaderMarks'
+import { HeaderProMark, ProMark } from './ProMark'
 import { HISTORY_CLEARED } from './HomeView'
 import { FinishSetup, type SetupCheck, setupStatus } from './SetupStatus'
 import {
@@ -228,6 +230,12 @@ export function App(): React.JSX.Element {
   // 2026-09-14: the profiles row cached its own copy from mount and
   // kept selling Get Pro to a fresh founding member).
   const [license, setLicense] = useState<import('../../main/license').LicenseStatus | null>(null)
+  // The moment you buy (US-107): when Activate or Reactivate succeeds,
+  // the outlined marks fill a beat apart and the header mark arrives with
+  // its brush fill. Holds when that happened; 0 means it has not.
+  const [arrival, setArrival] = useState(0)
+  // While the header mark is lifted, the belt steps aside by this much.
+  const [proLift, setProLift] = useState<number | null>(null)
   const [customPreset, setCustomPreset] = useState(false)
   const [perms, setPerms] = useState<PermissionsStatus | null>(null)
   const [hotkeys, setHotkeys] = useState<HotkeysStatus | null>(null)
@@ -351,6 +359,19 @@ export function App(): React.JSX.Element {
   const update = async (partial: Partial<Settings>): Promise<void> => {
     setSettings(await bridge().updateSettings(partial))
     setHotkeys(await bridge().getHotkeysStatus())
+  }
+
+  // Pro's small records change one field at a time from different places
+  // (the header mark, Home, the Pro section), so they send only that
+  // field: the store deep-merges, and two near-simultaneous writes can
+  // never undo each other with a stale copy of the rest.
+  const updatePro = useCallback(async (patch: Partial<Settings['pro']>): Promise<void> => {
+    setSettings(await bridge().updateSettings({ pro: patch } as unknown as Partial<Settings>))
+  }, [])
+
+  const activated = (): void => {
+    setArrival(Date.now())
+    void updatePro({ offerDone: true, thanksPending: true })
   }
 
   useEffect(() => {
@@ -579,6 +600,15 @@ export function App(): React.JSX.Element {
   const failing = (...ids: string[]): boolean =>
     checks.some((c) => ids.includes(c.id) && c.state === 'bad')
 
+  // The outlined marks fill once, a beat apart, right after a purchase.
+  const arriving = arrival > 0 && Date.now() - arrival < 3000
+  const offerMark = markFor('offer', license)
+  // Beside a title that already says murmur Pro, the mark is decorative.
+  const proMark = (beat: 1 | 2 | 3, size?: 'md', decorative?: boolean): React.ReactNode =>
+    offerMark === 'none' ? undefined : (
+      <ProMark state={offerMark} size={size} arriveBeat={arriving ? beat : undefined} decorative={decorative} />
+    )
+
   const railSections: RailSection[] = [
     { id: 'provider', title: 'Provider and keys', group: 'essentials', alert: failing('key', 'conn') },
     { id: 'dictation', title: 'Dictation', group: 'essentials', alert: failing('hotkey') },
@@ -588,7 +618,7 @@ export function App(): React.JSX.Element {
     { id: 'timeback', title: 'Time back and recap', group: 'features' },
     { id: 'look', title: 'Look', group: 'app' },
     { id: 'system', title: 'System', group: 'app', alert: failing('mic', 'axs', 'input') },
-    { id: 'pro', title: 'murmur Pro', group: 'app' }
+    { id: 'pro', title: 'murmur Pro', group: 'app', mark: proMark(1, undefined, true) }
   ]
 
   // The chosen accent recolors data emphasis across the GUI (progress
@@ -632,8 +662,20 @@ export function App(): React.JSX.Element {
       style={guiAccent ? ({ '--gui-accent': guiAccent } as React.CSSProperties) : undefined}
     >
       <header className="masthead" ref={watchMasthead}>
-        <p className="micro-label wordmark">
+        <p
+          className={`micro-label wordmark${proLift !== null ? ' pro-lifting' : ''}`}
+          style={proLift !== null ? ({ '--pro-lift-shift': `${proLift}px` } as React.CSSProperties) : undefined}
+        >
           murmur
+          {markFor('header', license) === 'filled' && (
+            <HeaderProMark
+              enabled={settings.pro.dailyPaint}
+              lastPaintDay={settings.pro.lastPaintDay}
+              onPlayed={(day) => void updatePro({ lastPaintDay: day })}
+              arrival={arrival}
+              onLift={setProLift}
+            />
+          )}
           {insignia && (
             <Insignia belt={insignia.belt} stripes={insignia.stripes} label={insignia.label} founder={insignia.founder} />
           )}
@@ -650,7 +692,19 @@ export function App(): React.JSX.Element {
 
       {page !== 'setup' && (
         <div className="page">
-          {page === 'home' && <HomeView settings={settings} onUpdateSettings={update} />}
+          {page === 'home' && (
+            <HomeView
+              settings={settings}
+              onUpdateSettings={update}
+              license={license}
+              onUpdatePro={updatePro}
+              onSeePro={() => {
+                setPage('setup')
+                // The settings column is hidden until the page switch paints.
+                requestAnimationFrame(() => requestAnimationFrame(() => jumpToRow('row-license-key', { focus: true })))
+              }}
+            />
+          )}
           {page === 'analytics' && <AnalyticsView hotkey={settings.hotkey.binding} />}
           {page === 'wrapup' && <WrapUpView typingWpm={settings.timeBack.typingWpm} hotkey={settings.hotkey.binding} />}
           {page === 'journey' && <JourneyView hotkey={settings.hotkey.binding} accent={guiAccent} />}
@@ -890,6 +944,7 @@ export function App(): React.JSX.Element {
                     })
                 }
                 pro={license === null ? null : license.pro}
+                mark={proMark(2)}
               />
 
               <Row
@@ -1393,8 +1448,19 @@ export function App(): React.JSX.Element {
             </Row>
           </Section>
 
-          <Section id="pro" title="murmur Pro" sub="Your license, verified offline.">
-            <ProSection status={license} onStatus={setLicense} />
+          <Section
+            id="pro"
+            title="murmur Pro"
+            mark={proMark(3, 'md', true)}
+            sub={license && !license.pro && !license.retained ? 'Optional. One time. Verified offline.' : 'Your license, verified offline.'}
+          >
+            <ProSection
+              status={license}
+              onStatus={setLicense}
+              onActivated={activated}
+              dailyPaint={settings.pro.dailyPaint}
+              onUpdatePro={updatePro}
+            />
           </Section>
         </div>
       </div>
@@ -1413,6 +1479,10 @@ export function App(): React.JSX.Element {
 function ProSection(props: {
   status: import('../../main/license').LicenseStatus | null
   onStatus: (s: import('../../main/license').LicenseStatus) => void
+  /** Activate or Reactivate succeeded: the moment you buy. */
+  onActivated: () => void
+  dailyPaint: boolean
+  onUpdatePro: (patch: Partial<Settings['pro']>) => Promise<void>
 }): React.JSX.Element {
   const { status, onStatus: setStatus } = props
   const [draft, setDraft] = useState('')
@@ -1421,21 +1491,34 @@ function ProSection(props: {
   if (!status) return <div />
   if (status.pro) {
     return (
-      <Row
-        label={status.founder ? 'Founding member' : 'Pro is active'}
-        keywords="license key deactivate"
-        desc={`${
-          status.founder
-            ? 'A permanent ten percent discount on every future paid product is yours, cloud included. '
-            : ''
-        }Thank you for supporting free software; belts stay earned, never bought. Supporter since ${new Date(
-          status.since
-        ).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}. Deactivate previews the free experience; your key stays saved here.`}
-      >
-        <button className="btn" onClick={() => void bridge().deactivateLicense().then(setStatus)}>
-          Deactivate
-        </button>
-      </Row>
+      <>
+        <Row
+          label={status.founder ? 'Founding member' : 'Pro is active'}
+          keywords="license key deactivate"
+          desc={`${
+            status.founder
+              ? 'A permanent ten percent discount on every future paid product is yours, cloud included. '
+              : ''
+          }Thank you for supporting free software; belts stay earned, never bought. Supporter since ${new Date(
+            status.since
+          ).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}. Deactivate previews the free experience; your key stays saved here.`}
+        >
+          <button className="btn" onClick={() => void bridge().deactivateLicense().then(setStatus)}>
+            Deactivate
+          </button>
+        </Row>
+        <Row
+          label="Paint the mark each day"
+          keywords="pro mark badge brush strokes animation lift daily"
+          desc="The first time you open murmur each day, brush strokes paint your Pro mark in, lifted close so you can see it, and stay as the day's badge. Off keeps today's brushwork still. Press the mark anytime to see it painted again."
+        >
+          <Switch
+            checked={props.dailyPaint}
+            label="Paint the mark each day"
+            onChange={(next) => void props.onUpdatePro({ dailyPaint: next })}
+          />
+        </Row>
+      </>
     )
   }
 
@@ -1447,7 +1530,17 @@ function ProSection(props: {
         desc="Pro is deactivated, but your key is still saved on this machine. Forget key deletes it; you would need the original key to activate again."
       >
         <div className="inline">
-          <button className="btn btn-primary" onClick={() => void bridge().reactivateLicense().then(setStatus)}>
+          <button
+            className="btn btn-primary"
+            onClick={() =>
+              void bridge()
+                .reactivateLicense()
+                .then((next) => {
+                  setStatus(next)
+                  if (next.pro) props.onActivated()
+                })
+            }
+          >
             Reactivate
           </button>
           <button className="btn btn-remove" onClick={() => void bridge().removeLicense().then(setStatus)}>
@@ -1462,19 +1555,49 @@ function ProSection(props: {
     const next = await bridge().setLicenseKey(draft)
     setStatus(next)
     setRejected(!next.pro)
+    if (next.pro) props.onActivated()
   }
 
+  // The free user's Pro section is one confident block (US-107, LaBroi's
+  // pick from the canvas): why Pro exists, what it adds, the price, and
+  // the key field at the foot. Still a row, so search finds it.
   return (
-    <Row
-      label="License key"
-      keywords="pro buy activate purchase"
-      desc={
-        rejected
-          ? 'That key did not verify. Check for missing characters and try again.'
-          : 'One-time purchase, verified offline, yours forever. Cosmetics stay earned, never bought.'
-      }
-    >
-      <div className="inline">
+    <div className="row pro-offer" id="row-license-key" data-keywords="pro buy activate purchase license key support">
+      <p className="micro-label pro-offer-kicker">murmur pro</p>
+      <div className="row-label pro-offer-head">Keep murmur free for everyone.</div>
+      <p className="row-desc">The free app is complete and stays complete. Pro funds it, with a few extras for you.</p>
+      <ul className="pro-extras">
+        <li>
+          <span className="pro-plus" aria-hidden="true">
+            +
+          </span>
+          <span>
+            Provider profiles <span className="dim">save a setup, switch in one click</span>
+          </span>
+        </li>
+        <li>
+          <span className="pro-plus" aria-hidden="true">
+            +
+          </span>
+          <span>
+            Early access <span className="dim">new conveniences first, then for everyone</span>
+          </span>
+        </li>
+        <li>
+          <span className="pro-plus" aria-hidden="true">
+            +
+          </span>
+          <span>
+            Priority support <span className="dim">and your name in SUPPORTERS.md</span>
+          </span>
+        </li>
+      </ul>
+      {proConfig.buyUrl && (
+        <button className="btn btn-primary pro-buy" onClick={() => void bridge().openBuyPage()}>
+          Get Pro, ${proConfig.price} once
+        </button>
+      )}
+      <div className="pro-keyrow">
         <input
           className="field"
           placeholder="MURMUR-…"
@@ -1484,17 +1607,20 @@ function ProSection(props: {
             setDraft(e.target.value)
             setRejected(false)
           }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && draft.trim().length > 0) void activate()
+          }}
         />
-        <button className="btn btn-primary" onClick={() => void activate()} disabled={draft.trim().length === 0}>
+        <button className="btn" onClick={() => void activate()} disabled={draft.trim().length === 0}>
           Activate
         </button>
-        {proConfig.buyUrl && (
-          <button className="btn" onClick={() => void bridge().openBuyPage()}>
-            Get Pro
-          </button>
-        )}
       </div>
-    </Row>
+      {rejected && (
+        <p className="row-desc pro-rejected" role="alert">
+          That key did not verify. Check for missing characters and try again.
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -1517,6 +1643,8 @@ function ProfilesRow(props: {
   onKeysChanged: () => void
   /** Shared app-level license truth; null while it loads. */
   pro: boolean | null
+  /** The Pro mark beside the label: filled for Pro, outlined as an offer. */
+  mark?: React.ReactNode
 }): React.JSX.Element {
   const pro = props.pro
   const [name, setName] = useState('')
@@ -1528,6 +1656,7 @@ function ProfilesRow(props: {
     return (
       <Row
         label="Profiles"
+        mark={props.mark}
         desc="murmur Pro: save this setup (endpoint and models) under a name and switch providers in one click; each provider's saved key comes along from the key ring."
       >
         {proConfig.buyUrl ? (
@@ -1554,6 +1683,7 @@ function ProfilesRow(props: {
   return (
     <Row
       label="Profiles"
+      mark={props.mark}
       desc="Each profile carries its endpoint and models; applying one swaps the setup and the key ring supplies that provider's key."
     >
       <div className="inline profiles-stack">

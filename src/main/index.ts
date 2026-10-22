@@ -262,6 +262,8 @@ app.whenReady().then(async () => {
   initUpdater()
   const { initLicense } = await import('./license')
   initLicense()
+  const { initInstallDate } = await import('./install')
+  initInstallDate()
   const { initProfiles } = await import('./profiles')
   initProfiles()
   initTranscribe()
