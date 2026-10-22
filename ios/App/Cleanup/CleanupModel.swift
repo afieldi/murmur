@@ -8,7 +8,7 @@ import MurmurCore
 
 @Observable @MainActor final class CleanupModel {
     private(set) var settings: CleanupSettings
-    /// The model polish uses, as the Provider screen set it.
+    /// The model polish will use (CleanupModel.modelPolishUses).
     let polishModel: String
     @ObservationIgnored private let store: CleanupStore
 

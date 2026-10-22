@@ -70,11 +70,20 @@ struct CleanupScreen: View {
 }
 
 extension CleanupModel {
-    /// The real screen: saved settings, and the cleanup model the Provider
-    /// screen chose.
+    /// The real screen: saved settings, and the model polish will use.
     static func live() -> CleanupModel {
-        let model = (try? BundledRules.catalog()).map { ConnectionStore().load(catalog: $0).cleanupModel } ?? ""
+        let ring = KeychainKeyRing()
+        let model = (try? BundledRules.catalog()).map {
+            modelPolishUses(ConnectionStore().load(catalog: $0), key: { (try? ring.key(for: $0)) ?? nil })
+        } ?? ""
         return CleanupModel(store: CleanupStore(), polishModel: model)
+    }
+
+    /// The model polish will really use, by desktop's resolvePolishConnection:
+    /// the separate cleanup provider's only when it has its own key, else the
+    /// transcription provider's; empty with no key, so the line names none.
+    static func modelPolishUses(_ connection: ConnectionSettings, key: (String) -> APIKey?) -> String {
+        connection.polishConnection(key: key)?.model ?? ""
     }
 }
 

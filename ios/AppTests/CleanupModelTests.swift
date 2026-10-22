@@ -43,6 +43,24 @@ import Testing
         model.level = .off
         #expect(CleanupStore(defaults: defaults).load().dictionary == entries)
     }
+
+    /// The Polish line names the model polish really uses, by desktop's
+    /// resolvePolishConnection: a separate cleanup provider without its own
+    /// key rides the transcription provider's model, and with no key at all
+    /// the line names no model.
+    @Test func thePolishLineNamesTheModelPolishUses() throws {
+        var connection = ConnectionSettings(defaultsFrom: try BundledRules.catalog())
+        connection.transcription.llmModel = "openai/gpt-oss-120b"
+        connection.cleanup.separate = true
+        connection.cleanup.baseUrl = "https://api.deepseek.com/v1"
+        connection.cleanup.llmModel = "deepseek-chat"
+        let groq = connection.transcription.baseUrl
+        let groqKey = try #require(APIKey("gsk_groqgroq1111"))
+        let deepseekKey = try #require(APIKey("sk-deepseekdeep1"))
+        #expect(CleanupModel.modelPolishUses(connection, key: { $0 == groq ? groqKey : nil }) == "openai/gpt-oss-120b")
+        #expect(CleanupModel.modelPolishUses(connection, key: { $0 == groq ? groqKey : deepseekKey }) == "deepseek-chat")
+        #expect(CleanupModel.modelPolishUses(connection, key: { _ in nil }) == "")
+    }
 }
 
 @Suite struct CleanupCopyTests {
