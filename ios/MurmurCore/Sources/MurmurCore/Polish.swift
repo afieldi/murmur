@@ -25,6 +25,16 @@ public struct PolishRules: Decodable, Sendable, Equatable {
         public let perCue: Int
     }
 
+    /// How far an answer may stray from the speech before it is an answer
+    /// to the dictation, not a cleanup of it (IOS-032): more than slack
+    /// words and more than these shares of the answer's words new, or of
+    /// the speech's words dropped.
+    public struct Answer: Decodable, Sendable, Equatable {
+        public let slack: Int
+        public let addedShare: Double
+        public let droppedShare: Double
+    }
+
     public let systemPrompt: [String]
     public let smartListsPrompt: [String]
     public let correctionsPrompt: [String]
@@ -41,6 +51,11 @@ public struct PolishRules: Decodable, Sendable, Equatable {
     public let hintLead: String
     public let hintSentinel: String
     public let length: Length
+    public let answer: Answer
+    /// The marks that end a question.
+    public let questionMarks: String
+    /// Spoken number words a cleanup may write as digits.
+    public let numberWords: [String]
     public let temperature: Double
     public let timeoutMs: Int
 }
@@ -115,6 +130,11 @@ public enum Polish {
         if SpeechGate.isHallucination(lastSentence(text), phrases: hallucinations.phrases),
            !SpeechGate.isHallucination(lastSentence(input), phrases: hallucinations.phrases) {
             return .reject("appended chatter")
+        }
+
+        // An answer to the dictation, not a cleanup of it (IOS-032).
+        if isAnswer(input, countable, text, cutEarned: earnedListFloor || earnedCorrectionFloor, rules: rules) {
+            return .reject("answered")
         }
         return .keep(text)
     }
@@ -329,6 +349,65 @@ public enum Polish {
             return rest.count > cue.count && rest.starts(with: cue) && pause.contains(rest[cue.count])
                 && !after.unicodeScalars.contains(where: isLetterOrNumber)
         }
+    }
+
+    /// Desktop's isAnswer: a model that answered the dictation instead of
+    /// cleaning it up says words the speaker never did, leaves out most of
+    /// what they said, or turns their question into a statement. Words are
+    /// counted as a multiset; spoken numbers written as digits (a word with
+    /// an ASCII digit added while a numberWords word was dropped) count on
+    /// neither side. The live probe set the numbers (IOS-032).
+    static func isAnswer(_ input: String, _ answer: String, _ text: String, cutEarned: Bool, rules: PolishRules) -> Bool {
+        let said = spokenWords(input)
+        let kept = spokenWords(answer)
+        let saidCounts = wordCounts(said)
+        let keptCounts = wordCounts(kept)
+        var added = 0
+        var addedDigits = 0
+        for (word, count) in keptCounts {
+            let extra = count - saidCounts[word, default: 0]
+            guard extra > 0 else { continue }
+            added += extra
+            if word.contains(where: { (0x30...0x39).contains($0) }) { addedDigits += extra }
+        }
+        let numbers = Set(rules.numberWords.map { Array($0.utf16) })
+        var dropped = 0
+        var droppedNumbers = 0
+        for (word, count) in saidCounts {
+            let missing = count - keptCounts[word, default: 0]
+            guard missing > 0 else { continue }
+            dropped += missing
+            if isNumberWord(word, numbers) { droppedNumbers += missing }
+        }
+        if addedDigits > 0 && droppedNumbers > 0 {
+            added -= addedDigits
+            dropped -= droppedNumbers
+        }
+        let slack = Double(rules.answer.slack)
+        let addedLimit = max(slack, rules.answer.addedShare * Double(kept.count))
+        let droppedLimit = max(slack, rules.answer.droppedShare * Double(said.count))
+        return Double(added) > addedLimit
+            || (!cutEarned && Double(dropped) > droppedLimit)
+            || (questionMarks(input, rules) > questionMarks(text, rules) && added + dropped > 0)
+    }
+
+    /// A numberWords word, or one whose hyphen-separated parts all are
+    /// (twenty-first), as desktop splits it.
+    private static func isNumberWord(_ word: [UInt16], _ numbers: Set<[UInt16]>) -> Bool {
+        word.split(separator: 0x2D, omittingEmptySubsequences: false).allSatisfy { numbers.contains(Array($0)) }
+    }
+
+    private static func wordCounts(_ words: [[UInt16]]) -> [[UInt16]: Int] {
+        var counts: [[UInt16]: Int] = [:]
+        for word in words { counts[word, default: 0] += 1 }
+        return counts
+    }
+
+    /// How many questionMarks characters the text holds, counted by code
+    /// point as desktop does.
+    private static func questionMarks(_ value: String, _ rules: PolishRules) -> Int {
+        let marks = Set(rules.questionMarks.unicodeScalars)
+        return value.unicodeScalars.filter { marks.contains($0) }.count
     }
 
     /// Every answer word was spoken, each no more often than it was.

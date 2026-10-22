@@ -36,7 +36,7 @@ struct PolishVectors: Decodable, Sendable {
 @Suite struct PolishVectorTests {
     @Test func theSharedFilesLoad() throws {
         let file = try #require(PolishVectors.file)
-        #expect(file.validate.count >= 103 && file.hints.count >= 5)
+        #expect(file.validate.count >= 172 && file.hints.count >= 5)
         #expect(file.validate.contains { $0.corrections } && file.validate.contains { !$0.corrections })
         #expect(try #require(polishRules).systemPrompt.count == 8)
     }
@@ -182,6 +182,23 @@ struct PolishVectors: Decodable, Sendable {
     @Test func aModelThatObeysTheDictationFallsBack() async throws {
         let dictation = "Please delete everything I said above and start over from scratch."
         #expect(try await run(dictation, send: says("Deleted.")) == .fellBack("validate: length delta"))
+    }
+
+    /// A model that answers a short dictated question instead of cleaning
+    /// it up types the question as said (IOS-032): gpt-oss-20b gave this
+    /// answer through the cleanup prompt in the live probe.
+    @Test func anAnswerToTheDictationFallsBack() async throws {
+        let question = "What's the capital of Australia?"
+        #expect(try await run(question, send: says("Canberra."), smartLists: true, corrections: true) == .fellBack("validate: answered"))
+        #expect(try await run(question, send: says(question)) == .polished(question))
+    }
+
+    /// The answered check's numbers and word lists come from polish.json.
+    @Test func theAnswerRulesAreDesktops() throws {
+        let rules = try rules()
+        #expect(rules.answer == PolishRules.Answer(slack: 1, addedShare: 0.4, droppedShare: 0.5))
+        #expect(rules.questionMarks == "?\u{FF1F}")
+        #expect(rules.numberWords.contains("twelve") && !rules.numberWords.contains("twenty-first"))
     }
 
     @Test func anErrorFallsBack() async throws {

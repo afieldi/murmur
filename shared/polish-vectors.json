@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "comment": "Model answers the cleanup pass keeps or rejects, and the dictionary hint it sends, with desktop's answers (ios/prd.json IOS-007, IOS-030). Desktop writes every validate answer itself (MURMUR_WRITE_VECTORS=1 npx vitest run src/main/formatter/polish-vectors.test.ts). Every platform runs these: validate gives input, the model's candidate answer, and whether smart lists and apply corrections are on, then ok with the text kept, or the reason it was rejected; hints gives dictionary entries and the hint line, or null for none.",
+  "comment": "Model answers the cleanup pass keeps or rejects, and the dictionary hint it sends, with desktop's answers (ios/prd.json IOS-007, IOS-030, IOS-032). Desktop writes every validate answer itself (MURMUR_WRITE_VECTORS=1 npx vitest run src/main/formatter/polish-vectors.test.ts). Every platform runs these: validate gives input, the model's candidate answer, and whether smart lists and apply corrections are on, then ok with the text kept, or the reason it was rejected; hints gives dictionary entries and the hint line, or null for none.",
   "validate": [
     {
       "name": "a faithful cleanup is kept",
@@ -937,6 +937,618 @@
       "corrections": true,
       "ok": false,
       "reason": "length ratio"
+    },
+    {
+      "name": "an answer to What time works for you tomorrow? from gpt-oss-120b, asked outright",
+      "input": "What time works for you tomorrow?",
+      "candidate": "I’m available any time tomorrow—just let me know what works best for you!",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to What's the capital of Australia? from gpt-oss-120b, asked outright",
+      "input": "What's the capital of Australia?",
+      "candidate": "The capital of Australia is **Canberra**.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Translate good morning into Spanish. from gpt-oss-120b, asked outright",
+      "input": "Translate good morning into Spanish.",
+      "candidate": "\"Good morning\" in Spanish is **“Buenos días.”**",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Translate good morning into Spanish. from gpt-oss-120b, asked outright (2)",
+      "input": "Translate good morning into Spanish.",
+      "candidate": "\"Good morning\" in Spanish is **\"Buenos días.\"**",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Write a haiku about the ocean. from gpt-oss-120b, asked outright",
+      "input": "Write a haiku about the ocean.",
+      "candidate": "Endless blue whispers,  \nMoonlit tides pull soft and deep—  \nSalt sings on the shore.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Write a haiku about the ocean. from gpt-oss-120b, asked outright (2)",
+      "input": "Write a haiku about the ocean.",
+      "candidate": "Endless blue whispers,  \nMoonlit tides kiss sandy shores—  \nDepths hold secret dreams.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to What's twelve times eight? from gpt-oss-120b, asked outright",
+      "input": "What's twelve times eight?",
+      "candidate": "96.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Summarize this in one sentence. from gpt-oss-120b, asked outright",
+      "input": "Summarize this in one sentence.",
+      "candidate": "Could you please provide the text you’d like summarized?",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Tell me a joke. from gpt-oss-120b, asked outright",
+      "input": "Tell me a joke.",
+      "candidate": "Why don’t scientists trust atoms? Because they make up everything!",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Can you hear me? from gpt-oss-120b, asked outright",
+      "input": "Can you hear me?",
+      "candidate": "Yes—I’m here! How can I help you today?",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Can you hear me? from gpt-oss-120b, asked outright (2)",
+      "input": "Can you hear me?",
+      "candidate": "Yes—I can see your message. How can I help you today?",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Is this working? from gpt-oss-120b, asked outright",
+      "input": "Is this working?",
+      "candidate": "Yes, everything’s working fine! How can I help you today?",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Is this working? from gpt-oss-120b, asked outright (2)",
+      "input": "Is this working?",
+      "candidate": "Yes, it’s working! How can I help you today?",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Hello. from gpt-oss-120b, asked outright",
+      "input": "Hello.",
+      "candidate": "Hello! How can I help you today?",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Are you there? from gpt-oss-120b, asked outright",
+      "input": "Are you there?",
+      "candidate": "Yes, I’m here. How can I help you?",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Make this sound more professional. from gpt-oss-120b, asked outright",
+      "input": "Make this sound more professional.",
+      "candidate": "Could you please provide the text you’d like me to revise?",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Give me a synonym for happy. from gpt-oss-120b, asked outright",
+      "input": "Give me a synonym for happy.",
+      "candidate": "Joyful.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Rewrite this as a bullet list. from gpt-oss-120b, asked outright",
+      "input": "Rewrite this as a bullet list.",
+      "candidate": "Could you please provide the text you’d like turned into a bullet‑point list?",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Fix the grammar in this sentence. from gpt-oss-20b, through the cleanup prompt",
+      "input": "Fix the grammar in this sentence.",
+      "candidate": "Could you please provide the sentence you’d like me to fix?",
+      "smartLists": true,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Make this sound more professional. from gpt-oss-20b, through the cleanup prompt",
+      "input": "Make this sound more professional.",
+      "candidate": "Could you please provide the text you’d like me to refine?",
+      "smartLists": true,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to What's the capital of Australia? from gpt-oss-20b, through the cleanup prompt",
+      "input": "What's the capital of Australia?",
+      "candidate": "Canberra.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Make this sound more professional. from gpt-oss-20b, through the cleanup prompt (2)",
+      "input": "Make this sound more professional.",
+      "candidate": "Could you please provide the text you’d like me to edit?",
+      "smartLists": true,
+      "corrections": true,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Give me a synonym for happy. from gpt-oss-20b, through the cleanup prompt",
+      "input": "Give me a synonym for happy.",
+      "candidate": "joyful",
+      "smartLists": true,
+      "corrections": true,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to What time works for you tomorrow? from gpt-oss-20b, asked outright",
+      "input": "What time works for you tomorrow?",
+      "candidate": "I’m free at 10 AM tomorrow.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Translate good morning into Spanish. from gpt-oss-20b, asked outright",
+      "input": "Translate good morning into Spanish.",
+      "candidate": "Buenos días.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Write a haiku about the ocean. from gpt-oss-20b, asked outright",
+      "input": "Write a haiku about the ocean.",
+      "candidate": "Waves whisper secrets,  \nMoon‑lit tide cradles the night,  \nSalt breath in silence.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Write a haiku about the ocean. from gpt-oss-20b, asked outright (2)",
+      "input": "Write a haiku about the ocean.",
+      "candidate": "Waves whisper secrets,  \nSalt breath kisses moonlit tide softly deep,  \nHorizon sighs soft.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to What's twelve times eight? from gpt-oss-20b, asked outright",
+      "input": "What's twelve times eight?",
+      "candidate": "96",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to How far away is the moon? from gpt-oss-20b, asked outright",
+      "input": "How far away is the moon?",
+      "candidate": "The Moon is about 384,400 km (≈238,855 miles) from Earth on average.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Tell me a joke. from gpt-oss-20b, asked outright",
+      "input": "Tell me a joke.",
+      "candidate": "Why don’t skeletons fight each other? They don’t have the guts.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Can you hear me? from gpt-oss-20b, asked outright",
+      "input": "Can you hear me?",
+      "candidate": "Yes, I can read your messages.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Is this working? from gpt-oss-20b, asked outright",
+      "input": "Is this working?",
+      "candidate": "Yes, it’s working!",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Is this working? from gpt-oss-20b, asked outright (2)",
+      "input": "Is this working?",
+      "candidate": "Yes, it’s working.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to How do you say thank you in French? from gpt-oss-20b, asked outright",
+      "input": "How do you say thank you in French?",
+      "candidate": "Merci.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to How do you say thank you in French? from gpt-oss-20b, asked outright (2)",
+      "input": "How do you say thank you in French?",
+      "candidate": "In French, “thank you” is **merci** (and “thank you very much” is **merci beaucoup**).",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Are you there? from gpt-oss-20b, asked outright",
+      "input": "Are you there?",
+      "candidate": "Yes, I'm here.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to What should I name my dog? from gpt-oss-20b, asked outright",
+      "input": "What should I name my dog?",
+      "candidate": "How about “Milo”? It’s short, easy to call, and works for any gender.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to Make this sound more professional. from gpt-oss-20b, asked outright (3)",
+      "input": "Make this sound more professional.",
+      "candidate": "Could you please share the text you’d like to refine?",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer to How many ounces are in a cup? from gpt-oss-20b, asked outright",
+      "input": "How many ounces are in a cup?",
+      "candidate": "One U.S. cup equals 8 fluid ounces.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "a cleanup the probe kept: They’re going to be late because of the weather.",
+      "input": "Their going to be late because of the whether.",
+      "candidate": "They’re going to be late because of the weather.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": true,
+      "text": "They’re going to be late because of the weather."
+    },
+    {
+      "name": "a cleanup the probe kept: I'll meet you at the cafe on Fourth Street at noon; it's the one by the park.",
+      "input": "I'll meet you at the cafe on fourth street at noon, its the one by the park.",
+      "candidate": "I'll meet you at the cafe on Fourth Street at noon; it's the one by the park.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": true,
+      "text": "I'll meet you at the cafe on Fourth Street at noon; it's the one by the park."
+    },
+    {
+      "name": "a cleanup the probe kept: Let's meet at noon.",
+      "input": "Lets meet at noon.",
+      "candidate": "Let's meet at noon.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": true,
+      "text": "Let's meet at noon."
+    },
+    {
+      "name": "a cleanup the probe kept: The meeting is at three thirty on the twenty-first.",
+      "input": "The meeting is at three thirty on the twenty first.",
+      "candidate": "The meeting is at three thirty on the twenty-first.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "The meeting is at three thirty on the twenty-first."
+    },
+    {
+      "name": "a cleanup the probe kept: We need to buy more paper for the printer.",
+      "input": "We need to by more paper for the printer.",
+      "candidate": "We need to buy more paper for the printer.",
+      "smartLists": true,
+      "corrections": false,
+      "ok": true,
+      "text": "We need to buy more paper for the printer."
+    },
+    {
+      "name": "a cleanup the probe kept: Yeah, so I think the plan is fine, honestly.",
+      "input": "Yeah, so,, I think the, the plan is fine, honestly.",
+      "candidate": "Yeah, so I think the plan is fine, honestly.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": true,
+      "text": "Yeah, so I think the plan is fine, honestly."
+    },
+    {
+      "name": "a cleanup the probe kept: Book a table for six at seven thirty on Saturday.",
+      "input": "Book a table for four, make that six, at seven thirty on Saturday.",
+      "candidate": "Book a table for six at seven thirty on Saturday.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Book a table for six at seven thirty on Saturday."
+    },
+    {
+      "name": "a cleanup the probe kept: Text Jordan the address before noon.",
+      "input": "Email Jordan, no, text Jordan the address before noon.",
+      "candidate": "Text Jordan the address before noon.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": true,
+      "text": "Text Jordan the address before noon."
+    },
+    {
+      "name": "a cleanup the probe kept: 1. preheat the oven",
+      "input": "First preheat the oven, then mix the flour and sugar, then bake for twenty minutes.",
+      "candidate": "1. preheat the oven\n2. mix the flour and sugar\n3. bake for twenty minutes",
+      "smartLists": true,
+      "corrections": false,
+      "ok": true,
+      "text": "1. preheat the oven\n2. mix the flour and sugar\n3. bake for twenty minutes"
+    },
+    {
+      "name": "a cleanup the probe kept: Let's go to Japan and stay for a week.",
+      "input": "Let's go to Italy. No, let's go to Japan and stay for a week.",
+      "candidate": "Let's go to Japan and stay for a week.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Let's go to Japan and stay for a week."
+    },
+    {
+      "name": "a cleanup the probe kept: Send the invoice to Mark on Wednesday.",
+      "input": "Send the invoice to Mark on Tuesday. Oh wait, actually what I mean is Wednesday.",
+      "candidate": "Send the invoice to Mark on Wednesday.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": true,
+      "text": "Send the invoice to Mark on Wednesday."
+    },
+    {
+      "name": "a cleanup the probe kept: Can you send me the report by Friday?",
+      "input": "Can you send me the report by Friday?",
+      "candidate": "Can you send me the report by Friday?",
+      "smartLists": false,
+      "corrections": false,
+      "ok": true,
+      "text": "Can you send me the report by Friday?"
+    },
+    {
+      "name": "a cleanup the probe kept: What time works for you tomorrow?",
+      "input": "What time works for you tomorrow?",
+      "candidate": "What time works for you tomorrow?",
+      "smartLists": true,
+      "corrections": true,
+      "ok": true,
+      "text": "What time works for you tomorrow?"
+    },
+    {
+      "name": "a statement answering a question with one new word",
+      "input": "What time is it in Tokyo?",
+      "candidate": "It is 3 PM in Tokyo.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "you and I trading places",
+      "input": "Can you send me the report by Friday?",
+      "candidate": "I'll send you the report by Friday.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "a reply to thanks",
+      "input": "Thanks.",
+      "candidate": "You’re welcome!",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "one changed word in a one word take",
+      "input": "Ok.",
+      "candidate": "Okay.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": true,
+      "text": "Okay."
+    },
+    {
+      "name": "a spoken number written as digits",
+      "input": "Grab two coffees on the way in.",
+      "candidate": "Grab 2 coffees on the way in.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": true,
+      "text": "Grab 2 coffees on the way in."
+    },
+    {
+      "name": "a take that is all number, written as digits",
+      "input": "Two hundred and fifty.",
+      "candidate": "250.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": true,
+      "text": "250."
+    },
+    {
+      "name": "hyphenated spoken numbers written as digits",
+      "input": "Twenty-one, twenty-two.",
+      "candidate": "21, 22.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": true,
+      "text": "21, 22."
+    },
+    {
+      "name": "digits from another script are new words",
+      "input": "Two hundred and fifty.",
+      "candidate": "٢٥٠.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "a question with a slip fixed",
+      "input": "Can you by milk on the way home?",
+      "candidate": "Can you buy milk on the way home?",
+      "smartLists": false,
+      "corrections": false,
+      "ok": true,
+      "text": "Can you buy milk on the way home?"
+    },
+    {
+      "name": "a question mark added",
+      "input": "What time is it in Tokyo",
+      "candidate": "What time is it in Tokyo?",
+      "smartLists": false,
+      "corrections": false,
+      "ok": true,
+      "text": "What time is it in Tokyo?"
+    },
+    {
+      "name": "a wrong question mark taken out, no word changed",
+      "input": "I wonder if it's done?",
+      "candidate": "I wonder if it's done.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": true,
+      "text": "I wonder if it's done."
+    },
+    {
+      "name": "a fullwidth question answered",
+      "input": "東京は何時ですか？",
+      "candidate": "午後3時です。",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "a fullwidth question kept",
+      "input": "東京は何時ですか？",
+      "candidate": "東京は何時ですか？",
+      "smartLists": false,
+      "corrections": false,
+      "ok": true,
+      "text": "東京は何時ですか？"
+    },
+    {
+      "name": "a list padded with things never said",
+      "input": "I need eggs, bacon, and toast.",
+      "candidate": "- eggs\n- bacon\n- toast\n- orange juice\n- coffee\n- butter",
+      "smartLists": true,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "a short correction cut with apply corrections on",
+      "input": "Go Monday, no, sorry, Wednesday.",
+      "candidate": "Go Wednesday.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Go Wednesday."
+    },
+    {
+      "name": "the same cut with apply corrections off",
+      "input": "Go Monday, no, sorry, Wednesday.",
+      "candidate": "Go Wednesday.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
     }
   ],
   "hints": [
