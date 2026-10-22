@@ -66,6 +66,10 @@ Build 500 (TestFlight 8, uploaded 2026-10-19, the fix from LaBroi's first IOS-03
 
 > New in this build: Apply corrections now catches a No that takes back the sentence before it. Say Let's go to Italy. No, let's go to Japan and stay for a week, and only Let's go to Japan and stay for a week is typed. A plain No, like the answer to a question, stays as you said it. To try it: Settings, Cleanup, with Cleanup level Full and Polish on, turn on Apply corrections under Smart lists. Everything from build 493 still applies. If something goes wrong, Settings, Diagnostics, Save report makes a report you can read and then share.
 
+Build 530 (TestFlight 9, uploaded 2026-10-22, IOS-031 the live pill and IOS-032 a dictated question comes back as your question, with IOS-007's model line; set the same way). The first try hung inside altool's validation for an hour after App Store Connect answered 502, and nothing was sent; the same checked ipa went up on the second try:
+
+> New in this build: a live pill. Tap the microphone, and under the record button the pill sits still in the waveform you chose in Settings, Look. Start a take and it lights up and moves with your voice; stop, and it dries while your words are transcribed. New note does the same. Also new: a dictated question comes back as your question. If the cleanup model replies to what you said instead of cleaning it up (Canberra. for What's the capital of Australia?), murmur types your formatted words. To try it: Settings, Cleanup, with Cleanup level Full and Polish on, then dictate What time works for you tomorrow? The Cleanup screen's Polish line now names the cleanup model you picked. Everything from build 500 still applies. If something goes wrong, Settings, Diagnostics, Save report makes a report you can read and then share.
+
 ## Internal testing
 
 - The internal group is murmur team, with lbwalton@gmail.com in it (IOS-004). In App Store Connect, murmur voice dictation, TestFlight, Internal Testing, murmur team: if automatic distribution is on, each processed build joins the group by itself. If the new build is not listed under Builds, click the plus next to Builds and add it.
