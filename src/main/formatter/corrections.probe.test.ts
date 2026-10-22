@@ -100,6 +100,14 @@ const CASES: ProbeCase[] = [
     keep: ['text jordan the address before noon'],
     drop: ['email']
   },
+  // Added 2026-10-22 (IOS-032's review gate): a question asked again,
+  // corrected, so the answered check is seen to keep a corrected question.
+  {
+    text: 'Can we meet Monday? Sorry, I mean can we meet Tuesday?',
+    keep: ['can we meet tuesday'],
+    drop: ['monday']
+  },
+  { text: 'Is the call at two? Wait, is it at three?', keep: ['call at three'], drop: ['two'] },
   // Added 2026-10-19 from LaBroi's iPhone check (IOS-030): a bare No that
   // opens the next sentence and says the plan again was fixed 3 to 5
   // times in 10. The prompt's train to Boston example mirrors his
@@ -226,11 +234,19 @@ async function measure(corrections: boolean): Promise<{ fixed: number; kept: num
         answer = json?.choices?.[0]?.message?.content ?? ''
         return response
       }
-      const polished = await polishTranscript(
-        probe.text,
-        { baseUrl: BASE_URL, model: MODEL, apiKey: KEY },
-        { fetchImpl: recording, timeoutMs: 30_000, smartLists: SMART_LISTS, corrections, onFallback: (reason) => (fallback = reason) }
-      )
+      // A provider's rate limit is not the model's answer: wait and ask
+      // again (IOS-032), so every correction is judged.
+      let polished: string | null = null
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        fallback = ''
+        polished = await polishTranscript(
+          probe.text,
+          { baseUrl: BASE_URL, model: MODEL, apiKey: KEY },
+          { fetchImpl: recording, timeoutMs: 30_000, smartLists: SMART_LISTS, corrections, onFallback: (reason) => (fallback = reason) }
+        )
+        if (fallback !== 'http 429') break
+        await new Promise((resolve) => setTimeout(resolve, 3000 * attempt))
+      }
       // A fallback types the formatted text unchanged, so grade that.
       results.push({ probe, typed: polished ?? probe.text, fallback, answer })
     }

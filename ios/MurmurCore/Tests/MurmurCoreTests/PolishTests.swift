@@ -36,7 +36,7 @@ struct PolishVectors: Decodable, Sendable {
 @Suite struct PolishVectorTests {
     @Test func theSharedFilesLoad() throws {
         let file = try #require(PolishVectors.file)
-        #expect(file.validate.count >= 172 && file.hints.count >= 5)
+        #expect(file.validate.count >= 187 && file.hints.count >= 5)
         #expect(file.validate.contains { $0.corrections } && file.validate.contains { !$0.corrections })
         #expect(try #require(polishRules).systemPrompt.count == 8)
     }
@@ -197,7 +197,7 @@ struct PolishVectors: Decodable, Sendable {
     @Test func theAnswerRulesAreDesktops() throws {
         let rules = try rules()
         #expect(rules.answer == PolishRules.Answer(slack: 1, addedShare: 0.4, droppedShare: 0.5))
-        #expect(rules.questionMarks == "?\u{FF1F}")
+        #expect(rules.questionMarks == "?\u{FF1F}\u{061F}\u{FE56}\u{2047}\u{203D}")
         #expect(rules.numberWords.contains("twelve") && !rules.numberWords.contains("twenty-first"))
     }
 

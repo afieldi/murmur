@@ -78,6 +78,9 @@ import Testing
         let line = CleanupCopy.polish(model: "m")
         #expect(!line.contains("anything but your words"))
         #expect(line.contains("much longer or shorter"))
+        // IOS-032: polish now catches a reply to the dictation too, and the
+        // line says what the check sees, a reply's look (review gate).
+        #expect(line.contains("looks like a reply to what you said"))
     }
 
     /// Apply corrections says what it does in desktop's words, and with

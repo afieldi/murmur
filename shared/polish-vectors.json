@@ -1547,6 +1547,141 @@
       "candidate": "Go Wednesday.",
       "smartLists": false,
       "corrections": false,
+      "ok": true,
+      "text": "Go Wednesday."
+    },
+    {
+      "name": "a corrected question with apply corrections on",
+      "input": "Can we meet Monday? Sorry, I mean can we meet Tuesday?",
+      "candidate": "Can we meet Tuesday?",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "Can we meet Tuesday?"
+    },
+    {
+      "name": "a corrected question with apply corrections off",
+      "input": "Can we meet Monday? Sorry, I mean can we meet Tuesday?",
+      "candidate": "Can we meet Tuesday?",
+      "smartLists": false,
+      "corrections": false,
+      "ok": true,
+      "text": "Can we meet Tuesday?"
+    },
+    {
+      "name": "a question corrected after a wait",
+      "input": "Is the call at two? Wait, is it at three?",
+      "candidate": "Is the call at three?",
+      "smartLists": true,
+      "corrections": true,
+      "ok": true,
+      "text": "Is the call at three?"
+    },
+    {
+      "name": "a sum computed from two spoken numbers",
+      "input": "Calculate twelve times eight.",
+      "candidate": "96.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "a sum computed from numbers joined by and",
+      "input": "Add five and seven.",
+      "candidate": "12.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "spoken numbers in two runs written as digits",
+      "input": "We need two hundred and fifty chairs and forty tables for the event.",
+      "candidate": "We need 250 chairs and 40 tables for the event.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": true,
+      "text": "We need 250 chairs and 40 tables for the event."
+    },
+    {
+      "name": "a time and a date written as digits",
+      "input": "The meeting is at three thirty on the twenty first.",
+      "candidate": "The meeting is at 3:30 on the 21st.",
+      "smartLists": false,
+      "corrections": true,
+      "ok": true,
+      "text": "The meeting is at 3:30 on the 21st."
+    },
+    {
+      "name": "the same number spoken twice, written as digits",
+      "input": "Grab two coffees and two teas.",
+      "candidate": "Grab 2 coffees and 2 teas.",
+      "smartLists": true,
+      "corrections": false,
+      "ok": true,
+      "text": "Grab 2 coffees and 2 teas."
+    },
+    {
+      "name": "a yes after the question",
+      "input": "Are you free tomorrow?",
+      "candidate": "Are you free tomorrow? Yes.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "a sum after the question",
+      "input": "What is two plus two?",
+      "candidate": "What is 2 plus 2? 4.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "an answer sentence after the question",
+      "input": "Do you know when the meeting starts today?",
+      "candidate": "Do you know when the meeting starts today? It starts at noon.",
+      "smartLists": true,
+      "corrections": true,
+      "ok": false,
+      "reason": "answered"
+    },
+    {
+      "name": "a take that ends in two questions",
+      "input": "Is it done? Is it ready?",
+      "candidate": "Is it done? Is it ready?",
+      "smartLists": false,
+      "corrections": false,
+      "ok": true,
+      "text": "Is it done? Is it ready?"
+    },
+    {
+      "name": "a question inside a quote at the end",
+      "input": "Did he say \"go?\"",
+      "candidate": "Did he say, \"go?\"",
+      "smartLists": false,
+      "corrections": false,
+      "ok": true,
+      "text": "Did he say, \"go?\""
+    },
+    {
+      "name": "a question mid take losing its mark to a slip fix",
+      "input": "So I was wondering if you could send me the deck? Also their going to need the numbers by Friday.",
+      "candidate": "So I was wondering if you could send me the deck. Also, they're going to need the numbers by Friday.",
+      "smartLists": false,
+      "corrections": false,
+      "ok": true,
+      "text": "So I was wondering if you could send me the deck. Also, they're going to need the numbers by Friday."
+    },
+    {
+      "name": "an Arabic question answered",
+      "input": "ما هذا؟",
+      "candidate": "هذا كتاب.",
+      "smartLists": false,
+      "corrections": false,
       "ok": false,
       "reason": "answered"
     }

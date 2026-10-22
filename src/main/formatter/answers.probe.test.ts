@@ -14,11 +14,13 @@
 // the same model to answer each question outright (so the check is
 // measured against real answers even when the cleanup prompt holds),
 // and MURMUR_PROBE_OUT to write every answer to a JSON file.
-import { writeFileSync } from 'node:fs'
+// MURMUR_PROBE_REPLAY=<file>,<file> re-judges answers such files hold
+// through the current rule and grading, with no key and no calls.
+import { readFileSync, writeFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import formatSpec from '../../../shared/format-spec.json'
 import { type FormatSpec, formatTranscript } from '../../shared/formatter'
-import { polishTranscript } from './llm'
+import { polishTranscript, validatePolish } from './llm'
 
 const KEY = process.env.MURMUR_PROBE_KEY ?? ''
 const BASE_URL = process.env.MURMUR_PROBE_BASE_URL ?? 'https://api.groq.com/openai/v1'
@@ -27,6 +29,7 @@ const RUNS = Number(process.env.MURMUR_PROBE_RUNS ?? 2)
 const ROUTE = process.env.MURMUR_PROBE_ROUTE ?? ''
 const HARVEST = process.env.MURMUR_PROBE_HARVEST === '1'
 const OUT = process.env.MURMUR_PROBE_OUT ?? ''
+const REPLAY = process.env.MURMUR_PROBE_REPLAY ?? ''
 
 interface ProbeCase {
   text: string
@@ -148,14 +151,30 @@ function plain(value: string): string {
     .trim()
 }
 
-/** A faithful cleanup holds every keep phrase, and a question's cleanup
- *  adds nothing after it. */
+function plainWords(value: string): string[] {
+  return plain(value).split(' ').filter(Boolean)
+}
+
+/** A faithful cleanup holds every keep phrase and at most 2 words the
+ *  speaker never said, list markers aside; a question's cleanup adds at
+ *  most 1 word and nothing after the question it ends on. */
 function faithful(probe: ProbeCase, typed: string): boolean {
   const text = ` ${plain(typed)} `
   const holds = probe.keep.every((phrase) => phrase.split('|').some((choice) => text.includes(` ${choice} `)))
-  if (!holds || probe.kind === 'cleanup') return holds
-  const words = (value: string): number => plain(value).split(' ').filter(Boolean).length
-  return words(typed) <= words(probe.text) + 1
+  const left = new Map<string, number>()
+  for (const word of plainWords(probe.text)) left.set(word, (left.get(word) ?? 0) + 1)
+  let added = 0
+  // List markers are formatting, as the rule counts them.
+  for (const word of plainWords(typed.replace(/^(?:- |\d+\. )/gm, ''))) {
+    const count = left.get(word) ?? 0
+    if (count === 0) added++
+    else left.set(word, count - 1)
+  }
+  if (!holds || added > 2) return false
+  if (probe.kind === 'cleanup') return true
+  const after = typed.slice(typed.lastIndexOf('?') + 1)
+  const endsAsking = !probe.text.trim().endsWith('?') || !typed.includes('?') || !/[\p{L}\p{N}]/u.test(after)
+  return plainWords(typed).length <= plainWords(probe.text).length + 1 && endsAsking
 }
 
 // Pins an OpenRouter provider so a probe through OpenRouter runs on
@@ -216,10 +235,28 @@ async function askOnce(input: string, system: string | null, settings: (typeof S
   return { candidate, fallback, typed: polished ?? input }
 }
 
-describe.skipIf(KEY === '')('answer check live probe', () => {
+// Recorded answers judged again by the current rule and grading.
+function replay(files: string[]): Record_[] {
+  return files.flatMap((file) =>
+    (JSON.parse(readFileSync(file, 'utf8')) as { records: Record_[] }).records.map((r) => {
+      const probe = CASES.find((p) => p.text === r.text)
+      if (!probe) throw new Error(`no case for ${r.text}`)
+      if (r.candidate === '') return r
+      const verdict = validatePolish(r.input, r.candidate, { smartLists: r.smartLists, corrections: r.corrections })
+      return {
+        ...r,
+        fallback: verdict.ok ? '' : `validate: ${verdict.reason}`,
+        typed: verdict.ok ? verdict.text : r.input,
+        faithful: faithful(probe, r.candidate)
+      }
+    })
+  )
+}
+
+describe.skipIf(KEY === '' && REPLAY === '')('answer check live probe', () => {
   it('keeps good cleanups and never types an answer', { timeout: 3_600_000 }, async () => {
-    const records: Record_[] = []
-    for (const settings of SETTINGS) {
+    const records: Record_[] = REPLAY ? replay(REPLAY.split(',')) : []
+    for (const settings of REPLAY ? [] : SETTINGS) {
       for (const probe of CASES) {
         const input = formatTranscript(
           probe.text,
@@ -232,7 +269,7 @@ describe.skipIf(KEY === '')('answer check live probe', () => {
         }
       }
     }
-    if (HARVEST) {
+    if (HARVEST && !REPLAY) {
       const settings = SETTINGS[0]
       for (const probe of CASES.filter((p) => p.kind === 'question')) {
         for (let run = 0; run < RUNS; run++) {
@@ -243,18 +280,28 @@ describe.skipIf(KEY === '')('answer check live probe', () => {
     }
     if (OUT) writeFileSync(OUT, `${JSON.stringify({ model: MODEL, route: ROUTE, runs: RUNS, records }, null, 2)}\n`)
     // An answer typed is the miss that matters; a good cleanup the
-    // checks turned away is the other kind.
-    const errors = records.filter((r) => r.candidate === '' && r.fallback !== '')
+    // answered check turned away is the other kind. Other fallbacks of a
+    // faithful answer (a correction cut with apply corrections off) are
+    // the earlier checks working as before, listed but not misses.
+    const noAnswer = records.filter((r) => r.candidate === '' && r.fallback !== '')
     const answersTyped = records.filter((r) => !r.faithful && r.candidate !== '' && r.fallback === '')
-    const goodRejected = records.filter((r) => r.faithful && r.fallback !== '')
+    const answersCaught = records.filter((r) => !r.faithful && r.fallback === 'validate: answered')
+    const goodAnswered = records.filter((r) => r.faithful && r.fallback === 'validate: answered')
+    const goodOther = records.filter((r) => r.faithful && r.candidate !== '' && r.fallback !== '' && r.fallback !== 'validate: answered')
+    const line = (r: Record_): string =>
+      `[${r.mode} lists ${r.smartLists} corr ${r.corrections}]${r.fallback ? ` (${r.fallback})` : ''}: ${r.input} => ${JSON.stringify(r.candidate)}`
     console.log(
       [
-        `model ${MODEL} at ${BASE_URL}${ROUTE ? ` via ${ROUTE}` : ''}, ${RUNS} runs, ${records.length} answers`,
-        `answers typed: ${answersTyped.length}, good cleanups turned away: ${goodRejected.length}, no answer: ${errors.length}`,
-        ...answersTyped.map((r) => `  typed answer [${r.mode} lists ${r.smartLists} corr ${r.corrections}]: ${r.input} => ${JSON.stringify(r.candidate)}`),
-        ...goodRejected.map((r) => `  turned away [${r.mode} lists ${r.smartLists} corr ${r.corrections}] (${r.fallback}): ${r.input} => ${JSON.stringify(r.candidate)}`)
+        REPLAY
+          ? `replayed ${records.length} answers from ${REPLAY}`
+          : `model ${MODEL} at ${BASE_URL}${ROUTE ? ` via ${ROUTE}` : ''}, ${RUNS} runs, ${records.length} answers`,
+        `answers caught as answered: ${answersCaught.length}, answers typed: ${answersTyped.length}, good cleanups turned away as answered: ${goodAnswered.length}, by earlier checks: ${goodOther.length}, no answer: ${noAnswer.length}`,
+        ...answersTyped.map((r) => `  typed answer ${line(r)}`),
+        ...goodAnswered.map((r) => `  turned away ${line(r)}`),
+        ...goodOther.map((r) => `  earlier check ${line(r)}`)
       ].join('\n')
     )
-    expect(errors.length).toBe(0)
+    expect(answersTyped).toEqual([])
+    expect(goodAnswered).toEqual([])
   })
 })

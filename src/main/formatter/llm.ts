@@ -218,15 +218,44 @@ function questionMarks(value: string): number {
   return [...value].filter((ch) => polish.questionMarks.includes(ch)).length
 }
 
+// Whether the text ends in a question: it holds a questionMarks mark and
+// no letter or number after the last one.
+function endsAsking(value: string): boolean {
+  const chars = [...value]
+  let last = -1
+  chars.forEach((ch, i) => {
+    if (polish.questionMarks.includes(ch)) last = i
+  })
+  return last >= 0 && !chars.slice(last + 1).some((ch) => /[\p{L}\p{N}]/u.test(ch))
+}
+
+// Runs of spoken number words, in the order said: two hundred and fifty
+// holds two runs, two hundred, then fifty.
+function numberRuns(words: string[]): string[][] {
+  const runs: string[][] = []
+  let run: string[] = []
+  for (const word of words) {
+    if (isNumberWord(word)) {
+      run.push(word)
+    } else if (run.length > 0) {
+      runs.push(run)
+      run = []
+    }
+  }
+  if (run.length > 0) runs.push(run)
+  return runs
+}
+
 // A model that answered the dictation instead of cleaning it up
 // (IOS-032): it says words the speaker never did, leaves out most of what
-// they said, or turns their question into a statement. The live probe
-// (answers.probe.test.ts, 2026-10-22, gpt-oss-120b and gpt-oss-20b on
-// Groq) set the numbers: no good cleanup added more than 22% new words
-// or dropped more than a third outside a list or a correction cut, and
-// every answer passed one of those lines or the question mark. Spoken
-// numbers written as digits count on neither side.
-function isAnswer(input: string, answer: string, text: string, cutEarned: boolean): boolean {
+// they said, turns their question into a statement, or answers after it.
+// The live probe (answers.probe.test.ts, 2026-10-22, gpt-oss-120b and
+// gpt-oss-20b on Groq) set the numbers: no good cleanup added more than
+// 22% new words or dropped more than a third outside a list or a
+// correction cut, and every answer crossed one of those lines or the
+// question mark. A cut shaped like a correction is judged by that rule
+// whether or not apply corrections is on, as it was before this check.
+function isAnswer(input: string, answer: string, text: string, listFloor: boolean, correctionCut: boolean): boolean {
   const said = spokenWords(input)
   const kept = spokenWords(answer)
   const saidCounts = wordCounts(said)
@@ -239,23 +268,38 @@ function isAnswer(input: string, answer: string, text: string, cutEarned: boolea
     added += extra
     if (/[0-9]/.test(word)) addedDigits += extra
   }
+  const missing = new Map<string, number>()
   let dropped = 0
-  let droppedNumbers = 0
   for (const [word, count] of saidCounts) {
-    const missing = count - (keptCounts.get(word) ?? 0)
-    if (missing <= 0) continue
-    dropped += missing
-    if (isNumberWord(word)) droppedNumbers += missing
+    const gone = count - (keptCounts.get(word) ?? 0)
+    if (gone <= 0) continue
+    missing.set(word, gone)
+    dropped += gone
   }
-  if (addedDigits > 0 && droppedNumbers > 0) {
-    added -= addedDigits
-    dropped -= droppedNumbers
+  // Spoken numbers written as digits count on neither side: each added
+  // word holding an ASCII digit stands for one run of number words the
+  // answer dropped whole, taken in the order said. 96 for twelve times
+  // eight stands for twelve alone, so eight still counts as dropped.
+  for (const run of numberRuns(said)) {
+    if (addedDigits === 0) break
+    const need = wordCounts(run)
+    if (![...need].every(([word, count]) => (missing.get(word) ?? 0) >= count)) continue
+    for (const [word, count] of need) missing.set(word, (missing.get(word) ?? 0) - count)
+    added -= 1
+    addedDigits -= 1
+    dropped -= run.length
   }
   const { slack, addedShare, droppedShare } = polish.answer
   return (
     added > Math.max(slack, addedShare * kept.length) ||
-    (!cutEarned && dropped > Math.max(slack, droppedShare * said.length)) ||
-    (questionMarks(input) > questionMarks(text) && added + dropped > 0)
+    (!listFloor && !correctionCut && dropped > Math.max(slack, droppedShare * said.length)) ||
+    // A take that ends in a question, answered: the question comes back as
+    // a statement with a word changed, or something follows the last
+    // question. A question in the middle of a longer take may lose its
+    // mark to a slip fix.
+    (!correctionCut &&
+      endsAsking(input) &&
+      ((questionMarks(input) > questionMarks(text) && added + dropped > 0) || (questionMarks(text) > 0 && !endsAsking(text))))
   )
 }
 
@@ -324,10 +368,12 @@ export function validatePolish(
   // explains one wrong phrase and the cue itself, about 8 words
   // (correctionCut.perCue), plus 4 of slack for a restart
   // (correctionCut.slack); a bigger cut is content, not a fix.
-  const cuesDropped = opts.corrections ? correctionCuesDropped(input, countable) : 0
-  const earnedCorrectionFloor =
+  // The answered check below reads the same shape with the setting off.
+  const cuesDropped = correctionCuesDropped(input, countable)
+  const correctionCut =
     cuesDropped > 0 && inputWords - outputWords <= polish.correctionCut.slack + polish.correctionCut.perCue * cuesDropped &&
     onlySpokenWords(input, countable)
+  const earnedCorrectionFloor = opts.corrections === true && correctionCut
   if (inputWords >= polish.length.ratioFromWords) {
     const ratio = outputWords / inputWords
     const floor = earnedListFloor || earnedCorrectionFloor ? polish.length.listFloor : polish.length.floor
@@ -350,7 +396,7 @@ export function validatePolish(
     return { ok: false, reason: 'appended chatter' }
   }
 
-  if (isAnswer(input, countable, text, earnedListFloor || earnedCorrectionFloor)) {
+  if (isAnswer(input, countable, text, earnedListFloor, correctionCut)) {
     return { ok: false, reason: 'answered' }
   }
 

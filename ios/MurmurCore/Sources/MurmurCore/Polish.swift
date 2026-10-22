@@ -117,7 +117,9 @@ public enum Polish {
         // same deeper floor: the speech said a cue the answer dropped, the
         // cut is no deeper than the dropped cues explain, and every word
         // left was spoken (IOS-030, desktop's US-105).
-        let earnedCorrectionFloor = corrections && isCorrection(input, countable, cut: inputWords - outputWords, rules: rules)
+        // The answered check below reads the same shape with the setting off.
+        let correctionCut = isCorrection(input, countable, cut: inputWords - outputWords, rules: rules)
+        let earnedCorrectionFloor = corrections && correctionCut
         if inputWords >= rules.length.ratioFromWords {
             let ratio = Double(outputWords) / Double(inputWords)
             let floor = earnedListFloor || earnedCorrectionFloor ? rules.length.listFloor : rules.length.floor
@@ -133,7 +135,7 @@ public enum Polish {
         }
 
         // An answer to the dictation, not a cleanup of it (IOS-032).
-        if isAnswer(input, countable, text, cutEarned: earnedListFloor || earnedCorrectionFloor, rules: rules) {
+        if isAnswer(input, countable, text, listFloor: earnedListFloor, correctionCut: correctionCut, rules: rules) {
             return .reject("answered")
         }
         return .keep(text)
@@ -353,11 +355,12 @@ public enum Polish {
 
     /// Desktop's isAnswer: a model that answered the dictation instead of
     /// cleaning it up says words the speaker never did, leaves out most of
-    /// what they said, or turns their question into a statement. Words are
-    /// counted as a multiset; spoken numbers written as digits (a word with
-    /// an ASCII digit added while a numberWords word was dropped) count on
-    /// neither side. The live probe set the numbers (IOS-032).
-    static func isAnswer(_ input: String, _ answer: String, _ text: String, cutEarned: Bool, rules: PolishRules) -> Bool {
+    /// what they said, turns their question into a statement, or answers
+    /// after it. Words are counted as a multiset. Spoken numbers written as
+    /// digits count on neither side: each added word holding an ASCII digit
+    /// stands for one run of number words the answer dropped whole, taken in
+    /// the order said. The live probe set the numbers (IOS-032).
+    static func isAnswer(_ input: String, _ answer: String, _ text: String, listFloor: Bool, correctionCut: Bool, rules: PolishRules) -> Bool {
         let said = spokenWords(input)
         let kept = spokenWords(answer)
         let saidCounts = wordCounts(said)
@@ -370,31 +373,58 @@ public enum Polish {
             added += extra
             if word.contains(where: { (0x30...0x39).contains($0) }) { addedDigits += extra }
         }
-        let numbers = Set(rules.numberWords.map { Array($0.utf16) })
+        var missing: [[UInt16]: Int] = [:]
         var dropped = 0
-        var droppedNumbers = 0
         for (word, count) in saidCounts {
-            let missing = count - keptCounts[word, default: 0]
-            guard missing > 0 else { continue }
-            dropped += missing
-            if isNumberWord(word, numbers) { droppedNumbers += missing }
+            let gone = count - keptCounts[word, default: 0]
+            guard gone > 0 else { continue }
+            missing[word] = gone
+            dropped += gone
         }
-        if addedDigits > 0 && droppedNumbers > 0 {
-            added -= addedDigits
-            dropped -= droppedNumbers
+        let numbers = Set(rules.numberWords.map { Array($0.utf16) })
+        for run in numberRuns(said, numbers) where addedDigits > 0 {
+            let need = wordCounts(run)
+            guard need.allSatisfy({ missing[$0.key, default: 0] >= $0.value }) else { continue }
+            for (word, count) in need { missing[word, default: 0] -= count }
+            added -= 1
+            addedDigits -= 1
+            dropped -= run.count
         }
         let slack = Double(rules.answer.slack)
         let addedLimit = max(slack, rules.answer.addedShare * Double(kept.count))
         let droppedLimit = max(slack, rules.answer.droppedShare * Double(said.count))
-        return Double(added) > addedLimit
-            || (!cutEarned && Double(dropped) > droppedLimit)
-            || (questionMarks(input, rules) > questionMarks(text, rules) && added + dropped > 0)
+        if Double(added) > addedLimit { return true }
+        if !listFloor && !correctionCut && Double(dropped) > droppedLimit { return true }
+        // A take that ends in a question, answered: the question comes back
+        // as a statement with a word changed, or something follows the last
+        // question. A question mid take may lose its mark to a slip fix.
+        guard !correctionCut && endsAsking(input, rules) else { return false }
+        let asked = questionMarks(input, rules)
+        let answered = questionMarks(text, rules)
+        return (asked > answered && added + dropped > 0) || (answered > 0 && !endsAsking(text, rules))
     }
 
     /// A numberWords word, or one whose hyphen-separated parts all are
     /// (twenty-first), as desktop splits it.
     private static func isNumberWord(_ word: [UInt16], _ numbers: Set<[UInt16]>) -> Bool {
         word.split(separator: 0x2D, omittingEmptySubsequences: false).allSatisfy { numbers.contains(Array($0)) }
+    }
+
+    /// Runs of spoken number words, in the order said: two hundred and
+    /// fifty holds two runs, two hundred, then fifty.
+    private static func numberRuns(_ words: [[UInt16]], _ numbers: Set<[UInt16]>) -> [[[UInt16]]] {
+        var runs: [[[UInt16]]] = []
+        var run: [[UInt16]] = []
+        for word in words {
+            if isNumberWord(word, numbers) {
+                run.append(word)
+            } else if !run.isEmpty {
+                runs.append(run)
+                run = []
+            }
+        }
+        if !run.isEmpty { runs.append(run) }
+        return runs
     }
 
     private static func wordCounts(_ words: [[UInt16]]) -> [[UInt16]: Int] {
@@ -408,6 +438,15 @@ public enum Polish {
     private static func questionMarks(_ value: String, _ rules: PolishRules) -> Int {
         let marks = Set(rules.questionMarks.unicodeScalars)
         return value.unicodeScalars.filter { marks.contains($0) }.count
+    }
+
+    /// Whether the text ends in a question: it holds a questionMarks mark
+    /// and no letter or number after the last one.
+    private static func endsAsking(_ value: String, _ rules: PolishRules) -> Bool {
+        let marks = Set(rules.questionMarks.unicodeScalars)
+        let scalars = Array(value.unicodeScalars)
+        guard let last = scalars.lastIndex(where: { marks.contains($0) }) else { return false }
+        return !scalars[(last + 1)...].contains(where: isLetterOrNumber)
     }
 
     /// Every answer word was spoken, each no more often than it was.

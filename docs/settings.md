@@ -77,6 +77,18 @@ Set a transform chord under Settings, Transform. Select text in any app, hold th
 
 The cleanup pass fails open: if the model is slow, wrong, or chatty, murmur inserts the deterministically formatted text instead. A dictation is never lost or delayed indefinitely because of the cleanup model.
 
+## What if the cleanup model answers my question instead of typing it?
+
+murmur checks every reply from the cleanup model, and when a reply looks like an answer to what you said rather than your words tidied up, it inserts your formatted words instead. The model is told that everything you dictate is your words, but it can still slip and reply, such as "Canberra." for "What's the capital of Australia?". A reply is turned away when:
+
+- more than 4 in 10 of its words are words you never said (and more than 1 word);
+- it leaves out more than half of what you said (and more than 1 word), unless a list you spoke (with Smart lists on) or a correction you made explains the cut;
+- your take ends in a question, and the reply turns it into a statement with a word changed, or adds something after it ("Are you free tomorrow? Yes.").
+
+Spoken numbers written as digits ("two coffees" as "2 coffees") don't count against a cleanup, and 1 changed word doesn't on its own. The check can miss a reply that keeps most of your words, such as one that works out a sum while repeating it ("12 times 8 is 96" for "Tell me twelve times eight"), so read back anything that matters. In a very short take, a model that splits or joins words ("3pm" as "3 PM") can be turned away too; you get your formatted words, never a lost dictation.
+
+Measured on Groq through these rules (2026-10-22): 70 test sentences, 32 of them questions or requests, sent through the cleanup pass with Smart lists and Apply corrections in every combination, 2 runs each, on gpt-oss-120b and gpt-oss-20b, with each question also asked of the model outright to see what its answers look like. gpt-oss-120b never answered through the cleanup pass; gpt-oss-20b did 11 times over two runs, and earlier versions of murmur would have typed every one. Across all of it the check caught 119 answers and turned away none of the 2,023 good cleanups (189 different ones, 30 of which changed words).
+
 ## What is Smart lists, and how do I dictate a list?
 
 Smart lists turns spoken structure into real structure. It is off by default (dictation behaves exactly as it always has) and lives in Settings, Dictation, Smart lists. With it on and formatting at Full, murmur formats lists two ways:

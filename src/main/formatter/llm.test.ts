@@ -457,8 +457,62 @@ describe('validatePolish catches an answer (IOS-032)', () => {
     expect(validatePolish('Go Monday, no, sorry, Wednesday.', 'Go Wednesday.', { corrections: true })).toMatchObject({
       ok: true
     })
-    // With apply corrections off, the cut is the model's own: the slip stays.
-    expect(validatePolish('Go Monday, no, sorry, Wednesday.', 'Go Wednesday.')).toMatchObject(answered)
+    // A cut shaped like a correction is judged as before even with apply
+    // corrections off: the base prompt still applies self-corrections, and
+    // a short take's fix passed the length check (review gate, IOS-032).
+    expect(validatePolish('Go Monday, no, sorry, Wednesday.', 'Go Wednesday.')).toMatchObject({ ok: true })
+  })
+
+  it('keeps a corrected question, with apply corrections on or off', () => {
+    for (const corrections of [true, false]) {
+      expect(
+        validatePolish('Can we meet Monday? Sorry, I mean can we meet Tuesday?', 'Can we meet Tuesday?', { corrections })
+      ).toMatchObject({ ok: true })
+      expect(validatePolish('Is the call at two? Wait, is it at three?', 'Is the call at three?', { corrections })).toMatchObject({
+        ok: true
+      })
+    }
+  })
+
+  it.each([
+    ['Calculate twelve times eight.', '96.'],
+    ['Add five and seven.', '12.']
+  ])('rejects %j computed as %j: one digit word stands for one run of spoken numbers', (input, answer) => {
+    expect(validatePolish(input, answer)).toMatchObject(answered)
+  })
+
+  it.each([
+    ['We need two hundred and fifty chairs and forty tables for the event.', 'We need 250 chairs and 40 tables for the event.'],
+    ['The meeting is at three thirty on the twenty first.', 'The meeting is at 3:30 on the 21st.'],
+    ['Grab two coffees and two teas.', 'Grab 2 coffees and 2 teas.']
+  ])('keeps %j with its numbers written as %j', (input, cleaned) => {
+    expect(validatePolish(input, cleaned)).toMatchObject({ ok: true })
+  })
+
+  it.each([
+    ['Are you free tomorrow?', 'Are you free tomorrow? Yes.'],
+    ['What is two plus two?', 'What is 2 plus 2? 4.'],
+    ['Do you know when the meeting starts today?', 'Do you know when the meeting starts today? It starts at noon.']
+  ])('rejects %j answered after the question: %j', (input, answer) => {
+    expect(validatePolish(input, answer)).toMatchObject(answered)
+  })
+
+  it('keeps a take that ends in its questions', () => {
+    expect(validatePolish('Is it done? Is it ready?', 'Is it done? Is it ready?')).toMatchObject({ ok: true })
+    expect(validatePolish('Did he say "go?"', 'Did he say, "go?"')).toMatchObject({ ok: true })
+  })
+
+  it('lets a long take lose a question mark while fixing one slip', () => {
+    expect(
+      validatePolish(
+        'So I was wondering if you could send me the deck? Also their going to need the numbers by Friday.',
+        "So I was wondering if you could send me the deck. Also, they're going to need the numbers by Friday."
+      )
+    ).toMatchObject({ ok: true })
+  })
+
+  it('counts an Arabic question mark as a question', () => {
+    expect(validatePolish('ما هذا؟', 'هذا كتاب.')).toMatchObject(answered)
   })
 
   it('still catches a list padded with things never said', () => {
