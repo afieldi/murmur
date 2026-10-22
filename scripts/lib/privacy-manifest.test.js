@@ -40,7 +40,9 @@ describe('the privacy manifests declare what the code uses', () => {
   // The App Store privacy label says murmur collects nothing (IOS-026), so
   // no target's manifest may say otherwise.
   it('finds tracking, tracking domains, and collected data in a manifest', () => {
-    const clean = readFileSync(join(ios, 'App', 'PrivacyInfo.xcprivacy'), 'utf8')
+    // Windows checks text out with \r\n line ends, which the edits below
+    // would not find.
+    const clean = readFileSync(join(ios, 'App', 'PrivacyInfo.xcprivacy'), 'utf8').replace(/\r\n/g, '\n')
     expect(collectionProblems(clean)).toEqual([])
     const tracking = clean.replace('<key>NSPrivacyTracking</key>\n\t<false/>', '<key>NSPrivacyTracking</key>\n\t<true/>')
     expect(collectionProblems(tracking)).toEqual(['NSPrivacyTracking is true'])

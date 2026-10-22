@@ -8,7 +8,8 @@ const store = join(__dirname, '..', '..', 'ios', 'store')
 const fields = JSON.parse(readFileSync(join(store, 'listing.json'), 'utf8'))
 // The description is its own plain text file, so it pastes with real line
 // breaks, never a JSON string's \n.
-const description = readFileSync(join(store, 'description.txt'), 'utf8').trim()
+// Windows checks text out with \r\n line ends; read it as it is pasted.
+const description = readFileSync(join(store, 'description.txt'), 'utf8').replace(/\r\n/g, '\n').trim()
 const listing = { ...fields, description }
 const withField = (field, value) => ({ ...listing, [field]: value })
 const one = (problems, words) => {
@@ -99,7 +100,7 @@ describe('the App Store screenshots (IOS-026)', () => {
 })
 
 describe('the App Review notes (IOS-026)', () => {
-  const notes = readFileSync(join(__dirname, '..', '..', 'ios', 'store', 'review-notes.txt'), 'utf8')
+  const notes = readFileSync(join(__dirname, '..', '..', 'ios', 'store', 'review-notes.txt'), 'utf8').replace(/\r\n/g, '\n')
 
   it('pass as written', () => {
     expect(reviewNotesProblems(notes)).toEqual([])
