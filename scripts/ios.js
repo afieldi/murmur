@@ -5,6 +5,7 @@
 //   node scripts/ios.js test       MurmurCore on the Mac, then the app's tests on murmur's own simulator
 //   node scripts/ios.js smoke      boots the app headless and relays its SMOKE_RESULT
 //   node scripts/ios.js pill-shots every stage of the pill, every style, as images in ios/build/pill-shots
+//   node scripts/ios.js store-shots the App Store screenshots, checked, in ios/build/store-shots
 //   node scripts/ios.js register   one device build that registers the bundle ids and app group
 //   node scripts/ios.js release    archives for the App Store and checks it; --upload sends it to TestFlight
 // Only the ios: commands need Xcode; npm install and the desktop gates never do.
@@ -35,6 +36,7 @@ const {
   systemFirstPath,
   uploadArgs
 } = require('./lib/ios')
+const { SHOT, storeShotProblems } = require('./lib/ios-store')
 
 const root = join(__dirname, '..')
 const iosDir = join(root, 'ios')
@@ -214,6 +216,33 @@ async function pillShots() {
   }
 }
 
+/** The App Store screenshots (IOS-026): StoreShotsTests draws murmur's own
+ *  screens with sample takes on murmur's simulator, an iPhone 17 at the
+ *  size Apple requires, and each one is checked for size and alpha before
+ *  it lands in ios/build/store-shots, which git ignores. */
+async function storeShots() {
+  await generateAll()
+  const udid = simulator()
+  const folder = join(iosDir, 'build', 'store-shots')
+  rmSync(folder, { recursive: true, force: true })
+  mkdirSync(folder, { recursive: true })
+  try {
+    run('xcodebuild', ['test', ...onSimulator(udid), '-only-testing:murmurTests/StoreShotsTests', '-collect-test-diagnostics', 'never'], {
+      env: { ...process.env, TEST_RUNNER_MURMUR_STORE_SHOTS: folder }
+    })
+  } finally {
+    shutdown(udid)
+  }
+  const names = readdirSync(folder).filter((name) => name.endsWith('.png')).sort()
+  const problems = names.flatMap((name) =>
+    storeShotProblems(name, execFileSync('sips', ['-g', 'pixelWidth', '-g', 'pixelHeight', '-g', 'hasAlpha', join(folder, name)], { encoding: 'utf8' }))
+  )
+  if (names.length === 0) problems.push('no screenshots were drawn')
+  for (const problem of problems) console.error(`ios: ${problem}`)
+  console.log(`ios: ${names.length} App Store screenshots at ${SHOT.width} by ${SHOT.height} in ${folder}${problems.length ? `, ${problems.length} with problems` : ''}`)
+  return problems.length === 0 ? 0 : 1
+}
+
 /** One device build with automatic provisioning: registers both bundle
  *  ids and the app group under the project's team (Eze Media LLC in
  *  murmur's own builds), then proves the profiles
@@ -353,6 +382,7 @@ const COMMANDS = {
   test,
   smoke,
   'pill-shots': pillShots,
+  'store-shots': storeShots,
   register,
   release
 }

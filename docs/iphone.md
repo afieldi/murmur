@@ -1,6 +1,6 @@
 # murmur on iPhone
 
-murmur for iPhone is being built on the feature/ios branch and is not on the App Store yet. These answers describe the app as built. They move into docs/ and onto murmurapp.app when the App Store page goes live (IOS-026).
+murmur for iPhone is a keyboard you talk to: tap the pill in any app, speak, and your words land where your cursor is, cleaned up. It is on its way to the App Store, free, for iPhones running iOS 26 or later, and like murmur on the Mac and Windows, it runs on your own key and collects nothing.
 
 ## How do I add my API key on iPhone?
 
@@ -17,7 +17,7 @@ Open murmur, tap the gear at the top right, then Provider and key, paste your ke
 
 Cleanup runs on the same provider unless you choose otherwise. Pick Separate under Cleanup to use another provider for it, with its own key.
 
-Each provider keeps its own key, so switching providers and back never asks for a key twice. For what each provider offers and costs, see [Providers](../../docs/providers.md).
+Each provider keeps its own key, so switching providers and back never asks for a key twice. For what each provider offers and costs, see [Providers](./providers.md).
 
 ## Where does murmur keep my key?
 
@@ -267,7 +267,7 @@ If murmur closes while a session runs (you swipe it away, or iOS stops it), the 
 
 ## How do belts work on iPhone?
 
-The same way as on the Mac: the same ladder of belts and stripes (white, blue, purple, brown, and black, each with four stripes, then the black belt degrees, the coral belts, and the red belt), with the same two gates for each. A belt needs both enough words dictated and enough different days you dictated on, so one long day never skips a belt. What every belt and stripe takes is in the [Journey guide](../../docs/journey.md), under What are the exact requirements for each belt and stripe?
+The same way as on the Mac: the same ladder of belts and stripes (white, blue, purple, brown, and black, each with four stripes, then the black belt degrees, the coral belts, and the red belt), with the same two gates for each. A belt needs both enough words dictated and enough different days you dictated on, so one long day never skips a belt. What every belt and stripe takes is in the [Journey guide](./journey.md), under What are the exact requirements for each belt and stripe?
 
 On iPhone, the Journey row on Home shows your belt. Tap it to see your stripes, your words and your days against what the next belt needs, your level (one more for every hundred thousand words), and the day you earned each belt.
 

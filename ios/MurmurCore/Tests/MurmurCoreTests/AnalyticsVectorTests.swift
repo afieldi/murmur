@@ -298,7 +298,7 @@ private func same(_ got: UsageTotals, _ want: AnalyticsVectors.Totals) -> Bool {
     /// The iPhone docs quote the recap as the iPhone says it, counted
     /// against thumbs: 4 takes, 12 minutes, and 1,240 words.
     @Test func theDocsQuoteTheIPhonesRecap() throws {
-        let page = repoShared.deletingLastPathComponent().appendingPathComponent("ios/docs/iphone.md")
+        let page = repoShared.deletingLastPathComponent().appendingPathComponent("docs/iphone.md")
         let docs = try String(contentsOf: page, encoding: .utf8)
         let back = TimeBack.minutesBack(words: 1240, durationMs: 720_000, wpm: TimeBack.thumbWpm)
         let said = Recap.body(RecapSummary(sessions: 4, words: 1240, minutes: 12, minutesBack: back), words: .iPhone, locale: Locale(identifier: "en_US"))

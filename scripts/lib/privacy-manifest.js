@@ -30,4 +30,30 @@ function declared(manifest) {
   )
 }
 
-module.exports = { categoriesUsed, declared }
+const TOP_KEYS = ['NSPrivacyTracking', 'NSPrivacyTrackingDomains', 'NSPrivacyCollectedDataTypes', 'NSPrivacyAccessedAPITypes']
+
+/** Everything from a top-level key to the next one, or '' without it. */
+function valueOf(manifest, key) {
+  const at = manifest.indexOf(`<key>${key}</key>`)
+  if (at < 0) return ''
+  const ends = TOP_KEYS.filter((k) => k !== key)
+    .map((k) => manifest.indexOf(`<key>${k}</key>`, at + 1))
+    .filter((i) => i > at)
+  return manifest.slice(at, ends.length > 0 ? Math.min(...ends) : undefined)
+}
+
+/** Whatever a manifest says is tracked or collected; murmur's App Store
+ *  label says neither (IOS-026), so each line is a contradiction. */
+function collectionProblems(manifest) {
+  const problems = []
+  if (/<key>NSPrivacyTracking<\/key>\s*<true\/>/.test(manifest)) problems.push('NSPrivacyTracking is true')
+  for (const domain of valueOf(manifest, 'NSPrivacyTrackingDomains').matchAll(/<string>([^<]+)<\/string>/g)) {
+    problems.push(`NSPrivacyTrackingDomains lists ${domain[1]}`)
+  }
+  for (const type of valueOf(manifest, 'NSPrivacyCollectedDataTypes').matchAll(/<string>(NSPrivacyCollectedDataType(?!Purpose)\w+)<\/string>/g)) {
+    problems.push(`NSPrivacyCollectedDataTypes lists ${type[1]}`)
+  }
+  return problems
+}
+
+module.exports = { categoriesUsed, collectionProblems, declared }

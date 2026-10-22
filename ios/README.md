@@ -16,6 +16,7 @@ open ios/murmur.xcodeproj
 npm run ios:test       # MurmurCore's tests on the Mac, then the app's tests on a simulator
 npm run ios:smoke      # builds the app, launches it headless, and prints SMOKE_RESULT
 npm run ios:release    # archives for the App Store and checks it; -- --upload sends it (see RELEASING.md)
+npm run ios:store-shots # the App Store screenshots, drawn and checked, in ios/build/store-shots (see store/)
 ```
 
 Releasing to TestFlight needs murmur's App Store Connect API key and Apple Distribution certificate; `ios/RELEASING.md` is the runbook.

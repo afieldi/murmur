@@ -57,7 +57,7 @@ What `npm install` makes, none of it tracked in the repo: the app and tray icons
 
 ## murmur on iPhone
 
-The iPhone app is being built in [ios/](ios/): a keyboard that is a dictation pad, backed by the murmur app. It is not on the App Store yet. Its plan is [ios/prd.json](ios/prd.json), and you can build it yourself with [ios/README.md](ios/README.md).
+murmur for iPhone, a keyboard you talk to backed by the murmur app and running on your own key like the desktop app, is on its way to the App Store. How to use it is in [docs/iphone.md](docs/iphone.md). The code lives in [ios/](ios/), its plan is [ios/prd.json](ios/prd.json), and you can build it yourself with [ios/README.md](ios/README.md).
 
 ## Project process
 

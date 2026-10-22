@@ -5,7 +5,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { categoriesUsed, declared } from './privacy-manifest'
+import { categoriesUsed, collectionProblems, declared } from './privacy-manifest'
 
 const ios = join(__dirname, '..', '..', 'ios')
 
@@ -36,6 +36,28 @@ describe('the privacy manifests declare what the code uses', () => {
     expect(declared(manifest)).toEqual({ NSPrivacyAccessedAPICategoryUserDefaults: ['CA92.1'] })
     expect(declared('<key>NSPrivacyAccessedAPITypes</key><array/>')).toEqual({})
   })
+
+  // The App Store privacy label says murmur collects nothing (IOS-026), so
+  // no target's manifest may say otherwise.
+  it('finds tracking, tracking domains, and collected data in a manifest', () => {
+    const clean = readFileSync(join(ios, 'App', 'PrivacyInfo.xcprivacy'), 'utf8')
+    expect(collectionProblems(clean)).toEqual([])
+    const tracking = clean.replace('<key>NSPrivacyTracking</key>\n\t<false/>', '<key>NSPrivacyTracking</key>\n\t<true/>')
+    expect(collectionProblems(tracking)).toEqual(['NSPrivacyTracking is true'])
+    const domains = clean.replace('<key>NSPrivacyTrackingDomains</key>\n\t<array/>', '<key>NSPrivacyTrackingDomains</key>\n\t<array><string>ads.example.com</string></array>')
+    expect(collectionProblems(domains)).toEqual(['NSPrivacyTrackingDomains lists ads.example.com'])
+    const collected = clean.replace(
+      '<key>NSPrivacyCollectedDataTypes</key>\n\t<array/>',
+      '<key>NSPrivacyCollectedDataTypes</key>\n\t<array><dict><key>NSPrivacyCollectedDataType</key><string>NSPrivacyCollectedDataTypeAudioData</string></dict></array>'
+    )
+    expect(collectionProblems(collected)).toEqual(['NSPrivacyCollectedDataTypes lists NSPrivacyCollectedDataTypeAudioData'])
+  })
+
+  for (const target of ['App', 'Keyboard', 'Widgets']) {
+    it(`the ${target} target collects nothing and tracks nothing`, () => {
+      expect(collectionProblems(readFileSync(join(ios, target, 'PrivacyInfo.xcprivacy'), 'utf8'))).toEqual([])
+    })
+  }
 
   // Each target's sources, as ios/project.yml lists them.
   for (const [target, sources] of [
