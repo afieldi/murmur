@@ -163,7 +163,7 @@ That means iOS did not let the keyboard open murmur. Check that Allow Full Acces
 
 ## How do I change the waveform on iPhone?
 
-In murmur, tap the gear at the top right, then Look, and tap a waveform. The Keyboard screen links to the same place, under The pill. The waveform in use is outlined in gold and says In use. Each tile is the real pill moving to a made-up voice; your microphone is never used for the tiles. The keyboard draws your pick from your next take, and the screen murmur opens to draws it the next time it records.
+In murmur, tap the gear at the top right, then Look, and tap a waveform. The Keyboard screen links to the same place, under The pill. The waveform in use is outlined in gold and says In use. Each tile is the real pill moving to a made-up voice; your microphone is never used for the tiles. The keyboard draws your pick from your next take, and the screen murmur opens to, Dictate, and New note draw it the next time they record.
 
 There are seven waveforms, the same as on the Mac. Two are free, and belts earn the rest, from the takes this iPhone keeps:
 
@@ -188,9 +188,13 @@ On the same Look screen, pick an accent under Accent. Every accent paints wet wh
 
 A locked accent shows what earns it. If an accent you picked is locked again (after Clear all), the pill paints signal amber until you earn it back, as on the Mac.
 
+## How do I know murmur is hearing me?
+
+Watch the pill. In the murmur app, Dictate and New note show the pill under the record button, in the waveform you chose in Settings, Look. At rest it is small, grey, and still. While a take records, it paints in your color and moves with your voice: the louder you speak, the more it moves, and it goes quiet when you stop talking. If it stays quiet while you speak, murmur is not hearing you: check that no other app is using the microphone and that murmur is allowed it (Settings, Privacy & Security, Microphone). When you tap stop, it dries while your words are transcribed, then settles when they land. With Reduce Motion on, it shows a still picture of each stage, so it cannot show your voice; the clock beside Recording still counts. VoiceOver skips the pill there, since the record button already says what is happening. The keyboard shows the same pill, described below.
+
 ## What does the pill show on iPhone?
 
-The pill in the keyboard shows where your take is. The screen murmur opens to shows the same pill while it records.
+The pill in the keyboard shows where your take is. The screen murmur opens to shows the same pill while it records, and so do Dictate and New note in the app.
 
 - **At rest**, it is small, grey, and still. It never shows amber at rest, even while a session keeps the microphone ready.
 - **Recording**, it is wet amber at your voice's level, cooling toward gold as each moment ages. With another accent, it is wet in that color, cooling toward a darker shade of it.
