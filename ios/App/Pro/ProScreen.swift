@@ -65,7 +65,7 @@ struct ProScreen: View {
                         Text(message).foregroundStyle(ProCopy.problems.contains(message) ? Tokens.red : Tokens.textDim)
                     }
                 } footer: {
-                    Text(ProCopy.founders).foregroundStyle(Tokens.textDim)
+                    Text(ProCopy.bothDevices).foregroundStyle(Tokens.textDim)
                 }
                 .listRowBackground(Tokens.panel)
             }

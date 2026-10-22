@@ -20,7 +20,9 @@ enum ProCopy {
     static let buyFailed = "The purchase did not go through. Nothing was charged; try again."
     static let restoreFailed = "murmur could not reach the App Store. Check your connection and try again."
     static let nothingToRestore = "This Apple Account has no murmur Pro purchase to restore."
-    static let founders = "Founding member on the Mac? Email support@murmurapp.app for your founders code."
+    /// One Pro covers both devices (LaBroi, 2026-10-19), asked for by email
+    /// either way, since a license key can never unlock anything here.
+    static let bothDevices = "Bought murmur Pro on your Mac or PC? Email support@murmurapp.app with your order id for a free code. Bought it here? Email the order id from Apple's receipt for your desktop key."
     static let active = "Pro is active"
     static let founding = "Founding member"
     static let thanks = "Thank you for supporting free software; belts stay earned, never bought."

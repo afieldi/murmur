@@ -417,7 +417,7 @@ Select the text, touch and hold the pill on the murmur keyboard, and tap Transfo
 
 ## How do I get murmur Pro on iPhone?
 
-Open murmur, tap the gear, then murmur Pro, and tap Get murmur Pro. It is a one-time purchase through the App Store with your Apple Account, and it supports murmur. Everything you use today stays free: dictation, cleanup, notes, the Journey, and every provider. Pro adds:
+Open murmur, tap the gear, then murmur Pro, and tap Get murmur Pro. It is a one-time purchase of $49 through the App Store with your Apple Account, the same as on the Mac, it supports murmur, and it covers your Mac or PC too (see Do I get murmur Pro on my Mac or PC too?). Everything you use today stays free: dictation, cleanup, notes, the Journey, and every provider. Pro adds:
 
 - **Provider profiles.** Save your whole provider setup, transcription and cleanup, under a name in Settings, then Provider and key, and switch to it in one tap. A profile keeps addresses and models; your keys stay in your iPhone's Keychain.
 - **Early access.** New conveniences come to Pro first, then to everyone.
@@ -427,8 +427,12 @@ Belts and cosmetics are earned by practice, never sold.
 
 - **On a new iPhone,** sign in with the same Apple Account, open Settings, murmur Pro, and tap Restore purchases.
 - **If Apple refunds the purchase,** Pro turns off. Profiles you saved stay, unused, and come back if you buy Pro again.
-- **Founding members of murmur on the Mac** get their ten percent through a founders code: email support@murmurapp.app from the address on your desktop license. Once it checks out, you get a one-time code to enter with Redeem a code in Settings, murmur Pro, or in the App Store. Apple's codes last at most six months, so ask when you are ready. A purchase made with a founders code shows Founding member. (Checked 2026-10-15 against Apple's App Store Connect Help.)
+- **Bought murmur Pro on your Mac or PC?** You get it here free. Email support@murmurapp.app with your order id, from the address on your desktop license. Once it checks out, you get a one-time code to enter with Redeem a code in Settings, murmur Pro, or in the App Store. Apple's codes last at most 6 months, so ask when you are ready. Founding members get a founders code, so their purchase here shows Founding member too. (Checked 2026-10-19 against Apple's App Store Connect Help.)
 
 ## Does my desktop Pro carry over to iPhone?
 
-No. Apple's App Review Guidelines (3.1.1) do not let an iPhone app unlock features with a license key, so a murmur license key never unlocks anything on iPhone, and murmur never asks for one. murmur Pro on iPhone is its own purchase through the App Store. Founding members get their ten percent there with a founders code, as above. (Checked 2026-10-10 against Apple's App Review Guidelines.)
+Not by itself, but you get it free. Apple's App Review Guidelines (3.1.1) do not let an iPhone app unlock features with a license key, so a murmur license key never unlocks anything on iPhone, and murmur never asks for one. Instead, email support@murmurapp.app with your desktop order id, and you get a one-time App Store code for murmur Pro on iPhone at no cost, as above. (Checked 2026-10-10 against Apple's App Review Guidelines.)
+
+## Do I get murmur Pro on my Mac or PC too?
+
+Yes. murmur Pro bought on iPhone covers the Mac and Windows app as well. Email support@murmurapp.app with the order id from Apple's email receipt (it is also in your App Store purchase history). Once Apple confirms the purchase, you get a murmur license key by email: in murmur on your computer, open Settings, murmur Pro, paste the key, and click Activate. One purchase, both devices.

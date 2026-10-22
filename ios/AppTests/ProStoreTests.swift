@@ -135,6 +135,20 @@ import Testing
         #expect(ProCopy.markPerk == "The supporter mark, here and in Settings.")
     }
 
+    /// One Pro covers both devices (LaBroi, 2026-10-19): a desktop buyer
+    /// gets a free code here, and a buyer here gets a desktop key, both by
+    /// email with the order id. A license key never unlocks anything here.
+    @Test func theFooterSaysOneProCoversBothDevices() {
+        let line = ProCopy.bothDevices
+        #expect(line.contains("support@murmurapp.app"))
+        #expect(line.contains("on your Mac or PC"))
+        #expect(line.contains("free code"))
+        #expect(line.contains("Apple's receipt"))
+        #expect(line.contains("desktop key"))
+        #expect(!line.localizedCaseInsensitiveContains("license"))
+        #expect(!line.contains("ten percent"))
+    }
+
     /// No App Store answer: no price to show, and the free app goes on.
     @Test func withNoPriceProIsNotForSale() async {
         let store = ProStore(shop: FixedShop(outcome: .failed), product: product)
