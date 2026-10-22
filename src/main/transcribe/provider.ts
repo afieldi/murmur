@@ -3,6 +3,7 @@
 // endpoint, Groq by default. Injectable fetch for tests and smoke. One
 // retry on transient failures, never on 4xx. Callers own the audio; this
 // module never discards it.
+import { appFetch } from '../net'
 
 export interface TranscribeConfig {
   baseUrl: string
@@ -77,7 +78,7 @@ export async function transcribe(
   cfg: TranscribeConfig,
   options: TranscribeOptions = {}
 ): Promise<TranscribeResult> {
-  const { fetchImpl = fetch, timeoutMs = 30_000, retries = 1 } = options
+  const { fetchImpl = appFetch, timeoutMs = 30_000, retries = 1 } = options
   let result = await attempt(wav, cfg, fetchImpl, timeoutMs)
   let remaining = retries
   while (!result.ok && RETRYABLE.includes(result.kind) && remaining > 0) {

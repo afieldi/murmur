@@ -8,6 +8,7 @@ import bundledCatalog from '../../../shared/provider-catalog.json'
 import { validateCatalog } from '../../shared/catalog'
 import { IpcChannels } from '../../shared/ipc'
 import type { Settings } from '../../shared/settings'
+import { appFetch } from '../net'
 import { registerSmokeCheck } from '../smoke'
 import { type KeyCipher, KeyStore } from './keystore'
 import { KeyRing, type RingStatus, migrateLegacyKeys } from './keyring'
@@ -173,7 +174,7 @@ export function initSettings(): void {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 10_000)
     try {
-      const response = await fetch(`${baseUrl.replace(/\/$/, '')}/models`, {
+      const response = await appFetch(`${baseUrl.replace(/\/$/, '')}/models`, {
         headers: { Authorization: `Bearer ${key}` },
         signal: controller.signal
       })
@@ -187,7 +188,10 @@ export function initSettings(): void {
         : { ok: false, detail: `http ${response.status}` }
     } catch (error) {
       const aborted = error instanceof Error && error.name === 'AbortError'
-      return { ok: false, detail: aborted ? 'timed out' : 'network error' }
+      if (aborted) return { ok: false, detail: 'timed out' }
+      // The network's own reason (net::ERR_CERT_AUTHORITY_INVALID on an
+      // inspecting work network) says more than network error alone.
+      return { ok: false, detail: error instanceof Error ? `network error (${error.message})` : 'network error' }
     } finally {
       clearTimeout(timer)
     }

@@ -9,6 +9,7 @@
 // which the iPhone reads too (ios/prd.json IOS-024);
 // shared/transform-vectors.json keeps both platforms answering alike.
 import rules from '../../../shared/transform.json'
+import { appFetch } from '../net'
 import type { PolishConfig } from './llm'
 
 /** Longest selection a transform will send (characters). Longer ones
@@ -105,7 +106,7 @@ export async function transformText(
   cfg: PolishConfig,
   options: TransformOptions = {}
 ): Promise<TransformResult> {
-  const { fetchImpl = fetch, timeoutMs = rules.timeoutMs } = options
+  const { fetchImpl = appFetch, timeoutMs = rules.timeoutMs } = options
   if (instruction.trim().length === 0) return { ok: false, reason: 'no instruction' }
   if (selection.length > TRANSFORM_MAX_CHARS) return { ok: false, reason: 'selection too long' }
   const controller = new AbortController()

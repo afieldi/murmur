@@ -9,6 +9,7 @@
 import hallucinations from '../../../shared/hallucinations.json'
 import polish from '../../../shared/polish.json'
 import { isHallucination } from '../../shared/speech-gate'
+import { appFetch } from '../net'
 
 export interface PolishConfig {
   baseUrl: string
@@ -305,7 +306,7 @@ export async function polishTranscript(
   options: PolishOptions = {}
 ): Promise<string | null> {
   const {
-    fetchImpl = fetch,
+    fetchImpl = appFetch,
     timeoutMs = polish.timeoutMs,
     hints = [],
     smartLists = false,

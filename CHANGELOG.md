@@ -2,6 +2,11 @@
 
 All user-facing changes, newest first, in plain language. Each release's section doubles as its GitHub release notes, and the app shows your current version's section on the home tab under what's new.
 
+## 0.1.12 (2026-10-20)
+
+- Works on work networks that inspect secure traffic (Zscaler, Netskope, and the like): murmur now sends every request the way your browser does, trusting the certificates your computer trusts and following its proxy settings. Before, dictation could fail on these networks even while your browser worked fine.
+- When the connection test cannot reach your provider, it now says why, for example network error (net::ERR_CERT_AUTHORITY_INVALID), and the log names the same reason for a failed dictation.
+
 ## 0.1.11 (2026-10-19)
 
 - Apply corrections: say something wrong and then fix it (send it Tuesday, oh wait, I mean Wednesday) and murmur types only the fix. Turn it on in Settings, Dictation, right under Smart lists; it works at Full formatting with a cleanup model. A word like actually or I mean stays when it is not taking anything back, and if the cleanup ever goes wrong, your words are typed as you said them. Off, the default, keeps every word, slip-ups included.
