@@ -1,6 +1,6 @@
 # murmur for iPhone Roadmap
 
-> Generated from ios/prd.json (8/30 stories verified). Do not edit by hand: change ios/prd.json, then run `npm run roadmap`.
+> Generated from ios/prd.json (9/30 stories verified). Do not edit by hand: change ios/prd.json, then run `npm run roadmap`.
 
 ## Done and verified
 
@@ -9,6 +9,7 @@
 - [x] **IOS-003** MurmurCore passes desktop's answer key
 - [x] **IOS-004** Bundle ids and the App Store Connect record
 - [x] **IOS-005** Provider and key setup
+- [x] **IOS-006** Record and transcribe in the app
 - [x] **IOS-011** First run
 - [x] **IOS-014** Diagnostics
 - [x] **IOS-030** Apply corrections on iPhone
@@ -21,7 +22,6 @@ Automated criteria pass; the remaining step is a human loop noted in ios/prd.jso
 
 ## To do
 
-- [ ] **IOS-006** Record and transcribe in the app
 - [ ] **IOS-007** Cleanup that fails open
 - [ ] **IOS-008** The dictation pad
 - [ ] **IOS-009** The hot mic session and the swipe back
