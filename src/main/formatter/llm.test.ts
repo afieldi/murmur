@@ -402,6 +402,101 @@ describe('validatePolish with corrections', () => {
   })
 })
 
+// IOS-032: a model that answers the dictation instead of cleaning it up.
+// The answers below are the shapes the live probe saw (answers.probe.test.ts,
+// 2026-10-22), and the Tokyo one is the question that started the story.
+describe('validatePolish catches an answer (IOS-032)', () => {
+  const answered = { ok: false, reason: 'answered' }
+
+  it.each([
+    ['What time is it in Tokyo?', 'It is 3 PM in Tokyo.'],
+    ['Can you send me the report by Friday?', "I'll send you the report by Friday."],
+    ["What's the capital of Australia?", 'Canberra.'],
+    ["What's the capital of Australia?", 'The capital of Australia is **Canberra**.'],
+    ["What's twelve times eight?", '96.'],
+    ['Give me a synonym for happy.', 'Joyful.'],
+    ['Hello.', 'Hello! How can I help you today?'],
+    ['Thanks.', 'You’re welcome!'],
+    ['Is this working?', 'Yes, it’s working!'],
+    ['Make this sound more professional.', 'Could you please provide the text you’d like me to refine?']
+  ])('rejects %j answered with %j', (input, answer) => {
+    expect(validatePolish(input, answer)).toMatchObject(answered)
+    expect(validatePolish(input, answer, { smartLists: true, corrections: true })).toMatchObject(answered)
+  })
+
+  it.each([
+    ['Their going to be late because of the whether.', 'They’re going to be late because of the weather.'],
+    ['Lets meet at noon.', 'Let’s meet at noon.'],
+    ['Ok.', 'Okay.'],
+    ['Grab two coffees on the way in.', 'Grab 2 coffees on the way in.'],
+    ['Two hundred and fifty.', '250.'],
+    ['Twenty-one, twenty-two.', '21, 22.'],
+    ['Can you send me the report by Friday?', 'Can you send me the report by Friday?'],
+    ['Can you by milk on the way home?', 'Can you buy milk on the way home?'],
+    ['What time is it in Tokyo', 'What time is it in Tokyo?'],
+    ["I wonder if it's done?", "I wonder if it's done."],
+    ['Yeah, so, I think the, the plan is fine, honestly.', 'Yeah, so, I think the plan is fine, honestly.']
+  ])('keeps %j cleaned to %j', (input, cleaned) => {
+    expect(validatePolish(input, cleaned)).toMatchObject({ ok: true })
+  })
+
+  it('judges a list or a correction cut by its own rule, never as dropped words', () => {
+    const list = 'I want to make a list. First I want to add eggs, then bacon, then toast.'
+    expect(validatePolish(list, 'I want to make a list:\n1. eggs\n2. bacon\n3. toast', { smartLists: true })).toMatchObject({
+      ok: true
+    })
+    // Eight of fifteen words dropped, more than half, and the corrections
+    // rule earned the cut.
+    expect(
+      validatePolish(
+        'Send the invoice to Mark on Tuesday. Oh wait, actually what I mean is Wednesday.',
+        'Send the invoice to Mark on Wednesday.',
+        { corrections: true }
+      )
+    ).toMatchObject({ ok: true })
+    expect(validatePolish('Go Monday, no, sorry, Wednesday.', 'Go Wednesday.', { corrections: true })).toMatchObject({
+      ok: true
+    })
+    // With apply corrections off, the cut is the model's own: the slip stays.
+    expect(validatePolish('Go Monday, no, sorry, Wednesday.', 'Go Wednesday.')).toMatchObject(answered)
+  })
+
+  it('still catches a list padded with things never said', () => {
+    expect(
+      validatePolish('I need eggs, bacon, and toast.', '- eggs\n- bacon\n- toast\n- orange juice\n- coffee\n- butter', {
+        smartLists: true
+      })
+    ).toMatchObject(answered)
+  })
+
+  it('counts only ASCII digits as spoken numbers written as digits', () => {
+    expect(validatePolish('Two hundred and fifty.', '٢٥٠.')).toMatchObject(answered)
+  })
+
+  it('counts a fullwidth question mark as a question', () => {
+    expect(validatePolish('東京は何時ですか？', '午後3時です。')).toMatchObject(answered)
+    expect(validatePolish('東京は何時ですか？', '東京は何時ですか？')).toMatchObject({ ok: true })
+  })
+
+  it('leaves every earlier rejection its own reason', () => {
+    expect(validatePolish(INPUT, 'Sure, I will send it.')).toMatchObject({ ok: false, reason: 'meta chatter' })
+    expect(validatePolish('Hi.', 'One two three four five six seven eight nine ten.')).toMatchObject({
+      ok: false,
+      reason: 'length delta'
+    })
+  })
+
+  it('fails open with the reason, never the words', async () => {
+    const reasons: string[] = []
+    const typed = await polishTranscript("What's the capital of Australia?", cfg, {
+      fetchImpl: (async () => chatResponse('Canberra.')) as typeof fetch,
+      onFallback: (reason) => reasons.push(reason)
+    })
+    expect(typed).toBeNull()
+    expect(reasons).toEqual(['validate: answered'])
+  })
+})
+
 describe('polishTranscript', () => {
   it('returns validated cleaned text and sends the strict prompt', async () => {
     let sent: { url: string; body: Record<string, unknown> } | null = null

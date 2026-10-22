@@ -18,6 +18,9 @@ vi.mock('../../../shared/polish.json', () => ({
     refusals: ['kumquat'],
     hintSentinel: 'zebra',
     length: { ratioFromWords: 4, floor: 0.9, listFloor: 0.5, ceiling: 1.1, shortDelta: 1 },
+    answer: { slack: 1, addedShare: 0.9, droppedShare: 0.9 },
+    questionMarks: '%',
+    numberWords: ['fig'],
     temperature: 0.7,
     timeoutMs: 5000
   }
@@ -97,6 +100,23 @@ describe('cleanup rules from shared/polish.json', () => {
   it('uses the shared length limits', () => {
     expect(validatePolish('one two three', 'one two three four five')).toEqual({ ok: false, reason: 'length delta' })
     expect(validatePolish('one two three four five', 'one two three four')).toEqual({ ok: false, reason: 'length ratio' })
+  })
+
+  it('catches an answer by the shared shares, question marks, and number words', () => {
+    // Half the words new and half dropped: under the shared 0.9 shares,
+    // though desktop's own 0.4 and 0.5 would turn it away.
+    expect(
+      validatePolish('one two three four five six seven eight nine ten', 'one two three four five a b c d e')
+    ).toMatchObject({ ok: true })
+    expect(validatePolish('a b c d e f g h i j', 'k l m n o p q r s t')).toEqual({ ok: false, reason: 'answered' })
+    // A shared question mark lost with a word changed is an answer; a
+    // question mark this file does not list is not one.
+    expect(validatePolish('one two three%', 'one two four')).toEqual({ ok: false, reason: 'answered' })
+    expect(validatePolish('one two three?', 'one two four')).toMatchObject({ ok: true })
+    // Digits for a shared number word are not counted; desktop's own
+    // number word no longer counts once the shared list drops it.
+    expect(validatePolish('fig fig fig', '7 7 7')).toMatchObject({ ok: true })
+    expect(validatePolish('two two two', '2 2 2')).toEqual({ ok: false, reason: 'answered' })
   })
 
   it('sends the shared temperature and checks the shared sentinel', async () => {

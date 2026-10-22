@@ -201,6 +201,64 @@ function onlySpokenWords(input: string, output: string): boolean {
   return true
 }
 
+// A spoken number word (numberWords), or one whose hyphenated parts all
+// are (twenty-first), which a cleanup may write as digits.
+const NUMBER_WORDS = new Set(polish.numberWords)
+function isNumberWord(word: string): boolean {
+  return word.split('-').every((part) => NUMBER_WORDS.has(part))
+}
+
+function wordCounts(words: string[]): Map<string, number> {
+  const counts = new Map<string, number>()
+  for (const word of words) counts.set(word, (counts.get(word) ?? 0) + 1)
+  return counts
+}
+
+function questionMarks(value: string): number {
+  return [...value].filter((ch) => polish.questionMarks.includes(ch)).length
+}
+
+// A model that answered the dictation instead of cleaning it up
+// (IOS-032): it says words the speaker never did, leaves out most of what
+// they said, or turns their question into a statement. The live probe
+// (answers.probe.test.ts, 2026-10-22, gpt-oss-120b and gpt-oss-20b on
+// Groq) set the numbers: no good cleanup added more than 22% new words
+// or dropped more than a third outside a list or a correction cut, and
+// every answer passed one of those lines or the question mark. Spoken
+// numbers written as digits count on neither side.
+function isAnswer(input: string, answer: string, text: string, cutEarned: boolean): boolean {
+  const said = spokenWords(input)
+  const kept = spokenWords(answer)
+  const saidCounts = wordCounts(said)
+  const keptCounts = wordCounts(kept)
+  let added = 0
+  let addedDigits = 0
+  for (const [word, count] of keptCounts) {
+    const extra = count - (saidCounts.get(word) ?? 0)
+    if (extra <= 0) continue
+    added += extra
+    if (/[0-9]/.test(word)) addedDigits += extra
+  }
+  let dropped = 0
+  let droppedNumbers = 0
+  for (const [word, count] of saidCounts) {
+    const missing = count - (keptCounts.get(word) ?? 0)
+    if (missing <= 0) continue
+    dropped += missing
+    if (isNumberWord(word)) droppedNumbers += missing
+  }
+  if (addedDigits > 0 && droppedNumbers > 0) {
+    added -= addedDigits
+    dropped -= droppedNumbers
+  }
+  const { slack, addedShare, droppedShare } = polish.answer
+  return (
+    added > Math.max(slack, addedShare * kept.length) ||
+    (!cutEarned && dropped > Math.max(slack, droppedShare * said.length)) ||
+    (questionMarks(input) > questionMarks(text) && added + dropped > 0)
+  )
+}
+
 /**
  * Decide whether a model response is a faithful cleanup of the input.
  * Pure and strict: when in doubt, reject, and the caller falls back.
@@ -290,6 +348,10 @@ export function validatePolish(
     !isHallucination(lastSentence(input), hallucinations.phrases)
   ) {
     return { ok: false, reason: 'appended chatter' }
+  }
+
+  if (isAnswer(input, countable, text, earnedListFloor || earnedCorrectionFloor)) {
+    return { ok: false, reason: 'answered' }
   }
 
   return { ok: true, text }
