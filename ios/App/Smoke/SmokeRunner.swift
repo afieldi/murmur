@@ -48,6 +48,7 @@ enum SmokeRunner {
             ("mailbox", checkMailbox),
             ("session", checkSession),
             ("pill", checkPill),
+            ("takePill", checkTakePill),
             ("firstRun", checkFirstRun),
             ("history", checkHistory),
             ("dictionary", checkDictionary),
@@ -329,6 +330,42 @@ enum SmokeRunner {
         guard let read = levels.read(), read.level == 0.5, read.count == 3 else { throw SmokeFailure("the level file read back \(String(describing: levels.read()))") }
         let blank = PillShots.shots.filter { (PillShots.image($0.frame).pngData()?.count ?? 0) < 1_000 }.map(\.name)
         guard blank.isEmpty else { throw SmokeFailure("these stages drew nothing: \(blank)") }
+    }
+
+    /// The pill on Dictate and New note hears the take (IOS-031): a tone
+    /// through the device microphone's own gate raises its level while
+    /// recording, and the level falls to nothing once the take stops.
+    static func checkTakePill() throws {
+        if let failure = onMain({ await takePillFailure() }) { throw SmokeFailure(failure) }
+    }
+
+    @MainActor private static func takePillFailure() async -> String? {
+        guard let microphone = FedMicrophone(rate: Double(Wav.targetSampleRate)), let key = APIKey(StubProtocol.key),
+              let defaults = UserDefaults(suiteName: "murmur.smoke.\(UUID().uuidString)"),
+              let catalog = try? BundledRules.catalog(), let rules = try? BundledRules.takeRules()
+        else { return "the stand-ins did not build" }
+        let scratch = FileManager.default.temporaryDirectory.appending(path: "smoke-take-pill-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let connections = ConnectionStore(defaults: defaults)
+        let ring = MemoryKeyRing()
+        try? ring.save(key, for: connections.load(catalog: catalog).transcription.baseUrl)
+        let cleanup = CleanupStore(defaults: defaults)
+        cleanup.save(CleanupSettings(polish: false))
+        let model = TakeModel(
+            microphone: microphone, store: WaitingStore(directory: scratch.appending(path: "takes", directoryHint: .isDirectory)),
+            rules: rules, catalog: catalog, connections: connections, cleanup: cleanup, ring: ring,
+            send: { request in (Data(#"{"text":"smoke pill words"}"#.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!) },
+            copy: { _ in }
+        )
+        guard model.pillStage == .idle else { return "the pill began at \(model.pillStage)" }
+        await model.start()
+        microphone.hear(ScriptedMicrophone.tone)
+        guard model.pillStage == .recording else { return "the pill showed \(model.pillStage) while recording" }
+        guard model.level > 0 else { return "the pill heard \(model.level) while a tone played" }
+        await model.stop()
+        guard model.level == 0 else { return "the pill still heard \(model.level) after the stop" }
+        guard model.pillStage == .inserted else { return "the pill showed \(model.pillStage) once the words landed, the take gave \(model.state)" }
+        return nil
     }
 
     /// First run walks its steps with each permission granted and refused
