@@ -102,6 +102,9 @@ function rowId(label: string): string {
 
 export function Row(props: {
   label: string
+  /** A mark after the label (the Pro mark, US-107). It carries no text,
+   *  so search and jumps still read the label alone. */
+  mark?: React.ReactNode
   desc?: React.ReactNode
   anchor?: string
   /** Stacks the control under the text at full width: lists, wide
@@ -119,7 +122,10 @@ export function Row(props: {
       data-keywords={props.keywords}
     >
       <div className="row-text">
-        <div className="row-label">{props.label}</div>
+        <div className="row-label">
+          {props.label}
+          {props.mark}
+        </div>
         {props.desc && <div className="row-desc">{props.desc}</div>}
       </div>
       <div className="row-control">{props.children}</div>
@@ -134,6 +140,9 @@ export function Row(props: {
 export function Section(props: {
   id: string
   title: string
+  /** A mark after the title (the Pro mark, US-107); textless, so search
+   *  results still name the section by its title alone. */
+  mark?: React.ReactNode
   sub?: string
   children: React.ReactNode
 }): React.JSX.Element {
@@ -143,6 +152,7 @@ export function Section(props: {
           when it scrolls to the section. */}
       <h2 className="sec-title" id={`sec-${props.id}-title`} tabIndex={-1}>
         {props.title}
+        {props.mark}
       </h2>
       {props.sub && <p className="sec-sub">{props.sub}</p>}
       <div className="panel">{props.children}</div>

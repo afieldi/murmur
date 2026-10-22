@@ -60,9 +60,24 @@ The settings window is where people work, so paint appears only where something 
 | Wrap-up | A painting a day: each take adds the next stroke of a seeded subject (fourteen: moon over water, bamboo, plum branch, mountains, pine on a cliff, orchid, chrysanthemum, lotus pond, waterfall, willow by the water, boat on the river, breaking wave, maple branch, snowfall; recipes in src/renderer/settings/paintSubjects.ts) sized to a typical day; the seal when finished, in the color of the belt it was painted at (beltOnInk; ember before the first belt; the coral belts in two halves) and the light of the hours it was painted in (paintLight.ts: dawn 5 to 10, day to 17, dusk to 21, night; a sun or a crescent and stars set in the open sky found from the strokes, under every stroke; a painting with a moon keeps it), then the scene keeps growing, each subject in its own way, one stroke for each take after (up to 60), shaped by that take's words; richer brushwork with rank; plants kept inside a 5 percent margin while ground, cliffs, and limbs from the edge run off it; the paintings of the days before in a strip that opens each one large; a portrait Save card; Save the week, the seven days ending today side by side as one long scroll, its title in the display face (painting.ts paintWeekScroll, 1984 by 432 saved at twice that; a day without takes is one dry mark). | US-098 (replaced US-088's card), US-100, US-101, US-102 |
 | Empty states | One dry grey scrape and a sentence with the real hotkey. | US-089 |
 | Header | A painted belt insignia and a short gold stroke under the current tab. | US-090 |
+| Header, Pro | The Pro mark painted in each day: the first window open of a day lifts it to 2x while 3 or 4 slashing strokes seeded by the date paint its gold in from varied angles; the unfinished brushwork (dry ends, small gaps) stays as the day's badge. See The Pro mark below. | US-107 |
 | Journey | Painted belt, road, gates, and ink stamps. | US-076 |
 
 Paint in the window is static unless the moment moves (a promotion, a live preview tile), seeded by something stable like the date, so a mark keeps its shape across opens.
+
+## The Pro mark
+
+A small pill of brand gold with PRO in ink, mono caps (LaBroi's picks from the Pro canvas, https://claude.ai/artifact/ECbNrZm5ArdsGHftMYdAU7, 2026-10-19 and 2026-10-22). One rule: **a filled mark means Pro is yours, an outlined mark (brand edge border, gold text) means Pro offers it.** Never amber, never founder gold; the crown stays the founder's alone.
+
+| Who | Where |
+| --- | --- |
+| Pro and founding members | Filled: after the wordmark in the header (before the belt), beside murmur Pro in the rail, in the Pro section title, and on the Profiles row. |
+| Free, or a parked key | Outlined: the Profiles row, the rail entry, the Pro section title. No header mark. |
+
+- The word is CSS content (`.pro-mark::after`), so search results and section names never read it; `role="img"` names it aloud, except beside a title that already says murmur Pro (the rail, the section title), where it is hidden from screen readers. `src/renderer/settings/ProMark.tsx`, styles under `.pro-mark` in `styles.css`, rules in `src/shared/proMark.ts`.
+- The moment you buy: the outlined marks fill with gold once, a beat apart (`pro-mark-leaf`, 0.6 s), and the header mark arrives with its brush fill, which counts as the day's fill.
+- The header mark is painted, not filled: the brush engine draws the day's strokes on a canvas at twice the screen density (sharp at 2x), and PRO is drawn on the same canvas, ink wherever paint landed and gold where the ground is bare (`paintLabel`). A blend mode was tried first and left PRO a muddy brown on the darker strokes; measured over 60 days, no letter pixel falls under 3:1 now.
+- The daily moment waits until the window is visible and focused, then 350 ms, grows to 2x (or as far as the room before the tabs allows) from its left edge over 300 ms with a 3 percent overshoot (cubic-bezier(.16, 1, .3, 1)), paints for about 3 s while big, holds 400 ms, and settles over 500 ms with no overshoot (cubic-bezier(.4, 0, .2, 1)). The belt steps aside by the mark's growth, so nothing covers words. The first, shallow stroke runs wet and centered, a solid body under the letters, while the steeper strokes stay dry. A click, key, or blur skips to the end (200 ms settle). Settings, murmur Pro, Paint the mark each day turns it off; reduced motion shows the day's brushwork still. Both designers' notes (motion and brand) shaped this; the brand rule it answers to: Pro never moves bigger or more often than the belt's own ceremony.
 
 ## Motion
 

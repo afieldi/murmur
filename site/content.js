@@ -7,6 +7,9 @@
 // address: content(siteUrl) builds everything for one.
 
 const REPO = 'https://github.com/lbwalton/murmur'
+// The Pro price lives in shared/pro.json, which the app's Get Pro button
+// reads too, so the app and the site never disagree (US-107).
+const PRO = require('../shared/pro.json')
 
 function content(site) {
   const links = {
@@ -32,7 +35,7 @@ function content(site) {
   const facts = {
     macos: 'macOS 13 Ventura or later',
     windows: 'Windows 10 or later',
-    proPrice: 49
+    proPrice: PRO.price
   }
 
   const title = 'murmur: free, open source dictation app for Mac and Windows'

@@ -12,6 +12,8 @@ export interface RailSection {
   id: string
   title: string
   group: string
+  /** A mark after the title (the Pro mark, US-107). */
+  mark?: React.ReactNode
   /** A setup check in this section is failing. */
   alert?: boolean
 }
@@ -277,7 +279,10 @@ export function SettingsRail(props: {
                     aria-current={current === s.id ? 'true' : undefined}
                     onClick={() => goTo(s.id)}
                   >
-                    <span>{s.title}</span>
+                    <span className="rail-title">
+                      {s.title}
+                      {s.mark}
+                    </span>
                     {s.alert && (
                       <>
                         <span className="rail-dot" aria-hidden="true" />

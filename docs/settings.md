@@ -241,3 +241,13 @@ By default one provider handles both transcription and the cleanup pass. Setting
 ## What are provider profiles?
 
 A murmur Pro convenience: save your whole provider setup (base URL, speech model, cleanup model, and the matching API key) under a name, then switch setups in one click from Provider and keys, Advanced, Profiles. Profiles carry the endpoint and models; keys stay in the per-provider key ring, so applying a profile automatically uses that provider's saved key. The free single provider setup is unchanged, profiles are additive.
+
+## What is in the murmur Pro section?
+
+The last section in settings, under App in the rail. What it shows depends on whether Pro is yours:
+
+- **Free:** one block that says why Pro exists (the free app is complete and stays complete; Pro funds it), the 3 extras Pro adds (provider profiles, early access, priority support), a Get Pro button with the one-time price that opens the checkout, and the key field with Activate at the foot. Press Return in the key field to activate.
+- **Pro:** Pro is active (or Founding member, with the founding member promise), the date you became a supporter, and Deactivate. Below it, **Paint the mark each day** (on by default) turns the daily brush fill of the header's Pro mark on or off; see [murmur Pro](pro.md#what-happens-to-the-pro-mark-when-i-open-murmur-each-day).
+- **Deactivated:** your key is still saved on this machine; Reactivate brings Pro back in one click, and Forget key deletes it.
+
+A small gold PRO mark sits beside murmur Pro in the rail and in the section title: filled when Pro is yours, outlined when it is on offer. The Profiles row under Provider and keys carries the same mark, outlined until Pro is yours, then filled. [Where the mark appears](pro.md#where-does-the-pro-mark-appear-and-what-does-it-mean).

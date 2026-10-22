@@ -9,6 +9,7 @@ import { sectionFor } from '../../shared/changelog'
 import { type SessionEvent, countsTowardStats, dayKey, groupByDay } from '../../shared/history'
 import { type LastNote, receiptWhere, revealLabel } from '../../shared/receipt'
 import { formatMinutesBack, typicalLine } from '../../shared/timeback'
+import { type ProFacts, shouldOfferPro, thanksDue } from '../../shared/proMark'
 import type { SettingsApi } from '../../preload/settings'
 import type { WaitingTake } from '../../main/transcribe/recovery'
 import type { Settings } from '../../shared/settings'
@@ -16,6 +17,7 @@ import { PageTitle, useToday } from './PageTitle'
 import { DayStroke } from './DayStroke'
 import { EmptyState } from './EmptyState'
 import { AskFirst } from './AskFirst'
+import { ProMark } from './ProMark'
 
 const bridge = (): SettingsApi => window.murmur
 
@@ -409,6 +411,11 @@ function WaitingTakes(props: { pasteLastBinding: string }): React.JSX.Element | 
 export function HomeView(props: {
   settings: Settings
   onUpdateSettings: (partial: Partial<Settings>) => Promise<void>
+  /** The app-level license truth; null while it loads. */
+  license: ProFacts | null
+  onUpdatePro: (patch: Partial<Settings['pro']>) => Promise<void>
+  /** Opens the Pro section in settings. */
+  onSeePro: () => void
 }): React.JSX.Element {
   const [events, setEvents] = useState<SessionEvent[]>([])
   // The empty state waits for the list, so a full history never flashes
@@ -476,6 +483,26 @@ export function HomeView(props: {
   const typingWpm = props.settings.timeBack.typingWpm
   const today = useToday()
 
+  // The thank-you after an activation shows on this Home visit only
+  // (US-107): the record clears as it shows, and this visit keeps it.
+  const [thanks, setThanks] = useState(false)
+  const due = thanksDue(props.license, props.settings.pro.thanksPending)
+  const { onUpdatePro } = props
+  useEffect(() => {
+    if (due) {
+      setThanks(true)
+      void onUpdatePro({ thanksPending: false })
+    }
+  }, [due, onUpdatePro])
+
+  // One dim line, once ever, 30 calendar days after installing (US-107).
+  const offerPro = shouldOfferPro({
+    installedAt: props.settings.installedAt,
+    now: Date.now(),
+    done: props.settings.pro.offerDone,
+    status: props.license
+  })
+
   useEffect(() => {
     void bridge()
       .listHistory()
@@ -531,6 +558,12 @@ export function HomeView(props: {
           </p>
         </section>
       )}
+      {thanks && (
+        <p className="pro-thanks">
+          <ProMark state="filled" />
+          <span>Thank you for keeping murmur free for everyone. Your Pro extras are on in settings.</span>
+        </p>
+      )}
       <WhatsNew settings={props.settings} onUpdateSettings={props.onUpdateSettings} />
       <WaitingTakes pasteLastBinding={props.settings.hotkey.pasteLastBinding} />
       {events.some(countsTowardStats) && summary && (
@@ -556,6 +589,25 @@ export function HomeView(props: {
             {formatMinutesBack(summary.month.minutesBack)} this month ·{' '}
             {formatMinutesBack(summary.lifetime.minutesBack)} lifetime
           </p>
+          {offerPro && (
+            <p className="pro-offer-line">
+              murmur has given you back {formatMinutesBack(summary.lifetime.minutesBack)} so far. Pro is how it stays
+              free for everyone.{' '}
+              <button
+                className="link-btn"
+                onClick={() => {
+                  void props.onUpdatePro({ offerDone: true })
+                  props.onSeePro()
+                }}
+              >
+                See Pro
+              </button>{' '}
+              ·{' '}
+              <button className="link-btn" onClick={() => void props.onUpdatePro({ offerDone: true })}>
+                No thanks
+              </button>
+            </p>
+          )}
         </section>
       )}
       <LastNoteRow />
