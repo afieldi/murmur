@@ -121,6 +121,11 @@ struct TakeRules: Sendable {
         microphone.level
     }
 
+    /// What the pill on Dictate and New note shows (IOS-031).
+    var pillStage: PillStage {
+        PillStage(state, retrying: !retrying.isEmpty)
+    }
+
     /// Transcribing or retrying: one thing at a time.
     var isBusy: Bool {
         state == .transcribing || !retrying.isEmpty

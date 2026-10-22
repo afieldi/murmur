@@ -196,8 +196,19 @@ import UIKit
     }
 
     @Test func theAppFollowsTheTake() {
-        let states: [TakeModel.State] = [.idle, .recording(since: .now), .transcribing, .words("hi"), .heardNothing(sent: true), .micOff]
-        #expect(states.map(PillStage.init) == [.idle, .recording, .processing, .inserted, .noSpeech, .error])
+        let states: [TakeModel.State] = [
+            .idle, .recording(since: .now), .transcribing, .words("hi"), .heardNothing(sent: true),
+            .failed(TakeFailure(kind: "timeout", detail: "no response"), saved: true), .micOff, .micFailed,
+        ]
+        #expect(states.map { PillStage($0, retrying: false) } == [.idle, .recording, .processing, .inserted, .noSpeech, .error, .error, .error])
+    }
+
+    /// A retry from the waiting list dries like a take, never the red of
+    /// the take it retries (IOS-031).
+    @Test func aRetryShowsTheSheen() {
+        let failed = TakeModel.State.failed(TakeFailure(kind: "timeout", detail: "no response"), saved: true)
+        #expect(PillStage(failed, retrying: true) == .processing)
+        #expect(PillStage(.idle, retrying: true) == .processing)
     }
 
     /// The capture script draws every stage of every style.

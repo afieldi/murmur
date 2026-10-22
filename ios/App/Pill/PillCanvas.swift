@@ -25,6 +25,16 @@ struct PillCanvas: UIViewRepresentable {
 extension PillStage {
     /// The pill's stage for a take in the app.
     init(_ state: TakeModel.State) {
+        self.init(state, retrying: false)
+    }
+
+    /// The pill's stage for a take in the app. A retry from the waiting list
+    /// dries like a take, never the red of the take it retries (IOS-031).
+    init(_ state: TakeModel.State, retrying: Bool) {
+        if retrying {
+            self = .processing
+            return
+        }
         switch state {
         case .idle: self = .idle
         case .recording: self = .recording
