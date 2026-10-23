@@ -91,6 +91,10 @@ export function thanksDue(status: ProFacts | null, pending: boolean): boolean {
  */
 export const LIFT = {
   waitMs: 350,
+  /** murmur opens its window by itself at launch, before you are looking
+   *  (found live 2026-10-23: the fill ran 1 s after launch). Then the
+   *  lift waits until the window has been up this long. */
+  launchMs: 2500,
   growMs: 300,
   scale: 2,
   overshoot: 2.06,
@@ -98,6 +102,11 @@ export const LIFT = {
   settleMs: 500,
   skipSettleMs: 200
 } as const
+
+/** How long the lift waits once the window is in front, given how long its page has been up. */
+export function liftWaitMs(pageAgeMs: number): number {
+  return Math.max(LIFT.waitMs, LIFT.launchMs - pageAgeMs)
+}
 
 /** One stroke of the daily fill, in the mark's own box (0 to 1 each way). */
 export interface FillStroke {

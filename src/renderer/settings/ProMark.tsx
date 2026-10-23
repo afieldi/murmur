@@ -21,6 +21,7 @@ import {
   dailyFillDue,
   fillDurationMs,
   fillStrokes,
+  liftWaitMs,
   strokeProgress
 } from '../../shared/proMark'
 import { type Rgb, cachedBrush, mix, path, stroke, tokenColor } from '../brush'
@@ -328,13 +329,15 @@ export function HeaderProMark(props: {
       // Due: the outline waits, unpainted, for the window to be seen.
       draw(null, 0)
       if (!inFront() || waiting.current) return
+      // The page loads when the window first opens, so its age says
+      // whether this is the window murmur opened by itself at launch.
       waiting.current = window.setTimeout(() => {
         waiting.current = 0
         const now = latest.current
         const day = dayKey(Date.now())
         const due = dailyFillDue({ status: { pro: true }, enabled: now.enabled, lastPaintDay: now.lastPaintDay, today: day })
         if (inFront() && !run.current && due) start(day, true)
-      }, LIFT.waitMs)
+      }, liftWaitMs(performance.now()))
     }
 
     const skip = (): void => {

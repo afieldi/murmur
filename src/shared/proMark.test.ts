@@ -8,6 +8,7 @@ import {
   dailyFillDue,
   fillDurationMs,
   fillStrokes,
+  liftWaitMs,
   markFor,
   resolveInstallDate,
   shouldOfferPro,
@@ -180,6 +181,16 @@ describe('LIFT', () => {
     expect(LIFT.overshoot).toBeGreaterThan(LIFT.scale)
     expect(LIFT.overshoot).toBeLessThan(2.1)
     expect(LIFT.waitMs + LIFT.growMs + LIFT.holdMs + LIFT.settleMs).toBeLessThan(2000)
+  })
+
+  it('waits for the window murmur opens at launch to be seen, and not after', () => {
+    // The page mounts about 0.6 s after the window appears: the lift now
+    // comes about 1.5 s later than the 1 s it took before.
+    expect(liftWaitMs(600)).toBe(1900)
+    expect(liftWaitMs(2149)).toBe(LIFT.waitMs + 1)
+    expect(liftWaitMs(2150)).toBe(LIFT.waitMs)
+    expect(liftWaitMs(2300)).toBe(LIFT.waitMs)
+    expect(liftWaitMs(60_000)).toBe(LIFT.waitMs)
   })
 })
 
