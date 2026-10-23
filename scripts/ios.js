@@ -17,7 +17,8 @@ const { iosIconSet } = require('./lib/ios-icon')
 const { colorSetJson, parseRootTokens, toSwift } = require('./lib/ios-tokens')
 const {
   SIM_SIGNING,
-  altoolFailure,
+  ALTOOL_TIME_LIMIT_MS,
+  altoolRunFailure,
   fillJourneyPage,
   journeyScript,
   readDisplayFace,
@@ -365,12 +366,12 @@ function signedEntitlements(bundle, scratch) {
 }
 
 /** Runs altool, shows what it said, and fails on any failure it reports,
- *  whatever its exit code. */
+ *  whatever its exit code, or when it runs past the time limit. */
 function altool(args, env, step) {
-  const result = spawnSync('xcrun', args, { env, encoding: 'utf8' })
+  const result = spawnSync('xcrun', args, { env, encoding: 'utf8', timeout: ALTOOL_TIME_LIMIT_MS })
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`
   process.stdout.write(output)
-  const failure = result.error?.message ?? altoolFailure(output) ?? (result.status === 0 ? null : `altool exited ${result.status}`)
+  const failure = altoolRunFailure(result, output)
   if (failure) throw new Error(`the ${step} failed: ${failure}`)
 }
 

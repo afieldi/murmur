@@ -193,6 +193,21 @@ function altoolFailure(output) {
   return error ? error.trim() : null
 }
 
+/** How long one altool step, the validation or the upload, may run. Both
+ *  take a few minutes; build 530's validation hung for an hour after App
+ *  Store Connect answered 502 (2026-10-22), and spawnSync waits forever
+ *  unless told otherwise. */
+const ALTOOL_TIME_LIMIT_MS = 20 * 60_000
+
+/** Why an altool run failed, from how spawnSync says it ended and what
+ *  altool said, or null. A run past the time limit was stopped. */
+function altoolRunFailure(result, output) {
+  if (result.error?.code === 'ETIMEDOUT') {
+    return `altool gave no answer in ${ALTOOL_TIME_LIMIT_MS / 60_000} minutes and was stopped; run the release again to send the same build`
+  }
+  return result.error?.message ?? altoolFailure(output) ?? (result.status === 0 ? null : `altool exited ${result.status}`)
+}
+
 const ALL_ORIENTATIONS = [
   'UIInterfaceOrientationPortrait',
   'UIInterfaceOrientationPortraitUpsideDown',
@@ -278,6 +293,8 @@ module.exports = {
   releaseOptions,
   releaseBlocker,
   altoolFailure,
+  ALTOOL_TIME_LIMIT_MS,
+  altoolRunFailure,
   deviceProblem,
   keyFileProblem,
   journeyScript,

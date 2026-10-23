@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
+import { spawnSync } from 'node:child_process'
 import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  ALTOOL_TIME_LIMIT_MS,
   altoolFailure,
+  altoolRunFailure,
   buildNumber,
   compareVersions,
   copySharedJson,
@@ -208,6 +211,18 @@ describe('the release (IOS-015)', () => {
     expect(altoolFailure('UPLOAD FAILED with 1 error')).toBe('UPLOAD FAILED with 1 error')
     expect(altoolFailure(JSON.stringify({ 'success-message': "No errors uploading 'murmur.ipa'", 'product-errors': [] }))).toBeNull()
     expect(altoolFailure("No errors uploading 'murmur.ipa'")).toBeNull()
+  })
+
+  it('stops altool past its time limit and says so, since a hung validation once waited an hour', () => {
+    // The shape spawnSync gives a run it stopped, which the release reads.
+    const stopped = spawnSync('sleep', ['5'], { timeout: 50 })
+    expect(stopped.error?.code).toBe('ETIMEDOUT')
+    expect(altoolRunFailure(stopped, '')).toContain(`${ALTOOL_TIME_LIMIT_MS / 60_000} minutes`)
+    expect(ALTOOL_TIME_LIMIT_MS).toBeGreaterThanOrEqual(10 * 60_000)
+    expect(altoolRunFailure({ status: 0 }, "No errors uploading 'murmur.ipa'")).toBeNull()
+    expect(altoolRunFailure({ status: 0 }, '*** Error: Unable to upload archive.')).toBe('*** Error: Unable to upload archive.')
+    expect(altoolRunFailure({ status: 1 }, '')).toBe('altool exited 1')
+    expect(altoolRunFailure({ error: new Error('spawnSync xcrun ENOENT'), status: null }, '')).toBe('spawnSync xcrun ENOENT')
   })
 
   it('refuses an app that runs on iPad without turning every way, as Apple does (90474)', () => {
