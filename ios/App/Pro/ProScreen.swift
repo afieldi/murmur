@@ -93,7 +93,7 @@ struct ProRoute: View {
 /// A shop for previews: a price or none, one purchase or none, and an
 /// App Store that never answers when asked to wait.
 struct PreviewShop: ProShop {
-    var price: String? = "$39.99"
+    var price: String? = "$49.00"
     var bought: ProPurchase?
     var waits = false
 
@@ -109,7 +109,7 @@ struct PreviewShop: ProShop {
 }
 
 extension ProStore {
-    static func preview(bought: Bool, founder: Bool = false, price: String? = "$39.99", waits: Bool = false) -> ProStore {
+    static func preview(bought: Bool, founder: Bool = false, price: String? = "$49.00", waits: Bool = false) -> ProStore {
         let purchase = ProPurchase(product: ProRules.productId, purchased: Date(timeIntervalSince1970: 1_791_590_400), revoked: nil, code: founder ? ProRules.foundersCode : nil)
         return ProStore(shop: PreviewShop(price: price, bought: bought ? purchase : nil, waits: waits))
     }

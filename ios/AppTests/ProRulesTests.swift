@@ -44,12 +44,13 @@ let storeKitFileURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent(
 
 
     /// The test configuration sells the product the app names, with the
-    /// founders' code.
+    /// founders' code and the desktop buyers' code, both free as in App Store
+    /// Connect.
     @Test func theStoreKitFileSellsTheAppsProduct() throws {
         let file = try StoreKitFile.read(storeKitFileURL)
         let item = try #require(file.products.first { $0.productID == ProRules.productId })
         #expect(ProRules.productId == "com.lbwalton.murmur.ios.pro")
         #expect(item.type == "NonConsumable")
-        #expect(item.offerCodes?.map(\.referenceName) == [ProRules.foundersCode])
+        #expect(item.offerCodes?.map(\.referenceName) == [ProRules.foundersCode, "desktop"])
     }
 }

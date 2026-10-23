@@ -13,7 +13,7 @@
   "nonRenewingSubscriptions": [],
   "products": [
     {
-      "displayPrice": "39.99",
+      "displayPrice": "49.00",
       "familyShareable": false,
       "internalID": "6E3F1C2B",
       "localizations": [
@@ -29,7 +29,6 @@
       "offerCodes": [
         {
           "billingPlanType": "BILLED_UPFRONT",
-          "displayPrice": "35.99",
           "eligibility": [
             "new",
             "existing",
@@ -37,8 +36,20 @@
           ],
           "internalID": "6E3F1C2C",
           "isStackable": false,
-          "paymentMode": "payUpFront",
+          "paymentMode": "free",
           "referenceName": "founders"
+        },
+        {
+          "billingPlanType": "BILLED_UPFRONT",
+          "eligibility": [
+            "new",
+            "existing",
+            "expired"
+          ],
+          "internalID": "6E3F1C2D",
+          "isStackable": false,
+          "paymentMode": "free",
+          "referenceName": "desktop"
         }
       ]
     }

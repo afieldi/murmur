@@ -24,7 +24,7 @@ import Testing
         let store = ProStore(shop: ScriptedShop(file), product: product)
         await store.start()
         #expect(store.status == .free)
-        #expect(store.price == "$39.99")
+        #expect(store.price == "$49.00")
     }
 
     @Test func aPurchaseMakesProAndARefundEndsIt() async throws {
@@ -247,7 +247,8 @@ enum StoreKitTesting {
 /// The real StoreKit, in Xcode's test environment, on ios/murmur.storekit.
 /// One session plays the whole story in order, since every test shares the
 /// one StoreKit test environment, and each step waits for StoreKit to
-/// settle: a purchase, a refund, a founders code, and a restore.
+/// settle: a purchase, a refund, a founders code, a restore, and a desktop
+/// buyer's code.
 @MainActor @Suite(.serialized, .enabled(if: StoreKitTesting.works, "StoreKit testing is broken on iOS 26.3 to 26.x simulators (Apple FB22237318)"))
 struct ProStoreKitTests {
     let product = ProRules.productId
@@ -269,7 +270,7 @@ struct ProStoreKitTests {
         await store.start()
         try await settle(store) { store.status == .free }
         #expect(store.status == .free)
-        #expect(store.price == "$39.99")
+        #expect(store.price == "$49.00")
 
         // Get murmur Pro's own path, StoreKit's purchase and all.
         await store.buy()
@@ -293,5 +294,16 @@ struct ProStoreKitTests {
         await store.restore()
         #expect(store.status.isFounder)
         #expect(store.message == nil)
+
+        // A desktop buyer's free code makes a supporter, not a founding member.
+        let founded = try #require(session.allTransactions().last)
+        try session.refundTransaction(identifier: founded.identifier)
+        try await settle(store) { store.status == .free }
+        #expect(store.status == .free)
+        let desktop = try await session.buyProduct(identifier: product, options: [.codeOffer(referenceName: "desktop")])
+        #expect(StoreKitShop.purchase(desktop).code == "desktop")
+        try await settle(store) { store.status.isPro }
+        #expect(store.status.isPro)
+        #expect(!store.status.isFounder)
     }
 }
