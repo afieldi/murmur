@@ -181,8 +181,10 @@ export function fillStrokes(day: string): FillStroke[] {
       reverse: r() < 0.5,
       shade: r() * 2 - 1,
       // The shallow ground stroke runs wetter, so PRO sits on solid gold;
-      // the steeper strokes stay dry, their ends and gaps the day's look.
-      dry: first ? 0.3 + r() * 0.1 : 0.62 + r() * 0.18,
+      // the steeper strokes stay dry, their ends and gaps the day's look,
+      // though not so dry that the grain turns coarse (the soft grain).
+      // The painter treats under 0.5 as wet.
+      dry: first ? 0.3 + r() * 0.1 : 0.53 + r() * 0.15,
       brush: 3 + Math.floor(r() * 5),
       // Spread so the last stroke starts near 1.7 s with 3 strokes or 4,
       // and the fill lands in about 3 seconds either way.

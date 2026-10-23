@@ -51,6 +51,10 @@ export function ProMark(props: {
 const WHITE: Rgb = [255, 255, 255]
 const BLACK: Rgb = [0, 0, 0]
 
+/** Bristles per stroke: fine for a 16 px mark, so the grain stays soft
+ *  like the painting a day's strokes (LaBroi's pick, 2026-10-22). */
+const BRISTLES = 48
+
 function strokePath(s: FillStroke, w: number, h: number): ReturnType<typeof path> {
   const a = (s.angle * Math.PI) / 180
   const half = (s.len * w) / 2
@@ -81,17 +85,18 @@ export function paintFill(
     if (k <= 0) continue
     const P = strokePath(s, w, h)
     const rgb = s.shade >= 0 ? mix(gold, WHITE, s.shade * 0.1) : mix(gold, BLACK, -s.shade * 0.14)
-    stroke(ctx, P, cachedBrush(s.brush, 26), {
+    stroke(ctx, P, cachedBrush(s.brush, BRISTLES), {
       width: s.width * h,
       rgb,
       dry: s.dry,
       // The wet ground stroke lays a solid body under PRO; dry strokes
-      // are mostly bristles.
-      core: s.dry < 0.5 ? 0.8 : 0.34,
+      // keep a softer body under their bristles.
+      core: s.dry < 0.5 ? 0.8 : 0.55,
       ts: 0.05,
-      te: s.dry < 0.5 ? 0.26 : 0.46,
-      light: 0.14,
-      dark: 0.3,
+      te: s.dry < 0.5 ? 0.26 : 0.42,
+      // Gentle light and dark bristles: a soft grain, not wood grain.
+      light: 0.05,
+      dark: 0.1,
       i1: Math.max(1, Math.round(k * (P.length - 1)))
     })
   }
