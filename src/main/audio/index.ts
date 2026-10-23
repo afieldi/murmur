@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Main-process side of the recording pipeline: owns the hidden capture
 // window and exposes start/stop/cancel to the dictation flow. System
-// resume triggers a re-arm so the warm mic survives sleep.
+// resume, a screen unlock, and a session coming back trigger a re-arm so
+// the warm mic survives sleep (a Mac whose open mic keeps it from ever
+// sleeping only ever sees the unlock). The mic picked in Settings rides
+// to the capture window, and the inputs it sees ride back (US-110).
 import { join } from 'node:path'
 import { BrowserWindow, app, ipcMain, powerMonitor } from 'electron'
-import { devRendererUrl, watchWindow } from '../window-watch'
+import { devRendererUrl, watchWindow, writeAppLog } from '../window-watch'
 import { markMicrophoneWindow } from '../hardening'
 import { reviveOnDeath } from '../revive'
 import { IpcChannels } from '../../shared/ipc'
+import { type MicReport, sanitizeMicReport } from '../../shared/mic'
 import { isDeadStream } from '../../shared/speech-gate'
 import { parseWav } from '../../shared/wav'
 import { isSmoke, registerSmokeCheck } from '../smoke'
@@ -19,13 +23,22 @@ function aliveAudio(): BrowserWindow | null {
 }
 let readyResolvers: Array<() => void> = []
 let ready = false
+// What the capture window last said about the inputs, for the picker.
+let micReport: MicReport = { devices: [], current: '', standIn: false }
 
 function whenAudioReady(): Promise<void> {
   if (ready) return Promise.resolve()
   return new Promise((resolve) => readyResolvers.push(resolve))
 }
 
-export function initAudio(): void {
+/** Hand the capture window the mic picked in Settings. */
+function sendMicChoice(): void {
+  void import('../settings').then(({ getSettings }) => {
+    aliveAudio()?.webContents.send(IpcChannels.audioMic, getSettings().microphone)
+  })
+}
+
+export function initAudio(settingsWindow: () => BrowserWindow | null = () => null): void {
   audioWindow = new BrowserWindow({
     show: false,
     webPreferences: {
@@ -44,11 +57,41 @@ export function initAudio(): void {
     ready = true
     for (const resolve of readyResolvers) resolve()
     readyResolvers = []
+    // A fresh page (launch, or a revive) starts on the default.
+    sendMicChoice()
   })
 
-  powerMonitor.on('resume', () => {
-    aliveAudio()?.webContents.send(IpcChannels.audioRearm)
+  // Only the capture window speaks for the inputs; the report is bounded
+  // before it is kept, and only Settings hears that it changed.
+  ipcMain.on(IpcChannels.audioMics, (event, report: unknown) => {
+    if (event.sender !== aliveAudio()?.webContents) return
+    micReport = sanitizeMicReport(report)
+    const win = settingsWindow()
+    if (win && !win.isDestroyed()) win.webContents.send(IpcChannels.micsChanged)
   })
+  ipcMain.handle(IpcChannels.micsList, (): MicReport => micReport)
+
+  void import('../settings').then(({ onSettingsChanged }) => {
+    let lastChoice = ''
+    onSettingsChanged((settings) => {
+      const key = `${settings.microphone.id}\n${settings.microphone.label}`
+      if (key === lastChoice) return
+      lastChoice = key
+      sendMicChoice()
+    })
+  })
+
+  // A sleeping Mac comes back through resume. One that never sleeps
+  // (an open mic holds the system awake) comes back through an unlock or
+  // a returning session instead, so all three re-arm; the capture window
+  // waits for a take in progress to end first.
+  const wake = (reason: string) => (): void => {
+    writeAppLog(`[audio] ${reason}: re-arming capture`)
+    aliveAudio()?.webContents.send(IpcChannels.audioRearm)
+  }
+  powerMonitor.on('resume', wake('resume'))
+  powerMonitor.on('unlock-screen', wake('unlock-screen'))
+  powerMonitor.on('user-did-become-active', wake('user-did-become-active'))
 
   // A dead capture renderer (GPU reset, OS kill during sleep) means no
   // dictation until it comes back, so bring it back on the shared
@@ -60,7 +103,7 @@ export function initAudio(): void {
   // Smoke tightens the liveness watchdog so outage recovery proves
   // itself inside the per-check timeout.
   const smokeParams =
-    'synthetic=1&watchTickMs=100&stallMs=250&armTimeoutMs=2500&silentMs=250&maxSilentRearms=4'
+    'synthetic=1&watchTickMs=100&stallMs=250&armTimeoutMs=2500&silentMs=250&maxSilentRearms=4&deviceChangeMs=100'
   const query = isSmoke ? Object.fromEntries(new URLSearchParams(smokeParams)) : undefined
   watchWindow(audioWindow, 'audio')
   const devServer = devRendererUrl()
@@ -291,6 +334,121 @@ export function initAudio(): void {
     const info = parseWav(wav)
     if (info.sampleCount < 75_000 || !(info.peak > 0.05)) {
       console.error(`smoke recordingPressHang: take broken across the hung swap (samples=${info.sampleCount} peak=${info.peak})`)
+      return false
+    }
+    return true
+  })
+
+  registerSmokeCheck('recordingFollowsDefault', async () => {
+    // The 2026-10-23 report end to end (US-110): the system default
+    // moves while a take is open, the way a display wake hands it to a
+    // dock's jack and back. The take must keep its mic to the end, and
+    // capture must move to the new default the moment the take ends.
+    // Then a pick in Settings moves it, and clearing the pick follows the
+    // default again. The seam names its stand-in inputs Synthetic A and B.
+    await whenAudioReady()
+    const { existsSync, readFileSync } = await import('node:fs')
+    const logFile = join(app.getPath('userData'), 'logs', 'murmur.log')
+    const count = (needle: string): number =>
+      existsSync(logFile) ? readFileSync(logFile, 'utf8').split(needle).length - 1 : 0
+    const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
+    const waitFor = async (needle: string, before: number, ms: number): Promise<boolean> => {
+      const deadline = Date.now() + ms
+      while (count(needle) === before && Date.now() < deadline) await sleep(100)
+      return count(needle) > before
+    }
+    const onB = 'capture on Synthetic B'
+    const onA = 'capture on Synthetic A'
+    const queued = 'moving after this take'
+    const bBefore = count(onB)
+    const queuedBefore = count(queued)
+
+    startRecording()
+    await sleep(200)
+    aliveAudio()?.webContents.send(IpcChannels.audioSimulateDefaultMove, true)
+    // The change settles (100 ms at smoke timings) and is seen mid-take:
+    // the move is queued, and capture stays on A for the rest of the take.
+    if (!(await waitFor(queued, queuedBefore, 3_000))) {
+      console.error('smoke recordingFollowsDefault: the default move was never seen')
+      return false
+    }
+    await sleep(400)
+    const movedMidTake = count(onB) > bBefore
+    const take = await stopRecording()
+    if (!take) {
+      console.error('smoke recordingFollowsDefault: stop returned null')
+      return false
+    }
+    const taken = parseWav(take)
+    if (movedMidTake || taken.sampleCount < 8_000 || !(taken.peak > 0.05)) {
+      console.error(
+        `smoke recordingFollowsDefault: the take was not kept whole on its mic (movedMidTake=${movedMidTake} samples=${taken.sampleCount} peak=${taken.peak})`
+      )
+      return false
+    }
+    // Between takes: capture moves to the new default.
+    if (!(await waitFor(onB, bBefore, 3_000))) {
+      console.error('smoke recordingFollowsDefault: capture never moved after the take')
+      return false
+    }
+
+    // A pick moves it, while the default stays on B.
+    const aBefore = count(onA)
+    aliveAudio()?.webContents.send(IpcChannels.audioMic, { id: 'synthetic-a', label: 'Synthetic A' })
+    if (!(await waitFor(onA, aBefore, 3_000))) {
+      console.error('smoke recordingFollowsDefault: the pick did not move capture')
+      return false
+    }
+    // The report follows the log line over its own channel.
+    await sleep(300)
+    const picked = micReport.devices.length === 2 && micReport.current === 'Synthetic A' && !micReport.standIn
+    // Clearing the pick follows the default again.
+    const bAgain = count(onB)
+    aliveAudio()?.webContents.send(IpcChannels.audioMic, { id: '', label: '' })
+    if (!(await waitFor(onB, bAgain, 3_000))) {
+      console.error('smoke recordingFollowsDefault: clearing the pick did not return to the default')
+      return false
+    }
+    await sleep(300)
+    startRecording()
+    await sleep(600)
+    const wav = await stopRecording()
+    const info = wav ? parseWav(wav) : null
+    if (!picked || !info || info.sampleCount < 1_000 || !(info.peak > 0.05)) {
+      console.error(
+        `smoke recordingFollowsDefault: capture after the moves is not right (picked=${picked} report=${JSON.stringify(micReport)} peak=${info?.peak})`
+      )
+      return false
+    }
+    return true
+  })
+
+  registerSmokeCheck('recordingPressMoves', async () => {
+    // A default that changes with no device change event (US-110): only
+    // the next press can find it. That press must move capture under the
+    // take, the old mic feeding it until the new one is in, so the take
+    // runs unbroken and ends on the default.
+    await whenAudioReady()
+    const { existsSync, readFileSync } = await import('node:fs')
+    const logFile = join(app.getPath('userData'), 'logs', 'murmur.log')
+    const count = (needle: string): number =>
+      existsSync(logFile) ? readFileSync(logFile, 'utf8').split(needle).length - 1 : 0
+    const pressBefore = count('press found capture on')
+    aliveAudio()?.webContents.send(IpcChannels.audioSimulateDefaultMove, false)
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    startRecording()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    const wav = await stopRecording()
+    if (!wav) {
+      console.error('smoke recordingPressMoves: stop returned null')
+      return false
+    }
+    const info = parseWav(wav)
+    const moved = count('press found capture on') > pressBefore
+    if (!moved || info.sampleCount < 10_000 || !(info.peak > 0.05)) {
+      console.error(
+        `smoke recordingPressMoves: the press did not move capture under an unbroken take (moved=${moved} samples=${info.sampleCount} peak=${info.peak})`
+      )
       return false
     }
     return true

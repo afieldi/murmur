@@ -28,6 +28,22 @@ const api = {
   onSimulateHang: (cb: (count: number) => void): void => {
     ipcRenderer.on('audio:simulate-hang', (_e, count: number) => cb(Number(count)))
   },
+  onSimulateDefaultMove: (cb: (announce: boolean) => void): void => {
+    ipcRenderer.on('audio:simulate-default-move', (_e, announce: boolean) => cb(announce === true))
+  },
+  /** The mic picked in Settings (US-110); empty id and label follow the default. */
+  onMic: (cb: (choice: { id: string; label: string }) => void): void => {
+    ipcRenderer.on('audio:mic', (_e, choice: { id?: unknown; label?: unknown } | null) =>
+      cb({
+        id: typeof choice?.id === 'string' ? choice.id : '',
+        label: typeof choice?.label === 'string' ? choice.label : ''
+      })
+    )
+  },
+  /** The inputs by name and the one in use, for the Settings picker. */
+  mics: (report: { devices: Array<{ id: string; label: string }>; current: string; standIn: boolean }): void => {
+    ipcRenderer.send('audio:mics', report)
+  },
   ready: (): void => {
     ipcRenderer.send('audio:ready')
   },

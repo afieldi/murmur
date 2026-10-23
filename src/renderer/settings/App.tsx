@@ -25,6 +25,7 @@ import { JourneyView } from './JourneyView'
 import { WizardView } from './WizardView'
 import { WrapUpView } from './WrapUpView'
 import { ConnectionRows } from './ConnectionRows'
+import { MicRow } from './MicRow'
 import { NotesPanel } from './NotesPanel'
 import { TransformPanel } from './TransformPanel'
 import { type RailSection, SettingsRail } from './SettingsRail'
@@ -1030,6 +1031,8 @@ export function App(): React.JSX.Element {
                 onChange={(mode) => void update({ hotkey: { mode } as Settings['hotkey'] })}
               />
             </Row>
+
+            <MicRow settings={settings} onUpdate={update} />
 
             <Row label="Insert by" keywords="paste clipboard copy" desc="Paste puts text at your cursor. Copy only fills the clipboard.">
               <Segmented

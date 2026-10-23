@@ -49,7 +49,7 @@ It recovers on its own. When a computer sleeps, the operating system tears down 
 If dictation still comes up empty after a wake, check two things:
 
 1. The overlay pill. If it reacts to your hotkey but shows an error state, murmur is running and recovering; give it five to ten seconds and press the hotkey again.
-2. The microphone itself. If you dock or undock, your default microphone may have changed. macOS: System Settings, Sound, Input. Windows: Settings, System, Sound, Input.
+2. The microphone itself. If you dock or undock, your default microphone may have changed. macOS: System Settings, Sound, Input. Windows: Settings, System, Sound, Input. murmur follows the default on its own, between dictations, and Settings, Dictation, Microphone shows which mic it is on right now; if you picked a mic there, check it is the one you are speaking into. A mic that blips when a display wakes used to leave murmur stuck on another input until a restart; that is fixed, and [microphone](./microphone.md) has the story.
 
 ## What does murmur do while recovering the microphone?
 

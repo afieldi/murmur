@@ -25,6 +25,24 @@
 // captured before the graph died still delivers at stop. Recordings are
 // kept as rate-tagged segments so a rebuild onto a device with a
 // different sample rate resamples each stretch correctly.
+//
+// Device: the stream follows the system default input, or the mic picked
+// in Settings whenever it is plugged in (US-110, shared/mic.ts). A device
+// change moves it between takes, never under one, and a press that finds
+// it off its device moves it under the take, the way a silent stream is
+// healed. Each install names its device in the log.
+import {
+  type LiveMic,
+  type MicChoice,
+  type MicDevice,
+  type MicReport,
+  aliasName,
+  micTarget,
+  moveAction,
+  onTarget,
+  realMics,
+  targetKey
+} from '../../shared/mic'
 import { isDeadStream, peakLevel } from '../../shared/speech-gate'
 import { TARGET_SAMPLE_RATE, downsample, encodeWavPcm16 } from '../../shared/wav'
 import { LIVENESS_DEFAULTS, livenessAction, signalAction } from './liveness'
@@ -41,7 +59,23 @@ export interface RecorderOptions {
   maxSilentRearms?: number
   /** Called with the RMS level of each chunk while recording is active. */
   onLevel?: (rms: number) => void
+  /** How long a burst of device changes settles before the stream follows. */
+  deviceChangeMs?: number
+  /** Called with the inputs and the one in use whenever either may have changed. */
+  onMics?: (report: MicReport) => void
 }
+
+// A device list that does not come back in this long is not waited for:
+// the last one stands (enumeration can lag while a waking audio stack
+// settles, and an arm must never hang on it).
+const ENUMERATE_TIMEOUT_MS = 1_500
+
+// Smoke's stand-in inputs: two devices and Chromium's default alias,
+// which simulateDefaultMove points at one or the other.
+const SYNTHETIC_MICS: MicDevice[] = [
+  { deviceId: 'synthetic-a', groupId: 'synthetic-group-a', label: 'Synthetic A' },
+  { deviceId: 'synthetic-b', groupId: 'synthetic-group-b', label: 'Synthetic B' }
+]
 
 interface RecordingSegment {
   rate: number
@@ -81,9 +115,28 @@ export class Recorder {
   private failNextArms = 0
   private silentNextArms = 0
   private hangNextArms = 0
+  // Device state: the pick from Settings, the last input list, the
+  // installed graph's device, the device last named in the log, a move
+  // already tried (tried once, never looped), and work held for a take
+  // in progress to end.
+  private choice: MicChoice = { id: '', label: '' }
+  private devices: MicDevice[] = []
+  private live: LiveMic | null = null
+  private liveLabel = ''
+  private loggedLabel = ''
+  private triedKey = ''
+  private stuckLogged = ''
+  private moveAfterTake = false
+  private rearmAfterTake = false
+  private followAfterArm = false
+  private deviceTimer: ReturnType<typeof setTimeout> | null = null
+  private syntheticDefault = 0
 
   constructor(private readonly opts: RecorderOptions) {
     this.minSignalChunks = opts.minSignalChunks ?? LIVENESS_DEFAULTS.minSignalChunks
+    if (!opts.synthetic && typeof navigator !== 'undefined' && navigator.mediaDevices) {
+      navigator.mediaDevices.addEventListener('devicechange', () => this.deviceChanged())
+    }
   }
 
   /** (Re)acquire the source and start feeding the pre-roll buffer.
@@ -100,6 +153,10 @@ export class Recorder {
         if (this.arming === attempt) {
           this.arming = null
           this.armingSince = null
+          if (this.followAfterArm) {
+            this.followAfterArm = false
+            void this.follow()
+          }
         }
       })
       this.arming = attempt
@@ -151,6 +208,124 @@ export class Recorder {
   simulateHang(count: number): void {
     if (!this.opts.synthetic) return
     this.hangNextArms = Math.max(0, Math.floor(count))
+  }
+
+  /**
+   * Smoke-only seam: the system default moves to the other stand-in
+   * input, the way a display wake hands the default to a dock's jack and
+   * back. Announced, it arrives the way devicechange announces it;
+   * quiet, only the next press can find it. No-op outside synthetic mode.
+   */
+  simulateDefaultMove(announce: boolean): void {
+    if (!this.opts.synthetic) return
+    this.syntheticDefault = 1 - this.syntheticDefault
+    if (announce) this.deviceChanged()
+  }
+
+  /** The mic picked in Settings; empty follows the system default. */
+  setMicChoice(choice: MicChoice): void {
+    if (choice.id === this.choice.id && choice.label === this.choice.label) return
+    this.choice = { id: choice.id, label: choice.label }
+    this.triedKey = ''
+    void this.follow()
+  }
+
+  private deviceChanged(): void {
+    // Plugging in a dock or waking a display fires a burst of changes;
+    // follow once it settles.
+    if (this.deviceTimer) clearTimeout(this.deviceTimer)
+    this.deviceTimer = setTimeout(() => {
+      this.deviceTimer = null
+      void this.follow()
+    }, this.opts.deviceChangeMs ?? 500)
+  }
+
+  private async refreshDevices(): Promise<MicDevice[]> {
+    if (this.opts.synthetic) {
+      const to = SYNTHETIC_MICS[this.syntheticDefault]
+      this.devices = [{ deviceId: 'default', groupId: to.groupId, label: `Default - ${to.label}` }, ...SYNTHETIC_MICS]
+      return this.devices
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      const list = await Promise.race([
+        navigator.mediaDevices.enumerateDevices(),
+        new Promise<null>((resolve) => {
+          timer = setTimeout(() => resolve(null), ENUMERATE_TIMEOUT_MS)
+        })
+      ])
+      if (list) {
+        this.devices = list
+          .filter((d) => d.kind === 'audioinput')
+          .map((d) => ({ deviceId: d.deviceId, groupId: d.groupId, label: d.label }))
+      }
+    } catch {
+      // The last list stands; the next change or arm reads again.
+    } finally {
+      clearTimeout(timer)
+    }
+    return this.devices
+  }
+
+  private report(): void {
+    this.opts.onMics?.({
+      devices: realMics(this.devices).map((d) => ({ id: d.deviceId, label: d.label })),
+      current: this.liveLabel,
+      standIn: micTarget(this.devices, this.choice).standIn
+    })
+  }
+
+  /**
+   * Puts the stream on the device it belongs on, between takes only. A
+   * take in progress keeps its mic and the move waits for it to end. A
+   * graph still building reads the list itself and checks again when it
+   * installs; no graph at all is the watchdog's case.
+   */
+  private async follow(): Promise<void> {
+    const devices = await this.refreshDevices()
+    this.report()
+    if (this.arming) {
+      this.followAfterArm = true
+      return
+    }
+    if (this.ctx === null || !this.live) return
+    const target = micTarget(devices, this.choice)
+    const from = this.liveLabel || 'an unnamed input'
+    const to = target.label || 'the default input'
+    if (onTarget(this.live, target)) {
+      this.triedKey = ''
+      this.moveAfterTake = false
+      return
+    }
+    const action = moveAction(this.live, target, this.active !== null, this.triedKey)
+    if (action === 'stay') {
+      // The move was tried and capture still came up elsewhere.
+      if (this.stuckLogged !== this.triedKey) {
+        this.stuckLogged = this.triedKey
+        console.error(`[murmur] capture could not move to ${to}; staying on ${from}`)
+      }
+      return
+    }
+    if (action === 'after-take') {
+      if (!this.moveAfterTake) console.error(`[murmur] capture belongs on ${to}, not ${from}; moving after this take`)
+      this.moveAfterTake = true
+      return
+    }
+    this.triedKey = targetKey(target)
+    this.moveAfterTake = false
+    console.error(`[murmur] capture belongs on ${to}, not ${from}; moving between takes`)
+    void this.arm().catch(() => undefined)
+  }
+
+  /** What a take held back runs once it ends. */
+  private afterTake(): void {
+    if (this.rearmAfterTake) {
+      this.rearmAfterTake = false
+      this.moveAfterTake = false
+      void this.rearm().catch(() => false)
+    } else if (this.moveAfterTake) {
+      void this.follow()
+    }
   }
 
   private tick(): void {
@@ -267,19 +442,37 @@ export class Recorder {
       if (ctx) await ctx.close().catch(() => undefined)
     }
 
+    // The device this graph belongs on, from a fresh list: a mic yanked a
+    // moment ago must not be asked for by id.
+    const target = micTarget(await this.refreshDevices(), this.choice)
+    if (gen !== this.generation) return
+    let live: LiveMic = { deviceId: target.deviceId ?? 'default', groupId: target.groupId }
+    let liveLabel = target.label
+
     try {
       if (!this.opts.synthetic) {
         // The stream comes first: a getUserMedia that hangs until the
         // watchdog abandons this attempt is holding no AudioContext,
         // so abandoned attempts cannot exhaust the per-page context cap.
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }
-        })
+        const audio = { channelCount: 1, echoCancellation: true, noiseSuppression: true }
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: target.deviceId ? { ...audio, deviceId: { exact: target.deviceId } } : audio
+          })
+        } catch (error) {
+          // The pick vanished between the list and the open: the default
+          // stands in, and the next device change brings the pick back.
+          if (!target.deviceId) throw error
+          stream = await navigator.mediaDevices.getUserMedia({ audio })
+        }
         if (gen !== this.generation) return void (await release())
         const track = stream.getAudioTracks()[0]
         // A yanked or slept device ends the track: re-arm without a
         // restart. Failure lands on the watchdog, which keeps retrying.
         track.addEventListener('ended', () => void this.arm().catch(() => undefined))
+        const settings = track.getSettings()
+        live = { deviceId: settings.deviceId ?? '', groupId: settings.groupId ?? '' }
+        liveLabel = aliasName(track.label)
       }
 
       const audioCtx = new AudioContext()
@@ -336,6 +529,8 @@ export class Recorder {
     this.ctx = ctx
     this.stream = stream
     this.feedGen = gen
+    this.live = live
+    this.liveLabel = liveLabel
     if (replaced) {
       this.preRoll = []
       this.preRollSamples = 0
@@ -358,6 +553,15 @@ export class Recorder {
     this.lastChunkAt = Date.now()
     this.armedAt = Date.now()
     this.signalChunks = 0
+    // One line per device, not per rebuild: the log says which mic every
+    // dictation after this one heard.
+    if (liveLabel !== '' && liveLabel !== this.loggedLabel) {
+      this.loggedLabel = liveLabel
+      console.error(`[murmur] capture on ${liveLabel}`)
+    }
+    // The device may have changed while this graph was building: look
+    // again once this attempt settles.
+    this.followAfterArm = true
   }
 
   private onChunk(chunk: Float32Array): void {
@@ -407,11 +611,32 @@ export class Recorder {
       this.exhaustedLogged = false
       console.error('[murmur] press found a silent stream; rebuilding capture under the take')
       void this.arm(true).catch(() => undefined)
+      return
     }
+    // A press on a stream that is live but on the wrong mic moves it the
+    // same way, so the words of this very press land on the right one
+    // (US-110: after a wake the stream sat on a dock's hissing jack and
+    // every dictation came back as a few garbled words). The list is read
+    // fresh, since a default can change without a device change event;
+    // the old graph feeds the take meanwhile.
+    const take = this.active
+    void this.refreshDevices().then((devices) => {
+      if (this.active !== take || this.ctx === null || this.arming) return
+      const target = micTarget(devices, this.choice)
+      if (moveAction(this.live, target, false, this.triedKey) !== 'move') return
+      this.triedKey = targetKey(target)
+      this.moveAfterTake = false
+      console.error(
+        `[murmur] press found capture on ${this.liveLabel || 'an unnamed input'}, not ${target.label || 'the default input'}; moving capture under the take`
+      )
+      void this.arm(true).catch(() => undefined)
+    })
   }
 
   cancel(): void {
+    const open = this.active !== null
     this.active = null
+    if (open) this.afterTake()
   }
 
   /**
@@ -440,7 +665,9 @@ export class Recorder {
       all.set(p, offset)
       offset += p.length
     }
-    return encodeWavPcm16(all, TARGET_SAMPLE_RATE)
+    const wav = encodeWavPcm16(all, TARGET_SAMPLE_RATE)
+    this.afterTake()
+    return wav
   }
 
   isArmed(): boolean {
@@ -448,12 +675,21 @@ export class Recorder {
   }
 
   async rearm(): Promise<boolean> {
-    // Main is asking (resume, the press-time heal, smoke): a new
+    // Never under a take: a wake or an unlock can land the instant a
+    // press starts, and a cold rebuild then would cut its first words.
+    // The re-arm runs as soon as the take ends.
+    if (this.active) {
+      this.rearmAfterTake = true
+      return this.isArmed()
+    }
+    // Main is asking (resume, unlock, the press-time heal, smoke): a new
     // situation, so the silent-rearm budget reopens and a second round
-    // gets its own log lines (a heal that did not help is worth seeing).
+    // gets its own log lines (a heal that did not help is worth seeing),
+    // including which mic it came back on.
     this.silentRearms = 0
     this.silenceLogged = false
     this.exhaustedLogged = false
+    this.loggedLabel = ''
     await this.arm()
     return this.isArmed()
   }

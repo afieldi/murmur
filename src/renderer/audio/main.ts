@@ -33,6 +33,9 @@ const recorder = new Recorder({
   silentMs: msParam('silentMs'),
   minSignalChunks: msParam('minSignalChunks'),
   maxSilentRearms: msParam('maxSilentRearms'),
+  deviceChangeMs: msParam('deviceChangeMs'),
+  // Settings shows the inputs and the one in use (US-110); names only.
+  onMics: (report) => bridge.mics(report),
   onLevel: (rms) => {
     pendingLevel = Math.max(pendingLevel, rms)
     const now = performance.now()
@@ -63,6 +66,10 @@ bridge.onRearm(() => {
     .catch(() => bridge.armed(false))
 })
 
+bridge.onMic((choice) => {
+  recorder.setMicChoice(choice)
+})
+
 if (synthetic) {
   bridge.onSimulateOutage((failures) => {
     recorder.simulateOutage(failures)
@@ -77,6 +84,9 @@ if (synthetic) {
   bridge.onSimulateHang((count) => {
     recorder.simulateHang(count)
     bridge.armed(false)
+  })
+  bridge.onSimulateDefaultMove((announce) => {
+    recorder.simulateDefaultMove(announce)
   })
 }
 
