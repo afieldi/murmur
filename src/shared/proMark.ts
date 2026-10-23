@@ -103,6 +103,28 @@ export const LIFT = {
   skipSettleMs: 200
 } as const
 
+/**
+ * The moment you buy, rolled from the top of the window down (LaBroi's
+ * pick on canvas board 2, 2026-10-23): the header's mark starts at once,
+ * each outlined mark below it fills one step later than the one above,
+ * and every mark glows bright gold as it fills, then fades.
+ */
+export const ARRIVE = {
+  stepMs: 150,
+  /** pro-mark-glow in styles.css runs this long. */
+  glowMs: 1900
+} as const
+
+/** Each mark's delay, by its place on screen: highest first, then leftmost. */
+export function rollDelaysMs(places: readonly { top: number; left: number }[]): number[] {
+  const order = places.map((_, i) => i).sort((a, b) => places[a].top - places[b].top || places[a].left - places[b].left)
+  const delays = new Array<number>(places.length)
+  order.forEach((index, rank) => {
+    delays[index] = (rank + 1) * ARRIVE.stepMs
+  })
+  return delays
+}
+
 /** How long the lift waits once the window is in front, given how long its page has been up. */
 export function liftWaitMs(pageAgeMs: number): number {
   return Math.max(LIFT.waitMs, LIFT.launchMs - pageAgeMs)
