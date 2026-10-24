@@ -2,7 +2,7 @@
 // The settings surface. Quiet night-studio panels; the overlay pill
 // stays the only loud element in the product. The settings tab is a
 // rail of sections beside one scrolling column (US-069).
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type {
   HotkeysStatus,
   KeyStatus,
@@ -12,7 +12,7 @@ import type {
   SettingsApi
 } from '../../preload/settings'
 import proConfig from '../../../shared/pro.json'
-import { markFor } from '../../shared/proMark'
+import { markFor, rollDelaysMs } from '../../shared/proMark'
 import { type ProviderCatalog, costPer1kWords, providerForBaseUrl } from '../../shared/catalog'
 import { DEFAULT_SETTINGS, type Settings } from '../../shared/settings'
 import { type OverlayLook, normalizeOverlayLook } from '../../shared/overlay-state'
@@ -25,6 +25,7 @@ import { JourneyView } from './JourneyView'
 import { WizardView } from './WizardView'
 import { WrapUpView } from './WrapUpView'
 import { ConnectionRows } from './ConnectionRows'
+import { MicRow } from './MicRow'
 import { NotesPanel } from './NotesPanel'
 import { TransformPanel } from './TransformPanel'
 import { type RailSection, SettingsRail } from './SettingsRail'
@@ -374,6 +375,22 @@ export function App(): React.JSX.Element {
     void updatePro({ offerDone: true, thanksPending: true })
   }
 
+  // The marks roll in from the top of the window down (LaBroi, 2026-10-23):
+  // the header's mark starts at once, then each mark on screen one step
+  // after the one above it. Set before paint, so none starts out of turn.
+  // The 3 marks that can arrive (the rail, Profiles, the section title)
+  // are all on the page when the purchase lands, so the order is set once.
+  useLayoutEffect(() => {
+    if (!(arrival > 0 && Date.now() - arrival < 3000)) return
+    const marks = [...document.querySelectorAll<HTMLElement>('.pro-mark-arrive')]
+      .map((el) => ({ el, place: el.getBoundingClientRect() }))
+      .filter(({ place }) => place.height > 0 && place.bottom > 0 && place.top < window.innerHeight)
+    const delays = rollDelaysMs(marks.map(({ place }) => place))
+    marks.forEach(({ el }, i) => {
+      el.style.animationDelay = `${delays[i]}ms`
+    })
+  }, [arrival])
+
   useEffect(() => {
     if (settings) document.documentElement.dataset.theme = settings.cosmetics.uiTheme
   }, [settings])
@@ -600,13 +617,13 @@ export function App(): React.JSX.Element {
   const failing = (...ids: string[]): boolean =>
     checks.some((c) => ids.includes(c.id) && c.state === 'bad')
 
-  // The outlined marks fill once, a beat apart, right after a purchase.
+  // The outlined marks fill once right after a purchase.
   const arriving = arrival > 0 && Date.now() - arrival < 3000
   const offerMark = markFor('offer', license)
   // Beside a title that already says murmur Pro, the mark is decorative.
-  const proMark = (beat: 1 | 2 | 3, size?: 'md', decorative?: boolean): React.ReactNode =>
+  const proMark = (size?: 'md', decorative?: boolean): React.ReactNode =>
     offerMark === 'none' ? undefined : (
-      <ProMark state={offerMark} size={size} arriveBeat={arriving ? beat : undefined} decorative={decorative} />
+      <ProMark state={offerMark} size={size} arrive={arriving} decorative={decorative} />
     )
 
   const railSections: RailSection[] = [
@@ -618,7 +635,7 @@ export function App(): React.JSX.Element {
     { id: 'timeback', title: 'Time back and recap', group: 'features' },
     { id: 'look', title: 'Look', group: 'app' },
     { id: 'system', title: 'System', group: 'app', alert: failing('mic', 'axs', 'input') },
-    { id: 'pro', title: 'murmur Pro', group: 'app', mark: proMark(1, undefined, true) }
+    { id: 'pro', title: 'murmur Pro', group: 'app', mark: proMark(undefined, true) }
   ]
 
   // The chosen accent recolors data emphasis across the GUI (progress
@@ -944,7 +961,7 @@ export function App(): React.JSX.Element {
                     })
                 }
                 pro={license === null ? null : license.pro}
-                mark={proMark(2)}
+                mark={proMark()}
               />
 
               <Row
@@ -1014,6 +1031,8 @@ export function App(): React.JSX.Element {
                 onChange={(mode) => void update({ hotkey: { mode } as Settings['hotkey'] })}
               />
             </Row>
+
+            <MicRow settings={settings} onUpdate={update} />
 
             <Row label="Insert by" keywords="paste clipboard copy" desc="Paste puts text at your cursor. Copy only fills the clipboard.">
               <Segmented
@@ -1451,7 +1470,7 @@ export function App(): React.JSX.Element {
           <Section
             id="pro"
             title="murmur Pro"
-            mark={proMark(3, 'md', true)}
+            mark={proMark('md', true)}
             sub={license && !license.pro && !license.retained ? 'Optional. One time. Verified offline.' : 'Your license, verified offline.'}
           >
             <ProSection

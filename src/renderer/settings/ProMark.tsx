@@ -15,12 +15,14 @@
 import { useEffect, useRef } from 'react'
 import { dayKey } from '../../shared/history'
 import {
+  ARRIVE,
   type FillStroke,
   LIFT,
   arrivalDue,
   dailyFillDue,
   fillDurationMs,
   fillStrokes,
+  liftWaitMs,
   strokeProgress
 } from '../../shared/proMark'
 import { type Rgb, cachedBrush, mix, path, stroke, tokenColor } from '../brush'
@@ -28,8 +30,9 @@ import { type Rgb, cachedBrush, mix, path, stroke, tokenColor } from '../brush'
 export function ProMark(props: {
   state: 'filled' | 'outlined'
   size?: 'sm' | 'md'
-  /** The moment you buy: fill with gold once, this many beats in. */
-  arriveBeat?: 1 | 2 | 3
+  /** The moment you buy: fill with gold once and glow. The window sets
+   *  each mark's delay from its place on screen (App.tsx). */
+  arrive?: boolean
   /** Beside a title that already says murmur Pro: hidden from screen
    *  readers, so the name is not read twice. */
   decorative?: boolean
@@ -37,7 +40,7 @@ export function ProMark(props: {
   const cls = ['pro-mark']
   if (props.size === 'md') cls.push('pro-mark-md')
   if (props.state === 'outlined') cls.push('pro-mark-off')
-  else if (props.arriveBeat) cls.push('pro-mark-arrive', `pro-mark-beat${props.arriveBeat}`)
+  else if (props.arrive) cls.push('pro-mark-arrive')
   return (
     <span
       className={cls.join(' ')}
@@ -248,7 +251,7 @@ export function HeaderProMark(props: {
       }
     }
 
-    const start = (day: string, record: boolean): void => {
+    const start = (day: string, record: boolean, glow = false): void => {
       clearWait()
       const prior = run.current
       if (prior) finish(prior)
@@ -283,6 +286,26 @@ export function HeaderProMark(props: {
       }
       run.current = r
       draw(null, 0)
+      const pill = pillRef.current
+      if (glow && pill) {
+        // The moment you buy: the same bright glow as the marks below it,
+        // drawn at half size since the lift doubles it. A skip ends it
+        // with the rest of the run.
+        const root = getComputedStyle(document.documentElement)
+        const bright = root.getPropertyValue('--brand-glow').trim()
+        const fade = root.getPropertyValue('--brand-glow-fade').trim()
+        r.anims.push(
+          pill.animate(
+            [
+              { boxShadow: '0 0 0 0 transparent', easing: 'ease-out' },
+              { boxShadow: `0 0 9px 3.5px ${bright}`, offset: 0.22, easing: 'ease-out' },
+              { boxShadow: `0 0 6px 2px ${fade}`, offset: 0.45, easing: 'ease-out' },
+              { boxShadow: '0 0 0 0 transparent' }
+            ],
+            { duration: ARRIVE.glowMs }
+          )
+        )
+      }
       if (lift) {
         // Grows from its left edge, away from the wordmark, and the belt
         // steps aside by the same amount: paint never covers words.
@@ -328,13 +351,15 @@ export function HeaderProMark(props: {
       // Due: the outline waits, unpainted, for the window to be seen.
       draw(null, 0)
       if (!inFront() || waiting.current) return
+      // The page loads when the window first opens, so its age says
+      // whether this is the window murmur opened by itself at launch.
       waiting.current = window.setTimeout(() => {
         waiting.current = 0
         const now = latest.current
         const day = dayKey(Date.now())
         const due = dailyFillDue({ status: { pro: true }, enabled: now.enabled, lastPaintDay: now.lastPaintDay, today: day })
         if (inFront() && !run.current && due) start(day, true)
-      }, LIFT.waitMs)
+      }, liftWaitMs(performance.now()))
     }
 
     const skip = (): void => {
@@ -369,7 +394,7 @@ export function HeaderProMark(props: {
       start(today, dailyFillDue({ status: { pro: true }, enabled: p.enabled, lastPaintDay: p.lastPaintDay, today }))
     }
 
-    controls.current = { check, startArrival: () => start(dayKey(Date.now()), true) }
+    controls.current = { check, startArrival: () => start(dayKey(Date.now()), true, true) }
     check()
     window.addEventListener('focus', check)
     window.addEventListener('blur', onBlur)

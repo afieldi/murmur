@@ -1545,18 +1545,28 @@ details[open] > .ladder-summary::after {
   vertical-align: 2px;
 }
 
-/* The moment you buy: each outlined mark fills with gold once, a beat
-   apart, in under a second. Nothing loops. */
+/* The moment you buy: each outlined mark fills with gold once and glows
+   bright, then the glow fades. App.tsx staggers them from the top of the
+   window down. Nothing loops. */
 .pro-mark-arrive {
-  animation: pro-mark-leaf 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation:
+    pro-mark-leaf 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both,
+    pro-mark-glow 1.9s ease-out both;
 }
 
-.pro-mark-beat2 {
-  animation-delay: 0.12s;
-}
-
-.pro-mark-beat3 {
-  animation-delay: 0.24s;
+@keyframes pro-mark-glow {
+  0% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  22% {
+    box-shadow: 0 0 18px 7px var(--brand-glow);
+  }
+  45% {
+    box-shadow: 0 0 12px 4px var(--brand-glow-fade);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
 }
 
 @keyframes pro-mark-leaf {

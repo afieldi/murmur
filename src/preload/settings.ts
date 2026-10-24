@@ -74,6 +74,13 @@ const api = {
     return ipcRenderer.invoke('profiles:delete', id)
   },
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
+  /** The inputs murmur's capture window sees, by name, and the one in use (US-110). */
+  listMics: (): Promise<import('../shared/mic').MicReport> => ipcRenderer.invoke('mics:list'),
+  onMicsChanged: (cb: () => void): (() => void) => {
+    const handler = (): void => cb()
+    ipcRenderer.on('mics:changed', handler)
+    return () => ipcRenderer.removeListener('mics:changed', handler)
+  },
   updateSettings: (partial: Partial<Settings>): Promise<Settings> => {
     return ipcRenderer.invoke('settings:update', partial)
   },

@@ -30,6 +30,9 @@
      still outshines the hardware (LaBroi direction, 2026-09-07). */
   --brand: #d9a441;
   --brand-edge: rgba(217, 164, 65, 0.5);
+  /* the bright gold glow as a Pro mark fills (US-107, LaBroi 2026-10-23) */
+  --brand-glow: rgba(217, 164, 65, 0.8);
+  --brand-glow-fade: rgba(217, 164, 65, 0.5);
 
   /* paint (US-073, the brushwork art direction, LaBroi 2026-10-01).
      Brush marks only, never interface chrome. Smoke is background

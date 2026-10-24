@@ -302,6 +302,11 @@ const DOCS = [
     'Every murmur setting explained: hotkeys, hold to talk or toggle, insert modes, formatting levels, Smart lists, Apply corrections, the dictionary, history, sounds, and more.'
   ],
   [
+    'microphone',
+    'Microphone',
+    'Choose the microphone murmur listens to, and how murmur follows your default mic after a display wakes, a dock reconnects, or a mic is unplugged.'
+  ],
+  [
     'providers',
     'Providers',
     'Connect murmur to Groq, OpenAI, Mistral, a local Whisper server, or any OpenAI-compatible endpoint: base URLs, keys, models, costs, and fixes.'

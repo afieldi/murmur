@@ -33,6 +33,9 @@ const recorder = new Recorder({
   silentMs: msParam('silentMs'),
   minSignalChunks: msParam('minSignalChunks'),
   maxSilentRearms: msParam('maxSilentRearms'),
+  deviceChangeMs: msParam('deviceChangeMs'),
+  // Settings shows the inputs and the one in use (US-110); names only.
+  onMics: (report) => bridge.mics(report),
   onLevel: (rms) => {
     pendingLevel = Math.max(pendingLevel, rms)
     const now = performance.now()
@@ -63,6 +66,10 @@ bridge.onRearm(() => {
     .catch(() => bridge.armed(false))
 })
 
+bridge.onMic((choice) => {
+  recorder.setMicChoice(choice)
+})
+
 if (synthetic) {
   bridge.onSimulateOutage((failures) => {
     recorder.simulateOutage(failures)
@@ -77,6 +84,9 @@ if (synthetic) {
   bridge.onSimulateHang((count) => {
     recorder.simulateHang(count)
     bridge.armed(false)
+  })
+  bridge.onSimulateDefaultMove((announce, slowMs) => {
+    recorder.simulateDefaultMove(announce, slowMs)
   })
 }
 
@@ -98,10 +108,21 @@ bridge.onCue((cue, volume) => {
 // not that it succeeded: a wake-time reload often fails its first arm
 // and the watchdog recovers after. Welding ready to arm success would
 // leave main "not ready" forever in exactly that case.
-void recorder.arm().then(
-  () => bridge.ready(),
-  () => {
-    bridge.armed(false)
-    bridge.ready()
-  }
-)
+// The pick comes first (US-110), so a picked mic is the first one
+// opened; main answers at once, and a second at most stands in for it.
+const firstChoice = Promise.race([
+  bridge.micChoice(),
+  new Promise<{ id: string; label: string }>((resolve) => setTimeout(() => resolve({ id: '', label: '' }), 1_000))
+]).catch(() => ({ id: '', label: '' }))
+void firstChoice
+  .then((choice) => {
+    recorder.setMicChoice(choice)
+    return recorder.arm()
+  })
+  .then(
+    () => bridge.ready(),
+    () => {
+      bridge.armed(false)
+      bridge.ready()
+    }
+  )

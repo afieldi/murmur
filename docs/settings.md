@@ -65,6 +65,10 @@ Set a transform chord under Settings, Transform. Select text in any app, hold th
 
 **Hold to talk**: recording runs while the hotkey is held, stops when released. Best for short, frequent dictations. **Toggle**: tap once to start, tap again to stop. Best for long passages. Rapid accidental double-taps are absorbed.
 
+## How do I choose which microphone murmur uses?
+
+Settings, Dictation, Microphone. **Mac default** (on Windows, **Windows default**) follows your computer's default input, also after a mic is unplugged or the computer wakes. Picking a mic by name keeps murmur on it whenever it is plugged in; while it is unplugged the default stands in. The row shows the mic in use right now, and murmur only ever switches between dictations. Details: [microphone](./microphone.md).
+
 ## What do the insert modes do?
 
 **Paste at cursor** places the finished text wherever your cursor is, then restores whatever your clipboard held before about a second and a half after the paste lands, giving even a busy target app time to read it (an image or file on the clipboard is never destroyed, and anything you copy mid-dictation wins). **Copy only** skips the paste and leaves the text on the clipboard for you to place manually. If pasting ever fails (a revoked permission, an unusual app), murmur falls back to copy so the dictation is never lost.

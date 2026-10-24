@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { describe, expect, it } from 'vitest'
 import {
+  ARRIVE,
   LIFT,
   OFFER_AFTER_DAYS,
   arrivalDue,
@@ -8,7 +9,9 @@ import {
   dailyFillDue,
   fillDurationMs,
   fillStrokes,
+  liftWaitMs,
   markFor,
+  rollDelaysMs,
   resolveInstallDate,
   shouldOfferPro,
   strokeProgress,
@@ -180,6 +183,34 @@ describe('LIFT', () => {
     expect(LIFT.overshoot).toBeGreaterThan(LIFT.scale)
     expect(LIFT.overshoot).toBeLessThan(2.1)
     expect(LIFT.waitMs + LIFT.growMs + LIFT.holdMs + LIFT.settleMs).toBeLessThan(2000)
+  })
+
+  it('waits for the window murmur opens at launch to be seen, and not after', () => {
+    // The page mounts about 0.6 s after the window appears: the lift now
+    // comes about 1.5 s later than the 1 s it took before.
+    expect(liftWaitMs(600)).toBe(1900)
+    expect(liftWaitMs(2149)).toBe(LIFT.waitMs + 1)
+    expect(liftWaitMs(2150)).toBe(LIFT.waitMs)
+    expect(liftWaitMs(2300)).toBe(LIFT.waitMs)
+    expect(liftWaitMs(60_000)).toBe(LIFT.waitMs)
+  })
+})
+
+describe('rollDelaysMs', () => {
+  it('rolls from the top of the window down, one step apart, after the header', () => {
+    // The rail's mark sits low on screen, the section title higher, Profiles highest.
+    const rail = { top: 600, left: 40 }
+    const title = { top: 120, left: 220 }
+    const profiles = { top: 80, left: 300 }
+    expect(rollDelaysMs([rail, profiles, title])).toEqual([450, 150, 300])
+  })
+
+  it('breaks a tie on the same line from the left', () => {
+    expect(rollDelaysMs([{ top: 50, left: 200 }, { top: 50, left: 20 }])).toEqual([300, 150])
+  })
+
+  it("finishes the 3 marks' glows (rail, Profiles, section title) inside the 3 s they stay arriving", () => {
+    expect(3 * ARRIVE.stepMs + ARRIVE.glowMs).toBeLessThan(3000)
   })
 })
 
