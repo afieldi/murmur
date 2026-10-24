@@ -157,6 +157,8 @@ function createSettingsWindow(): BrowserWindow {
   if (capture) {
     const [w, h] = win.getContentSize()
     win.setContentSize(Math.round(w * capture), Math.round(h * capture))
+    // Grown from its corner it would run off the screen; recenter it.
+    win.center()
   }
   attachSettingsZoom(win, capture)
 
