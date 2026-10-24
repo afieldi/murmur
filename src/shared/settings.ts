@@ -58,6 +58,14 @@ export interface Settings {
   insertion: {
     mode: 'paste' | 'copy'
   }
+  /** The mic murmur listens to (US-110). Empty id and label follow the
+   *  system default, also after a mic is unplugged or the computer
+   *  wakes. A pick is kept by id and by name, so it is found again when
+   *  its id changes; while it is unplugged the default stands in. */
+  microphone: {
+    id: string
+    label: string
+  }
   overlay: {
     style: string
     /** How the pill is drawn (US-061): pill, compact, or bare. */
@@ -233,6 +241,10 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   insertion: {
     mode: 'paste'
+  },
+  microphone: {
+    id: '',
+    label: ''
   },
   overlay: {
     style: 'bars',
