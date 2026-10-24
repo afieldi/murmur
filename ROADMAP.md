@@ -1,6 +1,6 @@
 # murmur Roadmap
 
-> Generated from prd.json (87/110 stories verified). Do not edit by hand: change prd.json, then run `npm run roadmap`.
+> Generated from prd.json (87/111 stories verified). Do not edit by hand: change prd.json, then run `npm run roadmap`.
 
 ## Done and verified
 
@@ -122,3 +122,4 @@ Automated criteria pass; the remaining step is a human loop noted in prd.json an
 - [ ] **US-106** A changelog page on the site, built from CHANGELOG.md
 - [ ] **US-107** The murmur Pro mark in the app: a gold pill, filled when Pro is yours
 - [ ] **US-108** murmur Pro on the site: the mark, a pro link, and a /pro/ page
+- [ ] **US-111** Zoom the settings window with Cmd plus and Cmd minus
