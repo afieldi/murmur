@@ -70,9 +70,13 @@ Build 530 (TestFlight 9, uploaded 2026-10-22, IOS-031 the live pill and IOS-032 
 
 > New in this build: a live pill. Tap the microphone, and under the record button the pill sits still in the waveform you chose in Settings, Look. Start a take and it lights up and moves with your voice; stop, and it dries while your words are transcribed. New note does the same. Also new: a dictated question comes back as your question. If the cleanup model replies to what you said instead of cleaning it up (Canberra. for What's the capital of Australia?), murmur types your formatted words. To try it: Settings, Cleanup, with Cleanup level Full and Polish on, then dictate What time works for you tomorrow? The Cleanup screen's Polish line now names the cleanup model you picked. Everything from build 500 still applies. If something goes wrong, Settings, Diagnostics, Save report makes a report you can read and then share.
 
-Build 540 (TestFlight 10, uploaded 2026-10-23, the build to submit to the App Store; set the same way):
+Build 540 (TestFlight 10, uploaded 2026-10-23; set the same way):
 
 > The build for the App Store. New: murmur Pro's page says one Pro covers both devices. Bought murmur Pro on your Mac or PC? Email support@murmurapp.app with your order id for a free code. Bought it here? Email the order id from Apple's receipt for your desktop key. Everything from build 530 still applies: the live pill under the record button and in New note, and a dictated question comes back as your question. If something goes wrong, Settings, Diagnostics, Save report makes a report you can read and then share.
+
+Build 542 (TestFlight 11, uploaded 2026-10-23, the build to submit to the App Store, replacing 540; set the same way):
+
+> The build for the App Store. New: after a take, tap Copy words and you feel a tap and see Copied with a tick. Everything from build 540 still applies: murmur Pro's page says one Pro covers both devices, the live pill under the record button and in New note (at rest it shows your Look's waveform and colors), and a dictated question comes back as your question. If something goes wrong, Settings, Diagnostics, Save report makes a report you can read and then share.
 
 ## Internal testing
 
