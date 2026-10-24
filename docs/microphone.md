@@ -32,7 +32,7 @@ Now murmur watches for microphones coming and going and for the default changing
 3. Every press checks too. A press that finds murmur on the wrong mic moves it underneath the dictation, with the old mic recording until the new one is ready, so the words of that press are kept.
 4. A Mac that never fully sleeps (an open microphone can keep it awake) also gets a fresh start of the microphone when you unlock the screen, not only when the computer wakes from sleep.
 
-The log tells the story in plain lines, for example `capture belongs on USB Microphone, not Dock Audio - Front; moving between takes` and then `capture on USB Microphone`.
+The log tells the story in plain lines, for example `capture belongs on USB Microphone, not Dock Headset Jack; moving between takes` and then `capture on USB Microphone`.
 
 ## Does murmur ever switch microphones in the middle of a dictation?
 

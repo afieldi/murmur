@@ -36,12 +36,12 @@ import {
   type MicChoice,
   type MicDevice,
   type MicReport,
+  MoveTries,
   aliasName,
   micTarget,
   moveAction,
   onTarget,
-  realMics,
-  targetKey
+  realMics
 } from '../../shared/mic'
 import { isDeadStream, peakLevel } from '../../shared/speech-gate'
 import { TARGET_SAMPLE_RATE, downsample, encodeWavPcm16 } from '../../shared/wav'
@@ -116,21 +116,22 @@ export class Recorder {
   private silentNextArms = 0
   private hangNextArms = 0
   // Device state: the pick from Settings, the last input list, the
-  // installed graph's device, the device last named in the log, a move
-  // already tried (tried once, never looped), and work held for a take
-  // in progress to end.
+  // installed graph's device, the device last named in the log, the move
+  // tried since the last outside event (never looped on its own), and
+  // work held for a take in progress to end.
   private choice: MicChoice = { id: '', label: '' }
   private devices: MicDevice[] = []
   private live: LiveMic | null = null
   private liveLabel = ''
   private loggedLabel = ''
-  private triedKey = ''
+  private readonly tries = new MoveTries()
   private stuckLogged = ''
   private moveAfterTake = false
   private rearmAfterTake = false
   private followAfterArm = false
   private deviceTimer: ReturnType<typeof setTimeout> | null = null
   private syntheticDefault = 0
+  private slowNextArmMs = 0
 
   constructor(private readonly opts: RecorderOptions) {
     this.minSignalChunks = opts.minSignalChunks ?? LIVENESS_DEFAULTS.minSignalChunks
@@ -214,11 +215,15 @@ export class Recorder {
    * Smoke-only seam: the system default moves to the other stand-in
    * input, the way a display wake hands the default to a dock's jack and
    * back. Announced, it arrives the way devicechange announces it;
-   * quiet, only the next press can find it. No-op outside synthetic mode.
+   * quiet, only the next press can find it. slowMs holds the next graph
+   * that long before it installs, the way a waking audio stack is slow
+   * to open, so a press can land in the middle of the move. No-op
+   * outside synthetic mode.
    */
-  simulateDefaultMove(announce: boolean): void {
+  simulateDefaultMove(announce: boolean, slowMs = 0): void {
     if (!this.opts.synthetic) return
     this.syntheticDefault = 1 - this.syntheticDefault
+    this.slowNextArmMs = Math.max(0, Math.floor(slowMs))
     if (announce) this.deviceChanged()
   }
 
@@ -226,11 +231,14 @@ export class Recorder {
   setMicChoice(choice: MicChoice): void {
     if (choice.id === this.choice.id && choice.label === this.choice.label) return
     this.choice = { id: choice.id, label: choice.label }
-    this.triedKey = ''
+    this.tries.reset()
     void this.follow()
   }
 
   private deviceChanged(): void {
+    // An outside event: a move that did not stick earns a fresh try.
+    this.tries.reset()
+    this.stuckLogged = ''
     // Plugging in a dock or waking a display fires a burst of changes;
     // follow once it settles.
     if (this.deviceTimer) clearTimeout(this.deviceTimer)
@@ -293,15 +301,15 @@ export class Recorder {
     const from = this.liveLabel || 'an unnamed input'
     const to = target.label || 'the default input'
     if (onTarget(this.live, target)) {
-      this.triedKey = ''
+      this.tries.reset()
       this.moveAfterTake = false
       return
     }
-    const action = moveAction(this.live, target, this.active !== null, this.triedKey)
+    const action = moveAction(this.live, target, this.active !== null, this.tries.key)
     if (action === 'stay') {
       // The move was tried and capture still came up elsewhere.
-      if (this.stuckLogged !== this.triedKey) {
-        this.stuckLogged = this.triedKey
+      if (this.stuckLogged !== this.tries.key) {
+        this.stuckLogged = this.tries.key
         console.error(`[murmur] capture could not move to ${to}; staying on ${from}`)
       }
       return
@@ -311,10 +319,13 @@ export class Recorder {
       this.moveAfterTake = true
       return
     }
-    this.triedKey = targetKey(target)
+    this.tries.record(target)
     this.moveAfterTake = false
     console.error(`[murmur] capture belongs on ${to}, not ${from}; moving between takes`)
-    void this.arm().catch(() => undefined)
+    // Built beside the current graph and swapped in when ready: a press
+    // that lands mid-move records on the old mic until then instead of
+    // on nothing (review gate 2026-10-23).
+    void this.arm(true).catch(() => undefined)
   }
 
   /** What a take held back runs once it ends. */
@@ -446,6 +457,12 @@ export class Recorder {
     // moment ago must not be asked for by id.
     const target = micTarget(await this.refreshDevices(), this.choice)
     if (gen !== this.generation) return
+    if (this.opts.synthetic && this.slowNextArmMs > 0) {
+      const ms = this.slowNextArmMs
+      this.slowNextArmMs = 0
+      await new Promise((resolve) => setTimeout(resolve, ms))
+      if (gen !== this.generation) return
+    }
     let live: LiveMic = { deviceId: target.deviceId ?? 'default', groupId: target.groupId }
     let liveLabel = target.label
 
@@ -623,8 +640,8 @@ export class Recorder {
     void this.refreshDevices().then((devices) => {
       if (this.active !== take || this.ctx === null || this.arming) return
       const target = micTarget(devices, this.choice)
-      if (moveAction(this.live, target, false, this.triedKey) !== 'move') return
-      this.triedKey = targetKey(target)
+      if (moveAction(this.live, target, false, this.tries.key) !== 'move') return
+      this.tries.record(target)
       this.moveAfterTake = false
       console.error(
         `[murmur] press found capture on ${this.liveLabel || 'an unnamed input'}, not ${target.label || 'the default input'}; moving capture under the take`
@@ -690,6 +707,10 @@ export class Recorder {
     this.silenceLogged = false
     this.exhaustedLogged = false
     this.loggedLabel = ''
+    // And a move that did not stick (the list and the open can disagree
+    // right after a wake) earns a fresh try.
+    this.tries.reset()
+    this.stuckLogged = ''
     await this.arm()
     return this.isArmed()
   }

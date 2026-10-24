@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   type MicDevice,
+  MoveTries,
   aliasName,
   defaultMic,
   micTarget,
@@ -111,6 +112,17 @@ describe('onTarget and moveAction', () => {
   it('tries a move once: a target the stream cannot reach never loops', () => {
     const target = micTarget([alias(wave), wave, dock], FOLLOW)
     expect(moveAction(live(dock), target, false, targetKey(target))).toBe('stay')
+  })
+
+  it('tries an unreachable target again after a device change or a re-arm, never on its own', () => {
+    const target = micTarget([alias(wave), wave, dock], FOLLOW)
+    const tries = new MoveTries()
+    expect(moveAction(live(dock), target, false, tries.key)).toBe('move')
+    tries.record(target)
+    // The move landed on the dock again (the list and the open disagreed).
+    expect(moveAction(live(dock), target, false, tries.key)).toBe('stay')
+    tries.reset()
+    expect(moveAction(live(dock), target, false, tries.key)).toBe('move')
   })
 
   it('never churns on what it cannot tell', () => {

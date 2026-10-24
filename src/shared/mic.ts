@@ -58,6 +58,8 @@ export function aliasName(label: string): string {
 export function defaultMic(devices: readonly MicDevice[]): MicDevice | null {
   const mics = realMics(devices)
   const alias = devices.find((d) => d.deviceId === 'default')
+  // Chromium lists the default alias on macOS and Windows; without one
+  // (other platforms) it lists the default input first.
   if (!alias) return mics[0] ?? null
   const name = aliasName(alias.label)
   const match =
@@ -80,6 +82,8 @@ export function isPicked(choice: MicChoice): boolean {
 export function micTarget(devices: readonly MicDevice[], choice: MicChoice): MicTarget {
   const mics = realMics(devices)
   if (isPicked(choice)) {
+    // Two inputs with the same name resolve to the first of them when
+    // the id no longer matches; the id match comes first for that reason.
     const pick =
       mics.find((d) => choice.id !== '' && d.deviceId === choice.id) ??
       mics.find((d) => choice.label !== '' && d.label === choice.label)
@@ -104,6 +108,31 @@ export function onTarget(live: LiveMic, target: MicTarget): boolean {
   if (target.deviceId !== null) return live.deviceId === target.deviceId
   if (target.groupId === '' || live.groupId === '') return true
   return live.groupId === target.groupId
+}
+
+/**
+ * The move tried without an outside event since the last one. A target
+ * the stream cannot reach is tried once, then tried again after the next
+ * device change or re-arm, never in a loop on its own: right after a
+ * wake the input list and the open can briefly disagree, so a later
+ * event deserves a fresh try.
+ */
+export class MoveTries {
+  private tried = ''
+
+  /** What moveAction compares against. */
+  get key(): string {
+    return this.tried
+  }
+
+  record(target: MicTarget): void {
+    this.tried = targetKey(target)
+  }
+
+  /** A device change, a re-arm, or the stream landing where it belongs. */
+  reset(): void {
+    this.tried = ''
+  }
 }
 
 export type MoveAction = 'stay' | 'move' | 'after-take'

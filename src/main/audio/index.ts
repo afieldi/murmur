@@ -70,6 +70,13 @@ export function initAudio(settingsWindow: () => BrowserWindow | null = () => nul
     if (win && !win.isDestroyed()) win.webContents.send(IpcChannels.micsChanged)
   })
   ipcMain.handle(IpcChannels.micsList, (): MicReport => micReport)
+  // The capture window asks for the pick before its first arm, so a
+  // picked mic is the first one it opens, not a move after launch.
+  ipcMain.handle(IpcChannels.audioMicChoice, async (event) => {
+    if (event.sender !== aliveAudio()?.webContents) return { id: '', label: '' }
+    const { getSettings } = await import('../settings')
+    return getSettings().microphone
+  })
 
   void import('../settings').then(({ onSettingsChanged }) => {
     let lastChoice = ''
@@ -449,6 +456,49 @@ export function initAudio(settingsWindow: () => BrowserWindow | null = () => nul
       console.error(
         `smoke recordingPressMoves: the press did not move capture under an unbroken take (moved=${moved} samples=${info.sampleCount} peak=${info.peak})`
       )
+      return false
+    }
+    return true
+  })
+
+  registerSmokeCheck('recordingPressMidMove', async () => {
+    // The review gate's race (2026-10-23): a press that lands while a
+    // between-takes move is still building, right after a wake when the
+    // new mic is slow to open. The move builds beside the old graph, so
+    // the take records on the old mic until the swap; a cold move would
+    // tear it down first and the take would start on nothing. The seam
+    // holds the new graph 1.5 s, inside the 2.5 s abandon window.
+    await whenAudioReady()
+    const { existsSync, readFileSync } = await import('node:fs')
+    const logFile = join(app.getPath('userData'), 'logs', 'murmur.log')
+    const count = (needle: string): number =>
+      existsSync(logFile) ? readFileSync(logFile, 'utf8').split(needle).length - 1 : 0
+    const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
+    const movingBefore = count('moving between takes')
+    const installedBefore = count('capture on Synthetic')
+    aliveAudio()?.webContents.send(IpcChannels.audioSimulateDefaultMove, true, 1_500)
+    const deadline = Date.now() + 3_000
+    while (count('moving between takes') === movingBefore && Date.now() < deadline) await sleep(50)
+    if (count('moving between takes') === movingBefore) {
+      console.error('smoke recordingPressMidMove: the move never started')
+      return false
+    }
+    startRecording()
+    await sleep(600)
+    const wav = await stopRecording()
+    const info = wav ? parseWav(wav) : null
+    const installedMidTake = count('capture on Synthetic') > installedBefore
+    if (!info || installedMidTake || info.sampleCount < 6_000 || !(info.peak > 0.05)) {
+      console.error(
+        `smoke recordingPressMidMove: the press lost its first words to the move (installedMidTake=${installedMidTake} samples=${info?.sampleCount} peak=${info?.peak})`
+      )
+      return false
+    }
+    // And the move still lands.
+    const landBy = Date.now() + 4_000
+    while (count('capture on Synthetic') === installedBefore && Date.now() < landBy) await sleep(100)
+    if (count('capture on Synthetic') === installedBefore) {
+      console.error('smoke recordingPressMidMove: the move never landed')
       return false
     }
     return true
