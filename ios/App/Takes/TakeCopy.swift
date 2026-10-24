@@ -35,6 +35,8 @@ enum TakeCopy {
             : "murmur heard no speech, so it sent nothing. Speak a little closer, then try again."
     }
 
+    static let copyWords = "Copy words"
+    static let copied = "Copied"
     static let micOff = "Turn on Microphone for murmur in Settings, then try again."
     static let micFailed = "The microphone did not start. If another app is using it, close that app, then try again."
     static let lostAudio = "murmur could not save the audio either, so this take is gone."

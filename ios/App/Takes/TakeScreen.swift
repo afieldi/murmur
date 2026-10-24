@@ -136,8 +136,8 @@ struct TakeResult: View {
             Text(words)
                 .textSelection(.enabled)
                 .announced(words)
-            Button("Copy words") { UIPasteboard.general.string = words }
-                .buttonStyle(RowAction())
+            // New words start a new button, never one still saying Copied.
+            CopyWordsButton(words: words).id(words)
         case .heardNothing(let sent):
             Outcome(title: "Heard nothing", detail: TakeCopy.heardNothing(sent: sent), color: Tokens.textDim, symbol: "waveform.slash")
         case .failed(let failure, let saved):
@@ -152,6 +152,47 @@ struct TakeResult: View {
             Outcome(title: "The microphone did not start", detail: TakeCopy.micFailed, color: Tokens.red, symbol: "mic.slash")
         case .idle, .recording, .transcribing:
             EmptyView()
+        }
+    }
+}
+
+/// Copy words: a tap copies, taps back, and says Copied with a tick for a
+/// moment, as Home's rows do.
+struct CopyWordsButton: View {
+    let words: String
+    @State private var copied: Bool
+    @State private var copies = 0
+
+    init(words: String, copied: Bool = false) {
+        self.words = words
+        _copied = State(initialValue: copied)
+    }
+
+    var body: some View {
+        Button(action: copy) {
+            if copied {
+                Label(TakeCopy.copied, systemImage: "checkmark")
+                    .foregroundStyle(Tokens.ok)
+            } else {
+                Text(TakeCopy.copyWords)
+            }
+        }
+        .buttonStyle(RowAction())
+        .frame(minHeight: 44)
+        // The button keeps its name; the announcement says Copied.
+        .accessibilityLabel(TakeCopy.copyWords)
+        .sensoryFeedback(.success, trigger: copies)
+    }
+
+    private func copy() {
+        UIPasteboard.general.string = words
+        copies += 1
+        copied = true
+        AccessibilityNotification.Announcement(TakeCopy.copied).post()
+        let this = copies
+        Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            if copies == this { copied = false }
         }
     }
 }

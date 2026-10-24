@@ -31,6 +31,30 @@ import UIKit
         #expect(try shots.inked(page) > 0.01)
     }
 
+    /// After a tap, Copy words says Copied with a tick, at the largest text
+    /// size too.
+    @Test func copyWordsSaysCopied() async throws {
+        var pictures: [Data] = []
+        for copied in [false, true] {
+            let card = List {
+                Section {
+                    Text("Send the invoice to Dana tomorrow morning.")
+                    CopyWordsButton(words: "Send the invoice to Dana tomorrow morning.", copied: copied)
+                }
+                .listRowBackground(Tokens.panel)
+            }
+            .scrollContentBackground(.hidden)
+            .background(Tokens.ink)
+            .foregroundStyle(Tokens.text)
+            .preferredColorScheme(.dark)
+            let largest = try await shots.render(card.dynamicTypeSize(.accessibility5))
+            try shots.save(largest, "copy-words-\(copied ? "copied" : "ready")-largest")
+            #expect(try shots.inked(largest) > 0.01)
+            pictures.append(try #require(largest.pngData()))
+        }
+        #expect(pictures[0] != pictures[1])
+    }
+
     /// The transcribing scene holds its send, so the drying sheen shows.
     @Test func theTranscribingSceneHoldsTheSend() async throws {
         let model = try #require(await TakePreview.model(for: .transcribing))

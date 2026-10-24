@@ -25,6 +25,8 @@ struct HomeScreen: View {
     var notes: Notes? = Notes.live()
     let resume: (Setup.Step) -> Void
     @State private var copied: UUID?
+    /// Each copy taps back, as Dictate's Copy words does.
+    @State private var copies = 0
     @State private var askingClear = false
 
     var body: some View {
@@ -111,10 +113,12 @@ struct HomeScreen: View {
         .scrollContentBackground(.hidden)
         .background(Tokens.ink)
         .foregroundStyle(Tokens.text)
+        .sensoryFeedback(.success, trigger: copies)
     }
 
     private func copy(_ entry: HistoryEntry) {
         UIPasteboard.general.string = entry.words
+        copies += 1
         copied = entry.id
         Task {
             try? await Task.sleep(for: .seconds(1.5))
