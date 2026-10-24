@@ -4,14 +4,14 @@
 // on for the rest of the typical day. A day past typical fills the
 // width. Seeded by the date, so the stroke keeps its shape all day.
 import { useEffect, useRef } from 'react'
-import { cachedBrush, mulberry, path, rgba, stroke, tokenColor } from '../brush'
+import { cachedBrush, canvasDpr, mulberry, path, rgba, stroke, tokenColor } from '../brush'
 import { daySeed } from './inkMarks'
 
 const H = 24
 
 function paint(canvas: HTMLCanvasElement, share: number, day: string): void {
   const width = Math.max(40, canvas.clientWidth)
-  const dpr = Math.min(2, window.devicePixelRatio || 1)
+  const dpr = canvasDpr()
   canvas.width = Math.round(width * dpr)
   canvas.height = Math.round(H * dpr)
   const ctx = canvas.getContext('2d')
@@ -60,11 +60,22 @@ export function DayStroke(props: { share: number; day: string }): React.JSX.Elem
     const canvas = canvasRef.current
     if (!canvas) return
     const draw = (): void => paint(canvas, props.share, props.day)
-    draw()
-    // Repainted when the card changes width, never stretched.
+    // Repainted when the card changes width, never stretched, and when
+    // the pixel density changes (a zoom step, US-111) so it stays sharp.
     const watch = new ResizeObserver(draw)
     watch.observe(canvas)
-    return () => watch.disconnect()
+    let query: MediaQueryList | null = null
+    const onDensity = (): void => {
+      draw()
+      query?.removeEventListener('change', onDensity)
+      query = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`)
+      query.addEventListener('change', onDensity)
+    }
+    onDensity()
+    return () => {
+      watch.disconnect()
+      query?.removeEventListener('change', onDensity)
+    }
   }, [props.share, props.day])
   return <canvas ref={canvasRef} className="day-stroke" aria-hidden="true" />
 }

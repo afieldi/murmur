@@ -147,6 +147,12 @@ Settings, Look, Overlay look. Three looks:
 
 One rule holds in every look: text that has to be read (a hint such as "set a notes folder in settings", an error, no speech) always comes in the full pill, because a sentence with no backing is unreadable over a busy window. In bare, a note or a spoken edit shows its small mode tag but not the gold edge the pill wears, since there is no edge to color. Preview shows the current look without dictating. The overlay never takes focus and clicks pass straight through it in every look, so it can never steal a keystroke from the app you are dictating into.
 
+## How do I make murmur's window text bigger?
+
+Zoom the window. On a Mac, press Cmd + (or Cmd =) to zoom in, Cmd - to zoom out, and Cmd 0 to go back to actual size; the same three live in the View menu while the murmur window is in front. On Windows, press Ctrl +, Ctrl -, and Ctrl 0.
+
+Each press steps through 80, 90, 100, 110, 125, 150, 175, 200, 250, and 300 percent, like a browser. Past 200 percent, less fits in the window at once, so make the window bigger to see more. Only the settings window zooms: the overlay pill keeps its size, so dictation looks the same wherever you zoom. murmur remembers your zoom, so the window opens at the same size after you quit and reopen it. Text, the brush marks, and the painting all redraw at the new size, so nothing turns blurry.
+
 ## How do recaps and the wrap-up work?
 
 Turn on Daily recap under Settings, Time back and recap, and pick a time. At that moment (or on the next wake if the machine was asleep, once per day) murmur sends a notification with your day's numbers, ending with your time back once the day has at least a minute of it: "4 sessions, 12 minutes, 1,240 words today. 19 minutes back." Clicking it opens the wrap-up tab, with today's painting at the top (see the next question), then your dictations and words, your time back at your own typing speed, your longest take, and your best pace, and under it every take from the day. Copy summary puts those two lines on your clipboard. The Test button fires a preview notification immediately without using up the day's recap.
