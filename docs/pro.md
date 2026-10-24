@@ -39,7 +39,7 @@ Once, quietly. 30 calendar days after you install murmur, Home shows one line un
 
 ## What is a founding member?
 
-Everyone who buys Pro during the founders window (the FOUNDERS code era) is a founding member forever. Founding members keep a permanent ten percent discount on every future paid product, including the cloud subscription and any paid iOS offering, and their license shows the founding member mark in settings.
+Everyone who buys Pro with the code FOUNDERS before the founders window ends, at the end of December 31, 2026, is a founding member forever. The code takes $10 off at the Stripe checkout, so Pro is $39 instead of $49; it works only there, never in the App Store, and stops working when the window ends. Founding members keep a permanent ten percent discount on every future paid product, including the cloud subscription and any paid iOS offering, and their license shows the founding member mark in settings.
 
 ## Does murmur Pro cover my iPhone too?
 

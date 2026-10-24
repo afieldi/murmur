@@ -184,7 +184,10 @@ function jsonLd() {
         isAccessibleForFree: true,
         offers: [
           { '@type': 'Offer', name: 'murmur', price: '0', priceCurrency: 'USD' },
-          { '@type': 'Offer', name: 'murmur Pro', price: String(facts.proPrice), priceCurrency: 'USD', url: links.doc('pro') }
+          { '@type': 'Offer', name: 'murmur Pro', price: String(facts.proPrice), priceCurrency: 'USD', url: links.doc('pro') },
+          ...(facts.founders
+            ? [{ '@type': 'Offer', name: 'murmur Pro, founding member price', price: String(facts.founders.price), priceCurrency: 'USD', priceValidUntil: facts.founders.endsOn, url: facts.founders.buy }]
+            : [])
         ],
         author: { '@id': org },
         publisher: { '@id': org },
@@ -295,6 +298,15 @@ function footerHtml() {
     </footer>`
 }
 
+/** The founders price line (LaBroi, 2026-10-24), under the download on
+ *  home and atop the Pro doc while the window is open; nothing after. */
+function foundersHtml(onPro) {
+  const f = facts.founders
+  if (!f) return ''
+  const pro = onPro ? 'murmur Pro' : '<a href="/docs/pro/">murmur Pro</a>, the optional one-time upgrade,'
+  return `<p class="founders"><strong>Founding member price:</strong> ${pro} is $${f.price} through ${f.ends}, then $${facts.proPrice}. Founding members keep 10% off every future paid product. <a href="${escapeHtml(f.buy)}" target="_blank" rel="noopener noreferrer">Get Pro for $${f.price}</a>, with the code ${f.code} already filled in.</p>`
+}
+
 function fontPreload(font) {
   return font ? `<link rel="preload" href="/fonts/${font}" as="font" type="font/woff2" crossorigin />` : ''
 }
@@ -313,6 +325,7 @@ function page(tokens, font) {
     JSON_LD: jsonLd(),
     PILL_BARS: pillBars(),
     FAQ: faqHtml(),
+    FOUNDERS: foundersHtml(false),
     MAC_URL: links.mac,
     WINDOWS_URL: links.windows,
     WINDOWS_SCREEN_URL: links.windowsScreen.slice(SITE_URL.length),
@@ -400,7 +413,7 @@ function llmsTxt(docs) {
 
 ## Facts
 - Platforms: ${facts.macos} (Apple silicon and Intel, one universal download); ${facts.windows} (x64 and ARM, one installer)
-- Price: the app is free; murmur Pro is an optional one-time purchase of $${facts.proPrice} (provider profiles, early access)
+- Price: the app is free; murmur Pro is an optional one-time purchase of $${facts.proPrice} (provider profiles, early access)${facts.founders ? `; through ${facts.founders.ends}, it is $${facts.founders.price} with the code ${facts.founders.code}, and buyers at that price are founding members with 10% off every future paid product` : ''}
 - Privacy: records only while the hotkey is held; audio goes only to the provider the user configured; history, stats, and settings stay on the computer; no account, no murmur server, no telemetry
 - Cleanup fails open: if the cleanup model errors, the plain transcript is still inserted, so a dictation is never lost
 - Current version: ${version}
@@ -597,6 +610,7 @@ function docPage(docs, doc, font) {
         <article class="doc">
           <nav class="crumbs" aria-label="Breadcrumb"><a href="/docs/">docs</a> <span aria-hidden="true">/</span> <span aria-current="page">${escapeHtml(doc.short)}</span></nav>
           <h1>${escapeHtml(doc.title)}</h1>
+          ${doc.name === 'pro' ? foundersHtml(true) : ''}
           ${doc.html}
           <p class="doc-meta">Updated ${doc.updated} · <a href="${links.docSource(doc.name, DOCS_REF || 'main')}" target="_blank" rel="noopener noreferrer">this page on GitHub</a></p>
           ${next ? `<p class="doc-next">Next: <a href="/docs/${next.name}/">${escapeHtml(next.title)}</a></p>` : ''}

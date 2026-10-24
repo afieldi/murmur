@@ -139,3 +139,22 @@ describe('the site build (IOS-026)', () => {
     })
   })
 })
+
+describe('the founders price', () => {
+  const before = Date.parse('2026-12-31T23:00:00-08:00')
+  const after = Date.parse('2027-01-01T00:00:00-08:00')
+  const cost = (now) => plain(content(SITE, { now }).faq.find((item) => item.q === 'What does murmur cost?').a)
+
+  it('shows $39 with the code, filled in on the checkout link, through December 31', () => {
+    const { founders } = content(SITE, { now: before }).facts
+    expect(founders.price).toBe(39)
+    expect(founders.buy).toMatch(/^https:\/\/buy\.stripe\.com\/.+\?prefilled_promo_code=FOUNDERS$/)
+    expect(cost(before)).toContain('Through December 31, 2026, Pro is $39 with the code FOUNDERS')
+  })
+
+  it('says nothing once the window closes', () => {
+    expect(content(SITE, { now: after }).facts.founders).toBeNull()
+    expect(cost(after)).not.toContain('39')
+    expect(cost(after)).not.toContain('FOUNDERS')
+  })
+})

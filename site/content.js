@@ -11,7 +11,15 @@ const REPO = 'https://github.com/lbwalton/murmur'
 // reads too, so the app and the site never disagree (US-107).
 const PRO = require('../shared/pro.json')
 
-function content(site, { supportEmail = '' } = {}) {
+// The founders window (LaBroi, 2026-10-24): through December 31, 2026,
+// murmur Pro is $39 on the website with the Stripe code FOUNDERS, which
+// the checkout link fills in; then it is $49. Website only: the App Store
+// price stays $49. A build made after the window drops every founders
+// line, so the site is redeployed on January 1. It closes at midnight
+// Pacific time, the end of December 31 where LaBroi is.
+const FOUNDERS = { price: 39, code: 'FOUNDERS', ends: 'December 31, 2026', endsOn: '2026-12-31', closes: Date.parse('2027-01-01T08:00:00Z') }
+
+function content(site, { supportEmail = '', now = Date.now() } = {}) {
   const links = {
     site,
     repo: REPO,
@@ -35,7 +43,9 @@ function content(site, { supportEmail = '' } = {}) {
   const facts = {
     macos: 'macOS 13 Ventura or later',
     windows: 'Windows 10 or later',
-    proPrice: PRO.price
+    proPrice: PRO.price,
+    // null once the window closes, so nothing says it any more.
+    founders: now < FOUNDERS.closes ? { ...FOUNDERS, buy: `${PRO.buyUrl}?prefilled_promo_code=${FOUNDERS.code}` } : null
   }
 
   const title = 'murmur: free, open source dictation app for Mac and Windows'
@@ -57,7 +67,12 @@ function content(site, { supportEmail = '' } = {}) {
       a: [
         `The app is free, with every dictation feature included. Transcription runs on your own API key, so you pay your provider directly, and at Groq's rates typical use costs cents a month. murmur Pro is an optional one-time purchase of $${facts.proPrice} that adds provider profiles and early access to new conveniences, and it funds development. See `,
         { text: 'what Pro includes', href: links.doc('pro') },
-        '.'
+        '.',
+        ...(facts.founders
+          ? [
+              ` Through ${facts.founders.ends}, Pro is $${facts.founders.price} with the code ${facts.founders.code}, and everyone who buys at that price is a founding member, with 10% off every future paid product.`
+            ]
+          : [])
       ]
     },
     {
