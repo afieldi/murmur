@@ -9,10 +9,12 @@ describe('nextZoom', () => {
     expect(nextZoom(1.25, 'in')).toBe(1.5)
     expect(nextZoom(1, 'out')).toBe(0.9)
     expect(nextZoom(0.9, 'out')).toBe(0.8)
+    expect(nextZoom(2, 'in')).toBe(2.5)
+    expect(nextZoom(2.5, 'in')).toBe(3)
   })
 
   it('holds at the ends and resets to 100 percent', () => {
-    expect(nextZoom(2, 'in')).toBe(2)
+    expect(nextZoom(3, 'in')).toBe(3)
     expect(nextZoom(0.8, 'out')).toBe(0.8)
     expect(nextZoom(1.75, 'reset')).toBe(1)
   })
@@ -34,7 +36,9 @@ describe('normalizeZoom', () => {
   it('snaps a stored factor to the nearest step', () => {
     expect(normalizeZoom(1.24)).toBe(1.25)
     expect(normalizeZoom(1.3)).toBe(1.25)
-    expect(normalizeZoom(5)).toBe(2)
+    expect(normalizeZoom(2.2)).toBe(2)
+    expect(normalizeZoom(2.8)).toBe(3)
+    expect(normalizeZoom(5)).toBe(3)
     expect(normalizeZoom(0.1)).toBe(0.8)
   })
 

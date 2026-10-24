@@ -11,7 +11,7 @@ import { formatMinutesBack } from '../../shared/timeback'
 import type { SettingsApi } from '../../preload/settings'
 import { PageTitle } from './PageTitle'
 import { EmptyState } from './EmptyState'
-import { type Rgb, mix, parseColor, rgba, tokenColor } from '../brush'
+import { type Rgb, canvasDpr, mix, parseColor, rgba, tokenColor } from '../brush'
 import { daySeed, paintBlot, paintDab } from './inkMarks'
 
 const bridge = (): SettingsApi => window.murmur
@@ -214,7 +214,7 @@ function ChartDab(props: { day: string; height: number; empty: boolean; today: b
     const draw = (): void => {
       const width = canvas.clientWidth
       if (width === 0) return
-      const dpr = Math.min(2, window.devicePixelRatio || 1)
+      const dpr = canvasDpr()
       canvas.width = Math.round(width * dpr)
       canvas.height = Math.round(CHART_H * dpr)
       const ctx = canvas.getContext('2d')
@@ -267,7 +267,7 @@ function paintWall(canvas: HTMLCanvasElement, marks: ReadonlyArray<Mark | null>,
   const cols = Math.ceil(marks.length / rows)
   const width = Math.max(1, cols * STEP - (STEP - CELL)) + 2 * BLEED
   const height = rows * STEP - (STEP - CELL) + 2 * BLEED
-  const dpr = Math.min(2, window.devicePixelRatio || 1)
+  const dpr = canvasDpr()
   canvas.width = Math.round(width * dpr)
   canvas.height = Math.round(height * dpr)
   canvas.style.width = `${width}px`

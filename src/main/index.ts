@@ -615,6 +615,39 @@ app.whenReady().then(async () => {
     return probe.items === 9 && probe.sections === 9 && probe.finish && probe.first === 'Hotkey'
   })
 
+  registerSmokeCheck('settingsZoomSharp', async () => {
+    // At the top step, 300 percent, every brush canvas on screen paints
+    // at the full pixel ratio, not a capped one, so paint stays sharp
+    // (US-111). Registered after settingsRail, which skipped the wizard,
+    // so the tabs and the current tab's stroke are showing.
+    const win = settingsWindow
+    if (!win || win.isDestroyed()) return false
+    let top = 0
+    let sharp = 'no canvas'
+    try {
+      for (let i = 0; i < 12; i++) stepSettingsZoom(win, 'in')
+      top = win.webContents.getZoomFactor()
+      for (let i = 0; i < 20 && sharp !== 'ok'; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 100))
+        // Too few pixels is soft; more (the Pro mark's 2x for its lift)
+        // is fine.
+        sharp = await win.webContents.executeJavaScript(
+          `(() => {
+            const shown = [...document.querySelectorAll('canvas')].filter((c) => c.clientWidth > 0)
+            if (shown.length === 0) return 'no canvas'
+            const soft = shown.filter((c) => c.width < c.clientWidth * window.devicePixelRatio - 2)
+            return soft.length === 0 ? 'ok' : soft.map((c) => c.className + ' ' + c.width + '/' + c.clientWidth).join(';')
+          })()`
+        )
+      }
+    } finally {
+      stepSettingsZoom(win, 'reset')
+    }
+    const ok = Math.abs(top - 3) < 0.01 && sharp === 'ok'
+    if (!ok) console.error(`smoke settingsZoomSharp: top=${top} sharp=${sharp}`)
+    return ok
+  })
+
   registerSmokeCheck('widgetLifecycle', async () => {
     // Closing the window must hide it and keep the process alive.
     if (!settingsWindow) return false

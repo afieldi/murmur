@@ -151,7 +151,7 @@ One rule holds in every look: text that has to be read (a hint such as "set a no
 
 Zoom the window. On a Mac, press Cmd + (or Cmd =) to zoom in, Cmd - to zoom out, and Cmd 0 to go back to actual size; the same three live in the View menu while the murmur window is in front. On Windows, press Ctrl +, Ctrl -, and Ctrl 0.
 
-Each press steps through 80, 90, 100, 110, 125, 150, 175, and 200 percent, like a browser. Only the settings window zooms: the overlay pill keeps its size, so dictation looks the same wherever you zoom. murmur remembers your zoom, so the window opens at the same size after you quit and reopen it. Text, the brush marks, and the painting all redraw at the new size, so nothing turns blurry.
+Each press steps through 80, 90, 100, 110, 125, 150, 175, 200, 250, and 300 percent, like a browser. Past 200 percent, less fits in the window at once, so make the window bigger to see more. Only the settings window zooms: the overlay pill keeps its size, so dictation looks the same wherever you zoom. murmur remembers your zoom, so the window opens at the same size after you quit and reopen it. Text, the brush marks, and the painting all redraw at the new size, so nothing turns blurry.
 
 ## How do recaps and the wrap-up work?
 

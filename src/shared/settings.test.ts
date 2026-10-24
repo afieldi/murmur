@@ -187,6 +187,6 @@ describe('sanitized entry lists', () => {
     expect(mergeSettings(DEFAULT_SETTINGS, { windowZoom: 1.5 }).windowZoom).toBe(1.5)
     expect(mergeSettings(DEFAULT_SETTINGS, { windowZoom: 1.3 }).windowZoom).toBe(1.25)
     expect(mergeSettings(DEFAULT_SETTINGS, { windowZoom: 'big' }).windowZoom).toBe(1)
-    expect(mergeSettings(DEFAULT_SETTINGS, { windowZoom: 40 }).windowZoom).toBe(2)
+    expect(mergeSettings(DEFAULT_SETTINGS, { windowZoom: 40 }).windowZoom).toBe(3)
   })
 })

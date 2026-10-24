@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Zoom for the settings window (US-111): Cmd or Ctrl plus, minus, and
-// zero step through the factors a browser uses. Pure, so main and the
-// tests share one rule.
+// zero step through the factors a browser uses, up to Safari's 300
+// percent. Pure, so main and the tests share one rule.
 
 /** The factors a press steps through, smallest to largest. */
-export const ZOOM_STEPS = [0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2] as const
+export const ZOOM_STEPS = [0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3] as const
 
 export type ZoomAction = 'in' | 'out' | 'reset'
 
