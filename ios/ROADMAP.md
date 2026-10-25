@@ -1,6 +1,6 @@
 # murmur for iPhone Roadmap
 
-> Generated from ios/prd.json (10/32 stories verified). Do not edit by hand: change ios/prd.json, then run `npm run roadmap`.
+> Generated from ios/prd.json (12/32 stories verified). Do not edit by hand: change ios/prd.json, then run `npm run roadmap`.
 
 ## Done and verified
 
@@ -10,10 +10,12 @@
 - [x] **IOS-004** Bundle ids and the App Store Connect record
 - [x] **IOS-005** Provider and key setup
 - [x] **IOS-006** Record and transcribe in the app
+- [x] **IOS-007** Cleanup that fails open
 - [x] **IOS-011** First run
 - [x] **IOS-014** Diagnostics
 - [x] **IOS-030** Apply corrections on iPhone
 - [x] **IOS-031** See your voice while you talk
+- [x] **IOS-032** Polish catches an answer to a short question
 
 ## Built, awaiting live verification
 
@@ -23,7 +25,6 @@ Automated criteria pass; the remaining step is a human loop noted in ios/prd.jso
 
 ## To do
 
-- [ ] **IOS-007** Cleanup that fails open
 - [ ] **IOS-008** The dictation pad
 - [ ] **IOS-009** The hot mic session and the swipe back
 - [ ] **IOS-010** The pill on iPhone
@@ -39,7 +40,6 @@ Automated criteria pass; the remaining step is a human loop noted in ios/prd.jso
 - [ ] **IOS-022** Analytics, time back, and the recap
 - [ ] **IOS-023** Notes
 - [ ] **IOS-024** Transform selected text by voice
-- [ ] **IOS-032** Polish catches an answer to a short question
 - [ ] **IOS-025** murmur Pro on iPhone
 - [ ] **IOS-026** App Store launch
 - [ ] **IOS-027** iPad
