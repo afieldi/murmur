@@ -2,6 +2,10 @@
 
 All user-facing changes, newest first, in plain language. Each release's section doubles as its GitHub release notes, and the app shows your current version's section on the home tab under what's new.
 
+## 0.1.14 (2026-10-25)
+
+- Safer connections: murmur now refuses a set of stolen security certificates (issued through eMudhra) that browsers already block, so no one who can watch your network can use one to pose as your provider and read a dictation or your key on its way out. It comes with a newer Electron, the engine murmur runs on, which also fixes 2 rare ways a request could fail.
+
 ## 0.1.13 (2026-10-24)
 
 - The murmur Pro mark: a small gold pill that says PRO. Filled means Pro is yours, and it sits after the murmur wordmark at the top of the window, beside murmur Pro in the settings rail, and on the Profiles row; outlined means Pro adds something there. Founding members wear the same mark, and their Pro section says Founding member.
