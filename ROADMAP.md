@@ -1,6 +1,6 @@
 # murmur Roadmap
 
-> Generated from prd.json (88/112 stories verified). Do not edit by hand: change prd.json, then run `npm run roadmap`.
+> Generated from prd.json (89/113 stories verified). Do not edit by hand: change prd.json, then run `npm run roadmap`.
 
 ## Done and verified
 
@@ -92,6 +92,7 @@
 - [x] **US-105** Apply corrections: spoken slip-ups come out fixed, behind a switch
 - [x] **US-110** The mic follows your computer's default input, and Settings lets you pick one
 - [x] **US-111** Zoom the settings window with Cmd plus and Cmd minus
+- [x] **US-113** Paste last waits for the chord to be let go
 
 ## Built, awaiting live verification
 
