@@ -1787,8 +1787,8 @@
         "Live: LaBroi presses his paste-last chord at a normal speed in a real app and the last entry lands, every time"
       ],
       "needs_human": true,
-      "passes": false,
-      "notes": "Built 2026-10-26 on fix/paste-last-modifiers. pasteLastDictation now awaits waitForModifiersReleased (the transform's helper, 1 second cap) through the same dynamic import performTransform uses, logs 'paste-last modifiers still held; pasting anyway' when the cap runs out, and reads the overlay phase after the wait. Evidence: murmur.log showed paste-last outcome=inserted 3 times within 30 seconds on 2026-10-25 and again on 2026-10-27 UTC, LaBroi's binding is Ctrl+L, and dictation (pastes after release) and transform (already waits) both delivered in the same session. Docs: settings.md paste-last paragraph. Verified: typecheck clean, 840 tests green, smoke green. Review gate 2026-10-26: no confirmed findings; its docs note (say murmur pastes anyway after a second) applied. Live check in HANDOFF."
+      "passes": true,
+      "notes": "Built 2026-10-26 on fix/paste-last-modifiers. pasteLastDictation now awaits waitForModifiersReleased (the transform's helper, 1 second cap) through the same dynamic import performTransform uses, logs 'paste-last modifiers still held; pasting anyway' when the cap runs out, and reads the overlay phase after the wait. Evidence: murmur.log showed paste-last outcome=inserted 3 times within 30 seconds on 2026-10-25 and again on 2026-10-27 UTC, LaBroi's binding is Ctrl+L, and dictation (pastes after release) and transform (already waits) both delivered in the same session. Docs: settings.md paste-last paragraph. Verified: typecheck clean, 840 tests green, smoke green. Review gate 2026-10-26: no confirmed findings; its docs note (say murmur pastes anyway after a second) applied. Live check in HANDOFF. LaBroi live-verified 2026-10-27 on the installed test build (0.1.14 with the fix, swapped in after Squirrel's pending 0.1.14 update landed on quit): Ctrl+L at his normal speed pastes the last entry, every time. Story complete."
     }
   ]
 }
