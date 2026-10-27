@@ -2,6 +2,10 @@
 
 All user-facing changes, newest first, in plain language. Each release's section doubles as its GitHub release notes, and the app shows your current version's section on the home tab under what's new.
 
+## 0.1.15 (2026-10-27)
+
+- Paste last dictation works every time: the paste now lands the moment you let go of your shortcut. Before, murmur pasted while you were still holding the shortcut's Ctrl, Alt, Shift, or Cmd key, so the app saw a different shortcut and nothing appeared unless you let go very fast.
+
 ## 0.1.14 (2026-10-25)
 
 - Safer connections: murmur now refuses a set of stolen security certificates (issued through eMudhra) that browsers already block, so no one who can watch your network can use one to pose as your provider and read a dictation or your key on its way out. It comes with a newer Electron, the engine murmur runs on, which also fixes 2 rare ways a request could fail.
