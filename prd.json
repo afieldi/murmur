@@ -1774,6 +1774,21 @@
       "needs_human": true,
       "passes": false,
       "notes": "Built 2026-10-25 on fix/dep-security. Verified: npm audit 0 vulnerabilities; typecheck green; test 840 passed, 1 skipped; electron --version v44.9.3; smoke 3 in a row green (runs before that: 2 ended in the known exit crash, uiohook delivering an input event while Node tears down after the smoke run's app.exit, the same napi_fatal_error stack as Electron 44.5.1 crash reports from 2026-10-23 and 2026-10-24 with every check passing; 1 timed out at recordingRevive with the Mac at load 16, the known load flake). Ships in the next release; the live check waits for it. Review gate: no blocking findings; on its asks, every lockfile integrity change sits beside a version change, every package resolves from registry.npmjs.org, npmRebuild stays false, uiohook-napi is untouched, and the 44.6 to 44.9.3 release notes hold no breaking changes (44.7 and 44.8 fix net.fetch bugs that appFetch could have hit). Shipped in v0.1.14 on 2026-10-25 (LaBroi: ship now; his first dictation on it is the live check); the packaged app's Electron Framework reports 44.9.3, and GitHub closed all 14 alerts as fixed after the merge."
+    },
+    {
+      "id": "US-113",
+      "title": "Paste last waits for the chord to be let go",
+      "description": "Reported by LaBroi 2026-10-26: the paste-last shortcut (Ctrl+L on his Mac) does nothing. The log shows the chord firing and the paste reported as inserted, pressed 3 times in a row each time (2026-10-25 and 2026-10-27 UTC), so the words never reached the app. The chord fires on its key going down while Ctrl is still held, and the synthetic Cmd+V then arrives as Ctrl+Cmd+V, which no app treats as paste. It only worked when the chord was let go before the paste keystroke launched, which is why the 2026-09-17 live check passed. The transform chord already waits for the modifiers to come up before its copy for the same reason (US-054); paste-last now does the same. Dictation pastes after the hotkey is released and the note chord never pastes, so neither is affected.",
+      "acceptance": [
+        "pasteLastDictation waits for every physical modifier to be released (up to 1 second, the same wait the transform uses) before the paste keystroke, and logs a content-free line when it gives up waiting and pastes anyway",
+        "The recording and processing check runs after the wait, so a take that starts during it still ignores the chord",
+        "Docs say the paste lands as the chord's modifiers are let go, and why",
+        "typecheck, test and smoke stay green",
+        "Live: LaBroi presses his paste-last chord at a normal speed in a real app and the last entry lands, every time"
+      ],
+      "needs_human": true,
+      "passes": false,
+      "notes": "Built 2026-10-26 on fix/paste-last-modifiers. pasteLastDictation now awaits waitForModifiersReleased (the transform's helper, 1 second cap) through the same dynamic import performTransform uses, logs 'paste-last modifiers still held; pasting anyway' when the cap runs out, and reads the overlay phase after the wait. Evidence: murmur.log showed paste-last outcome=inserted 3 times within 30 seconds on 2026-10-25 and again on 2026-10-27 UTC, LaBroi's binding is Ctrl+L, and dictation (pastes after release) and transform (already waits) both delivered in the same session. Docs: settings.md paste-last paragraph. Verified: typecheck clean, 840 tests green, smoke green. Review gate 2026-10-26: no confirmed findings; its docs note (say murmur pastes anyway after a second) applied. Live check in HANDOFF."
     }
   ]
 }
