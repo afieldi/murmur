@@ -27,73 +27,13 @@
     "contributions": "The source is open so anyone can read it and build it. murmur accepts no outside code, so Eze Media LLC stays the sole copyright holder and can ship on the App Store. Issues and ideas are welcome."
   },
   "milestones": [
-    {
-      "name": "Foundation",
-      "stories": [
-        "IOS-001",
-        "IOS-002",
-        "IOS-003",
-        "IOS-004"
-      ]
-    },
-    {
-      "name": "Core, then TestFlight 1",
-      "stories": [
-        "IOS-005",
-        "IOS-006",
-        "IOS-007",
-        "IOS-008",
-        "IOS-009",
-        "IOS-010",
-        "IOS-011",
-        "IOS-012",
-        "IOS-013",
-        "IOS-014",
-        "IOS-015"
-      ]
-    },
-    {
-      "name": "Ways in",
-      "stories": [
-        "IOS-016"
-      ]
-    },
-    {
-      "name": "murmur on the phone",
-      "stories": [
-        "IOS-017",
-        "IOS-018",
-        "IOS-019",
-        "IOS-020",
-        "IOS-021",
-        "IOS-022",
-        "IOS-031"
-      ]
-    },
-    {
-      "name": "More desktop features",
-      "stories": [
-        "IOS-023",
-        "IOS-024",
-        "IOS-030",
-        "IOS-032"
-      ]
-    },
-    {
-      "name": "Money and launch",
-      "stories": [
-        "IOS-025",
-        "IOS-026",
-        "IOS-027"
-      ]
-    },
-    {
-      "name": "Later: the murmur account",
-      "stories": [
-        "IOS-028",
-        "IOS-029"
-      ]
-    }
+    { "name": "Foundation", "stories": ["IOS-001", "IOS-002", "IOS-003", "IOS-004"] },
+    { "name": "Core, then TestFlight 1", "stories": ["IOS-005", "IOS-006", "IOS-007", "IOS-008", "IOS-009", "IOS-010", "IOS-011", "IOS-012", "IOS-013", "IOS-014", "IOS-015"] },
+    { "name": "Ways in", "stories": ["IOS-016"] },
+    { "name": "murmur on the phone", "stories": ["IOS-017", "IOS-018", "IOS-019", "IOS-020", "IOS-021", "IOS-022", "IOS-031"] },
+    { "name": "More desktop features", "stories": ["IOS-023", "IOS-024", "IOS-030", "IOS-032", "IOS-033"] },
+    { "name": "Money and launch", "stories": ["IOS-025", "IOS-026", "IOS-027"] },
+    { "name": "Later: the murmur account", "stories": ["IOS-028", "IOS-029"] }
   ],
   "conventions": {
     "verify": "npm run ios:test and npm run ios:smoke must be green before any iOS commit, plus npm run typecheck and npm run test, since ios/ shares shared/ and scripts/ with desktop. Any change to shared/ or to code desktop runs also runs npm run smoke. ios:smoke builds the app for a simulator, runs it headless, and prints SMOKE_RESULT JSON; every subsystem adds a named check.",

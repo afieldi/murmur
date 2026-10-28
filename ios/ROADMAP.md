@@ -1,6 +1,6 @@
 # murmur for iPhone Roadmap
 
-> Generated from ios/prd.json (12/32 stories verified). Do not edit by hand: change ios/prd.json, then run `npm run roadmap`.
+> Generated from ios/prd.json (12/33 stories verified). Do not edit by hand: change ios/prd.json, then run `npm run roadmap`.
 
 ## Done and verified
 
@@ -45,3 +45,4 @@ Automated criteria pass; the remaining step is a human loop noted in ios/prd.jso
 - [ ] **IOS-027** iPad
 - [ ] **IOS-028** Done-for-you key subscription
 - [ ] **IOS-029** One Journey across devices
+- [ ] **IOS-033** iPhone parity: file only the item, and never a lone filler
