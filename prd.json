@@ -1789,6 +1789,39 @@
       "needs_human": true,
       "passes": true,
       "notes": "Built 2026-10-26 on fix/paste-last-modifiers. pasteLastDictation now awaits waitForModifiersReleased (the transform's helper, 1 second cap) through the same dynamic import performTransform uses, logs 'paste-last modifiers still held; pasting anyway' when the cap runs out, and reads the overlay phase after the wait. Evidence: murmur.log showed paste-last outcome=inserted 3 times within 30 seconds on 2026-10-25 and again on 2026-10-27 UTC, LaBroi's binding is Ctrl+L, and dictation (pastes after release) and transform (already waits) both delivered in the same session. Docs: settings.md paste-last paragraph. Verified: typecheck clean, 840 tests green, smoke green. Review gate 2026-10-26: no confirmed findings; its docs note (say murmur pastes anyway after a second) applied. Live check in HANDOFF. LaBroi live-verified 2026-10-27 on the installed test build (0.1.14 with the fix, swapped in after Squirrel's pending 0.1.14 update landed on quit): Ctrl+L at his normal speed pastes the last entry, every time. Story complete. Shipped in v0.1.15 on 2026-10-27 (LaBroi: commit, push, merge, and ship)."
+    },
+    {
+      "id": "US-114",
+      "title": "A spoken filler is never cut off as its own item",
+      "description": "Found 2026-10-27 while capturing murmur's real output for the Video C ad: the brain dump line \"Oh, and an idea: a Times Square takeover for BrambleCat.\" filed \"Oh\" as an idea of its own, on all 4 runs. findSeams offered the \", and \" cut because \"Oh\" has letters, and the model voted yes. A side made only of spoken fillers (oh, um, well, okay, and the like) is no more an item than a side made only of joining words, which US-056 already refuses to offer, so it is refused the same way and the sentence files whole. People open thoughts with \"Oh,\" and \"So,\" all the time, so anyone who sorts notes hits this.",
+      "acceptance": [
+        "findSeams never offers a cut where either side is made only of spoken fillers (oh, ah, um, uhm, uh, uhh, erm, hmm, mhm, well, so, okay, ok, yeah, anyway, actually) with or without joining words and punctuation, in time linear in the run of fillers, and cutAtSeams lets fillers left alone between two confirmed cuts ride with the next piece; a sentence with no cut comes back whole",
+        "A side that holds a filler plus real words (\"So, call Bob\", \"dig the well\") is unaffected, and words that only begin with a filler (Ohio, sofa, wellness, okra) or merely look like one (ER) are not fillers",
+        "\"Oh, and an idea: a Times Square takeover for BrambleCat.\" offers no cut, so it files whole on one line",
+        "Docs say a cut is never offered where one side would be only a filler",
+        "typecheck, test and smoke stay green",
+        "Live: Lucy's Video C brain dump, fed through VB-Cable into a dev build, files the Times Square idea as one line with no lone Oh"
+      ],
+      "needs_human": false,
+      "passes": true,
+      "notes": "Built 2026-10-27 on fix/filler-seams. findSeams refuses a side of fillers alone through NOT_AN_ITEM (the old ONLY_CONNECTORS plus oh, ah, um, uhm, uh, uhh, erm, hmm, mhm, well, so, okay, ok, yeah, anyway, actually; er left out so ER stays an item), and cutAtSeams lets fillers alone between two confirmed cuts ride with the next piece (fillerPiece). Review gate (independent agent): caught exponential backtracking in the first regex (604 ms at 24 fillers, projecting minutes at 30+) and an endless loop in cutAtSeams with no cuts; both fixed, the regex is linear (200-filler unit test, fuzz of 2,000 runs peaked at 1.39 ms), cutAtSeams('Okay.', [], []) returns whole; re-check cleared. Verified: typecheck clean, 857 tests, smoke 81/81. Live 2026-10-27 on a dev build: Lucy's Video C line fed through VB-Cable no longer files a lone Oh (3 of 3 runs, together with US-115)."
+    },
+    {
+      "id": "US-115",
+      "title": "File only the item: commentary stays in the inbox",
+      "description": "LaBroi, 2026-10-27, after the Video C capture filed \"an idea: a Times Square takeover for BrambleCat\": when someone brain dumps, murmur should pull out only the statements that make sense as a to-do or an idea and file those, and the rest of the commentary stays in the brain dump file. Sentences that are only commentary already label note and stay in the inbox; the gap was the words around an item inside a task or idea sentence (\"Oh, and an idea:\", \"I think\", \"honestly\"). The sort's one chat request now also lists each sentence's words, numbered, and asks for a keep vote: per task or idea sentence, the first and last word worth filing, keeping opening words that say when, where, or what a run is for (LaBroi's call: intro lines stay filed). murmur slices exactly those words before the cut, the lead-in, and the relation look read the sentence, so the model still never writes a word. A reply without a keep vote files exactly as before, so no extra request and nothing existing changes. The decision connection labels whole sentences only and files them whole. iPhone parity is a separate story on feature/ios (its sorter is a Swift port with shared prompts in shared/sorter.json).",
+      "acceptance": [
+        "The chat sort offers a Words list (every /\\S+/ word, numbered) for each prose sentence of 3 to 60 words and asks for a keep vote only when some sentence offers words; list lines are never offered",
+        "validateSort reads keep as [first, last] inside the words offered; anything else, or a span that keeps every word, leaves that sentence whole while the others still trim; keep sent when it was not offered rejects like any unknown key",
+        "applyKeep files exactly the kept words: the joining punctuation the trim leaves goes, a period goes when the kept words stop short of the sentence's end (not an abbreviation's), a span of fillers alone is ignored, confirmed seams inside the kept words carry over, and a lead-in that began among the dropped words is dropped",
+        "Only task and idea sentences are trimmed; the inbox is never rewritten; the sort log counts trimmed sentences",
+        "Docs explain filing only the item, with the decision connection exception",
+        "A smoke check covers a trimmed idea, a trimmed run with its cut and lead-in, a bad span filing whole, a note's span ignored, the chat fallback after a failed decision trimming, and no inbox write; typecheck, test and smoke stay green",
+        "Live: Lucy's Video C brain dump, fed through VB-Cable into a dev build, files the Times Square idea as its own words without \"Oh, and an idea:\" and files the 4 tasks"
+      ],
+      "needs_human": false,
+      "passes": true,
+      "notes": "Built 2026-10-27 on fix/filler-seams. The chat sort offers Words (keepWords, 3 to 60 words, no list lines) with SORT_KEEP_PROMPT; validateSort reads keep (readKeepSpans) only when offered; runSort applies applyKeep to task and idea sentences right after the verdict, so held lines, relation compare, cutting, lead-ins, and filing all read the kept words; the log adds trimmed=N. No extra request: a reply without keep files as before. Smoke check noteKeep covers a trimmed idea, a trimmed run with cut and lead-in, a bad span, a note's span, the chat fallback after a failed decision, and no inbox write. Review gate: applyKeep now refuses a span of fillers alone, docs matched to behavior (dangling punctuation, limits, fallback), prompt says Some sentences; re-check cleared (carry-over fuzz 123,139 sentences, 0 issues). Verified: typecheck clean, 857 tests, smoke 81/81. Live 2026-10-27: Lucy's brain dump through VB-Cable into the dev build filed 4 tasks and ideas.md 'a Times Square takeover for BrambleCat.' with 'Oh, and an idea:' left in the inbox, trimmed=1, 3 of 3 runs (capture/takes/note-5..7 in murmur-film). iPhone parity is IOS-033 on feature/ios."
     }
   ]
 }
