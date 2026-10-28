@@ -27,13 +27,73 @@
     "contributions": "The source is open so anyone can read it and build it. murmur accepts no outside code, so Eze Media LLC stays the sole copyright holder and can ship on the App Store. Issues and ideas are welcome."
   },
   "milestones": [
-    { "name": "Foundation", "stories": ["IOS-001", "IOS-002", "IOS-003", "IOS-004"] },
-    { "name": "Core, then TestFlight 1", "stories": ["IOS-005", "IOS-006", "IOS-007", "IOS-008", "IOS-009", "IOS-010", "IOS-011", "IOS-012", "IOS-013", "IOS-014", "IOS-015"] },
-    { "name": "Ways in", "stories": ["IOS-016"] },
-    { "name": "murmur on the phone", "stories": ["IOS-017", "IOS-018", "IOS-019", "IOS-020", "IOS-021", "IOS-022", "IOS-031"] },
-    { "name": "More desktop features", "stories": ["IOS-023", "IOS-024", "IOS-030", "IOS-032"] },
-    { "name": "Money and launch", "stories": ["IOS-025", "IOS-026", "IOS-027"] },
-    { "name": "Later: the murmur account", "stories": ["IOS-028", "IOS-029"] }
+    {
+      "name": "Foundation",
+      "stories": [
+        "IOS-001",
+        "IOS-002",
+        "IOS-003",
+        "IOS-004"
+      ]
+    },
+    {
+      "name": "Core, then TestFlight 1",
+      "stories": [
+        "IOS-005",
+        "IOS-006",
+        "IOS-007",
+        "IOS-008",
+        "IOS-009",
+        "IOS-010",
+        "IOS-011",
+        "IOS-012",
+        "IOS-013",
+        "IOS-014",
+        "IOS-015"
+      ]
+    },
+    {
+      "name": "Ways in",
+      "stories": [
+        "IOS-016"
+      ]
+    },
+    {
+      "name": "murmur on the phone",
+      "stories": [
+        "IOS-017",
+        "IOS-018",
+        "IOS-019",
+        "IOS-020",
+        "IOS-021",
+        "IOS-022",
+        "IOS-031"
+      ]
+    },
+    {
+      "name": "More desktop features",
+      "stories": [
+        "IOS-023",
+        "IOS-024",
+        "IOS-030",
+        "IOS-032"
+      ]
+    },
+    {
+      "name": "Money and launch",
+      "stories": [
+        "IOS-025",
+        "IOS-026",
+        "IOS-027"
+      ]
+    },
+    {
+      "name": "Later: the murmur account",
+      "stories": [
+        "IOS-028",
+        "IOS-029"
+      ]
+    }
   ],
   "conventions": {
     "verify": "npm run ios:test and npm run ios:smoke must be green before any iOS commit, plus npm run typecheck and npm run test, since ios/ shares shared/ and scripts/ with desktop. Any change to shared/ or to code desktop runs also runs npm run smoke. ios:smoke builds the app for a simulator, runs it headless, and prints SMOKE_RESULT JSON; every subsystem adds a named check.",
@@ -616,6 +676,22 @@
         "Founder status is verified once, on the account",
         "Share cards carry a check that proves the rank is real",
         "Leaving the account keeps each device's own Journey"
+      ],
+      "passes": false,
+      "needs_human": true,
+      "notes": ""
+    },
+    {
+      "id": "IOS-033",
+      "title": "iPhone parity: file only the item, and never a lone filler",
+      "description": "Desktop US-114 and US-115 (merged to main 2026-10-27, e7b7831) change the sorter: a side of spoken fillers alone (oh, um, well, okay...) is never offered as a cut and fillers alone between two cuts ride with the next piece, and the chat sort asks for a keep vote (first and last word worth filing per task or idea sentence) so commentary such as \"Oh, and an idea:\" stays in the inbox. LaBroi's direction: a brain dump files only what is a to-do or an idea. The iPhone sorter is a Swift port in MurmurCore with prompts in shared/sorter.json, so it needs the same rules to sort the same note the same way.",
+      "acceptance": [
+        "When main merges into feature/ios, the desktop keep prompt moves into shared/sorter.json alongside the other prompts, and both platforms read it",
+        "Sorter.swift: onlyConnectors becomes the linear filler pattern from src/shared/sorter.ts (NOT_AN_ITEM), cutAtSeams gains the filler-piece merge with the no-cut guard, and keepWords, keepPrompt, readKeepSpans, and applyKeep are ported",
+        "NoteSort applies the keep spans right after the chat verdict, before held lines, relation compare, cutting, lead-ins, and filing, as runSort does",
+        "shared/sort-scenarios.json gains the US-114 and US-115 cases (the BrambleCat line, a long filler run, ER staying an item, a trimmed run with its lead-in, a bad span) and both platforms pass them",
+        "Swift tests and CI green on Xcode 26.6",
+        "Live: the same brain dump dictated on the iPhone files 4 tasks and the trimmed idea"
       ],
       "passes": false,
       "needs_human": true,
