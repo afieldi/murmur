@@ -2,6 +2,11 @@
 
 All user-facing changes, newest first, in plain language. Each release's section doubles as its GitHub release notes, and the app shows your current version's section on the home tab under what's new.
 
+## 0.1.16 (2026-10-27)
+
+- Brain dumps file only the to-do or the idea: when murmur sorts a note, it files just the words that are the task or idea, and the words around them (Oh, and an idea:, I think, honestly) stay in your inbox note with everything else you said. Intro words that say when or what for, like "Tomorrow I need to buy", still sit above their items. murmur still never rewrites a word; the model only points at where each item starts and ends.
+- A filler is never filed on its own: "Oh, and an idea: a rooftop party" could put "Oh" on your ideas list as an idea of its own. Words like oh, um, well, and okay now stay with the item they belong to.
+
 ## 0.1.15 (2026-10-27)
 
 - Paste last dictation works every time: the paste now lands the moment you let go of your shortcut. Before, murmur pasted while you were still holding the shortcut's Ctrl, Alt, Shift, or Cmd key, so the app saw a different shortcut and nothing appeared unless you let go very fast.
