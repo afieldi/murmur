@@ -13,6 +13,7 @@ export interface FormatSpec {
     tens: Record<string, number>
   }
   terminalPunctuation: { minWords: number; append: string }
+  punctuationCleanup: { collapseRepeated: string[] }
 }
 
 export interface FormatOptions {
@@ -63,6 +64,18 @@ function applySpokenPunctuation(text: string, map: Record<string, string>): stri
     const symbol = map[phrase]
     const pattern = new RegExp(`(?:^|\\s)${escapeRegExp(phrase)}(?=\\s|[.,]|$)[.,]?`, 'gi')
     out = out.replace(pattern, symbol)
+  }
+  return out
+}
+
+/** Removing a filler or correction can leave its two surrounding commas.
+ *  Use only the symbols listed in the shared spec, preserving ellipses and
+ *  other intentional punctuation. Never join punctuation across lines. */
+export function collapseRepeatedPunctuation(text: string, symbols: string[]): string {
+  let out = text
+  for (const symbol of symbols) {
+    const escaped = escapeRegExp(symbol)
+    out = out.replace(new RegExp(`${escaped}(?:[ \t]*${escaped})+`, 'g'), symbol)
   }
   return out
 }
@@ -148,6 +161,7 @@ export function formatTranscript(raw: string, options: FormatOptions, spec: Form
     out = applyScratchThat(out, spec.scratchThat.triggers)
   }
 
+  out = collapseRepeatedPunctuation(out, spec.punctuationCleanup.collapseRepeated)
   out = fixWhitespace(out)
 
   if (options.level === 'full' && options.numbers === 'digits') {

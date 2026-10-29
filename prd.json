@@ -1822,6 +1822,21 @@
       "needs_human": false,
       "passes": true,
       "notes": "Built 2026-10-27 on fix/filler-seams. The chat sort offers Words (keepWords, 3 to 60 words, no list lines) with SORT_KEEP_PROMPT; validateSort reads keep (readKeepSpans) only when offered; runSort applies applyKeep to task and idea sentences right after the verdict, so held lines, relation compare, cutting, lead-ins, and filing all read the kept words; the log adds trimmed=N. No extra request: a reply without keep files as before. Smoke check noteKeep covers a trimmed idea, a trimmed run with cut and lead-in, a bad span, a note's span, the chat fallback after a failed decision, and no inbox write. Review gate: applyKeep now refuses a span of fillers alone, docs matched to behavior (dangling punctuation, limits, fallback), prompt says Some sentences; re-check cleared (carry-over fuzz 123,139 sentences, 0 issues). Verified: typecheck clean, 857 tests, smoke 81/81. Live 2026-10-27: Lucy's brain dump through VB-Cable into the dev build filed 4 tasks and ideas.md 'a Times Square takeover for BrambleCat.' with 'Oh, and an idea:' left in the inbox, trimmed=1, 3 of 3 runs (capture/takes/note-5..7 in murmur-film). iPhone parity is IOS-033 on feature/ios. Shipped in v0.1.16 on 2026-10-27 (LaBroi: ship it)."
+    },
+    {
+      "id": "US-117",
+      "title": "Remove repeated commas after transcript cleanup",
+      "description": "Merge duplicate commas introduced by filler removal or AI self-correction, with the rule defined in the shared formatting spec. Preserve intentional other punctuation, Off formatting, and literal expansion snippets.",
+      "acceptance": [
+        "Light and Full merge consecutive commas, including runs separated by spaces or tabs, without crossing line breaks",
+        "Filler removal and spoken comma commands cannot leave duplicate commas in shared formatter vectors",
+        "Successful AI cleanup applies the same comma rule after response validation; fallback and validation behavior stay unchanged",
+        "Off preserves original punctuation; ellipses, expressive punctuation, and literal expansion snippets remain unchanged",
+        "Typecheck, shared vectors, AI cleanup regression tests, full unit suite, and llmFormatter smoke pass; settings docs describe the behavior"
+      ],
+      "passes": true,
+      "needs_human": false,
+      "notes": "2026-10-29 on fix/duplicate-punctuation, based on origin/main: reproduced Send it, um, tomorrow. becoming Send it,, tomorrow. Five regression cases failed before the fix and pass afterward. The shared spec lists only comma for repeated-punctuation cleanup; deterministic formatting applies it at Light/Full, and accepted AI output applies the same helper after validation. Added 11 shared vectors and one mock AI correction regression, covering filler chains, existing/spoken commas, spaces/tabs, Off, ellipses/expressive punctuation, line boundaries, ordinary commas, and literal expansions. Verified: typecheck, header/design checks, 869 tests passed with one skipped, production build, and full Electron smoke including the extended llmFormatter check. No live provider call required for the deterministic bug or mocked correction regression. Settings docs updated. US-116 is reserved for the separate Hybrid recording PR."
     }
   ]
 }

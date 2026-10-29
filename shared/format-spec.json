@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "comment": "Single source of truth for deterministic formatter rules on every platform. The pipeline order is: trim, fillers, spoken punctuation, scratch-that, whitespace, numbers, capitalization, terminal punctuation. Spoken punctuation runs before scratch-that so sentence boundaries exist. Levels: off applies nothing but a trim; light applies fillers, whitespace, capitalization; full applies everything. List commands apply at full only when the smart lists setting is on, in the same stage as spoken punctuation. Change behavior here or nowhere.",
+  "comment": "Single source of truth for deterministic formatter rules on every platform. The pipeline order is: trim, fillers, spoken punctuation, scratch-that, repeated commas, whitespace, numbers, capitalization, terminal punctuation. Spoken punctuation runs before scratch-that so sentence boundaries exist. Levels: off applies nothing but a trim; light applies fillers, repeated commas, whitespace, capitalization; full applies everything. List commands apply at full only when the smart lists setting is on, in the same stage as spoken punctuation. Change behavior here or nowhere.",
   "fillers": {
     "comment": "Standalone filler words removed at light and full. Word-boundary, case-insensitive. Never part of another word.",
     "words": [
@@ -81,5 +81,11 @@
     "comment": "Full level: a transcript of three or more words that ends on a word character gets a closing period.",
     "minWords": 3,
     "append": "."
+  },
+  "punctuationCleanup": {
+    "comment": "Light and full: collapse runs of these symbols, allowing spaces or tabs between repeats but never crossing line breaks. Apply again after successful AI cleanup. Only commas are listed; preserve ellipses and expressive punctuation. Off and literal expansion snippets are unchanged.",
+    "collapseRepeated": [
+      ","
+    ]
   }
 }

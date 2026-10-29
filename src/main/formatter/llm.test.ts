@@ -283,6 +283,14 @@ describe('validatePolish with corrections', () => {
 })
 
 describe('polishTranscript', () => {
+  it('removes repeated commas left by a correction without changing other punctuation', async () => {
+    const input = 'Send it on Tuesday, oh wait, I mean Wednesday. Wait... really?!'
+    const fetchImpl = (async () => chatResponse('Send it, , on Wednesday. Wait... really?!')) as typeof fetch
+    expect(await polishTranscript(input, cfg, { fetchImpl, corrections: true })).toBe(
+      'Send it, on Wednesday. Wait... really?!'
+    )
+  })
+
   it('returns validated cleaned text and sends the strict prompt', async () => {
     let sent: { url: string; body: Record<string, unknown> } | null = null
     const fetchImpl = (async (url: unknown, init?: RequestInit) => {

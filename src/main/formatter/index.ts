@@ -171,6 +171,10 @@ export function initFormatter(): void {
     const fixed = ok('Send the invoice to Mark on Wednesday.')
     const corrected = await polishTranscript(slip, cfg, { fetchImpl: fixed, corrections: true })
     const uncorrected = await polishTranscript(slip, cfg, { fetchImpl: fixed })
+    const repeatedCommas = await polishTranscript(slip, cfg, {
+      fetchImpl: ok('Send the invoice to Mark, , on Wednesday.'),
+      corrections: true
+    })
 
     return (
       clean !== null &&
@@ -178,7 +182,8 @@ export function initFormatter(): void {
       failed === null &&
       obeyed === null &&
       corrected === 'Send the invoice to Mark on Wednesday.' &&
-      uncorrected === null
+      uncorrected === null &&
+      repeatedCommas === 'Send the invoice to Mark, on Wednesday.'
     )
   })
 }

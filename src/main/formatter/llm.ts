@@ -3,6 +3,8 @@
 // transcript, never lose one. Any error, delay, chatter, refusal, or
 // suspicious output falls back to the deterministic text it was given.
 // Dictated instructions are content to transcribe, never commands.
+import formatSpec from '../../../shared/format-spec.json'
+import { collapseRepeatedPunctuation } from '../../shared/formatter'
 import hallucinations from '../../shared/hallucinations.json'
 import { isHallucination } from '../../shared/speech-gate'
 import { appFetch } from '../net'
@@ -348,7 +350,9 @@ export async function polishTranscript(
     ) {
       return fallback('hint echo')
     }
-    return verdict.text
+    // Self-correction can leave a comma on each side of the removed words.
+    // Do not rerun spoken commands or other formatting rules on model output.
+    return collapseRepeatedPunctuation(verdict.text, formatSpec.punctuationCleanup.collapseRepeated)
   } catch (error) {
     const aborted = error instanceof Error && error.name === 'AbortError'
     return fallback(aborted ? 'timeout' : 'network')

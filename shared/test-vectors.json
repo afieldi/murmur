@@ -316,6 +316,84 @@
       },
       "input": "- send the report tomorrow",
       "expected": "- send the report tomorrow"
+    },
+    {
+      "name": "light removes filler without leaving duplicate commas",
+      "settings": {
+        "level": "light"
+      },
+      "input": "Send it, um, tomorrow.",
+      "expected": "Send it, tomorrow."
+    },
+    {
+      "name": "full removes consecutive fillers without leaving duplicate commas",
+      "input": "Send it, um, uh, tomorrow.",
+      "expected": "Send it, tomorrow."
+    },
+    {
+      "name": "existing duplicate commas collapse in light",
+      "settings": {
+        "level": "light"
+      },
+      "input": "Send it,, tomorrow.",
+      "expected": "Send it, tomorrow."
+    },
+    {
+      "name": "spaced comma runs collapse",
+      "input": "Send it, , , tomorrow.",
+      "expected": "Send it, tomorrow."
+    },
+    {
+      "name": "spoken comma beside existing comma collapses",
+      "input": "Send it, comma tomorrow.",
+      "expected": "Send it, tomorrow."
+    },
+    {
+      "name": "off preserves duplicate commas and filler words",
+      "settings": {
+        "level": "off"
+      },
+      "input": "  Send it, um,, tomorrow.  ",
+      "expected": "Send it, um,, tomorrow."
+    },
+    {
+      "name": "ellipsis and expressive punctuation survive comma cleanup",
+      "input": "Wait... really?! Yes!!",
+      "expected": "Wait... Really?! Yes!!"
+    },
+    {
+      "name": "expansions preserve literal repeated commas",
+      "settings": {
+        "expansions": [
+          {
+            "trigger": "csv row",
+            "text": "a,,b"
+          }
+        ]
+      },
+      "input": "csv row",
+      "expected": "a,,b"
+    },
+    {
+      "name": "commas on separate lines are not merged",
+      "settings": {
+        "level": "light"
+      },
+      "input": "One,\n,two",
+      "expected": "One,\n, two"
+    },
+    {
+      "name": "tab separated comma runs collapse",
+      "settings": {
+        "level": "light"
+      },
+      "input": "Send it,\t,\t, tomorrow.",
+      "expected": "Send it, tomorrow."
+    },
+    {
+      "name": "ordinary commas remain unchanged",
+      "input": "Send copies, then folders, please.",
+      "expected": "Send copies, then folders, please."
     }
   ]
 }
