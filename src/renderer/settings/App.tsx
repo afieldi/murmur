@@ -1020,13 +1020,22 @@ export function App(): React.JSX.Element {
               </div>
             </Row>
 
-            <Row label="Trigger" keywords="hold toggle mode" desc="Hold while you speak, or tap to start and tap again to stop.">
+            <Row
+              label="Trigger"
+              keywords="hold toggle hybrid hands-free mode"
+              desc={settings.hotkey.mode === 'hybrid'
+                ? 'Hold to talk. Double-tap for hands-free, then press again to stop.'
+                : settings.hotkey.mode === 'toggle'
+                  ? 'Tap to start recording. Tap again to stop.'
+                  : 'Hold while you speak. Release to stop.'}
+            >
               <Segmented
                 label="Trigger"
                 value={settings.hotkey.mode}
                 options={[
                   { value: 'hold', label: 'Hold to talk' },
-                  { value: 'toggle', label: 'Toggle' }
+                  { value: 'toggle', label: 'Toggle' },
+                  { value: 'hybrid', label: 'Hybrid' }
                 ]}
                 onChange={(mode) => void update({ hotkey: { mode } as Settings['hotkey'] })}
               />

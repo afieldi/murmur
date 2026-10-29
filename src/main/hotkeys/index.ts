@@ -3,8 +3,10 @@
 // Rebinding applies live whenever settings change. On macOS uIOhook.start
 // needs Accessibility and Input Monitoring permission; a denied start is
 // surfaced, never fatal.
+import { powerMonitor } from 'electron'
 import { UiohookKey, uIOhook } from 'uiohook-napi'
 import type { Settings } from '../../shared/settings'
+import { onRecordingEnded } from '../overlay'
 import { getSettings, onSettingsChanged } from '../settings'
 import { registerSmokeCheck } from '../smoke'
 import {
@@ -16,6 +18,7 @@ import {
   parseBinding
 } from './binding'
 import { HotkeyDispatcher, type ModifierCodes } from './dispatch'
+import { HybridMachine } from './hybrid'
 import { type DictationCallbacks, HoldMachine, ToggleMachine, type TriggerMachine } from './machines'
 
 const keyMap = buildKeyMap(UiohookKey as unknown as Record<string, unknown>)
@@ -53,9 +56,16 @@ let transformDispatcher: HotkeyDispatcher | null = null
 const heldModifiers = new Set<number>()
 let hookStarted = false
 let suppressed = false
+// Installed by initHotkeys once the recording callbacks are available.
+// A no-op keeps suppression and shutdown safe before hotkeys initialize.
+let finishHybrid: () => void = () => {}
+let unsubscribeRecordingEnded: (() => void) | null = null
 
-/** Pause the global trigger (used while capturing a new binding). */
+/** Pause global triggers while capturing a binding. Finish an active Hybrid
+ *  take first: suppression hides keyup events, so it must not leave a held
+ *  gesture or second-tap timer waiting for a release it will never see. */
 export function setHotkeysSuppressed(value: boolean): void {
+  if (value) finishHybrid()
   suppressed = value
 }
 
@@ -149,18 +159,42 @@ function chordsKey(settings: Settings): string {
 }
 let appliedChords = ''
 
+/** Clear Hybrid gesture state and pending timers across all dictation chords.
+ *  This does not stop or cancel audio. Call after the pipeline handles the
+ *  session, or after explicitly requesting a stop. Hold/Toggle have no reset. */
+function resetHybrid(): void {
+  for (const trigger of [machine, noteMachine, transformMachine]) trigger?.reset?.()
+}
+
+/** Use the same trigger mode for dictation, notes, and transforms. Each chord
+ *  gets its own gesture state; its callbacks route into the shared recording
+ *  pipeline, which decides whether that chord can start or stop a session. */
+function makeMachine(mode: Settings['hotkey']['mode'], cb: DictationCallbacks): TriggerMachine {
+  switch(mode) {
+    case 'hybrid':
+      return new HybridMachine(cb)
+    case 'hold':
+      return new HoldMachine(cb)
+    default:
+      return new ToggleMachine(cb)
+  }
+}
+
+/** Rebuild dispatchers when a shortcut or trigger mode changes. Finish live
+ *  takes and discard pending gestures before replacing their machines, so a
+ *  timer from the old binding cannot stop a take started by the new one. */
 function apply(settings: Settings, callbacks: HotkeyCallbacks): void {
   appliedChords = chordsKey(settings)
   // A live hold must not leak a stuck recording across a rebind.
   if (machine?.isActive()) callbacks.stop()
   if (noteMachine?.isActive()) callbacks.note?.stop()
   if (transformMachine?.isActive()) callbacks.transform?.stop()
+  resetHybrid()
   const parsed = parseBinding(settings.hotkey.binding, keyMap)
   // Unsafe bindings (a bare letter would fire on every keystroke) are
   // treated as invalid: the Finish setup card surfaces it, dictation stays off.
   binding = parsed && isSafeBinding(parsed) ? parsed : null
-  machine =
-    settings.hotkey.mode === 'hold' ? new HoldMachine(callbacks) : new ToggleMachine(callbacks)
+  machine = makeMachine(settings.hotkey.mode, callbacks)
   dispatcher = binding ? new HotkeyDispatcher(binding, machine, MODIFIER_CODES) : null
 
   // The secondary chords arm only when set and valid against the
@@ -173,10 +207,7 @@ function apply(settings: Settings, callbacks: HotkeyCallbacks): void {
   noteMachine = null
   noteDispatcher = null
   if (noteBinding && callbacks.note) {
-    noteMachine =
-      settings.hotkey.mode === 'hold'
-        ? new HoldMachine(callbacks.note)
-        : new ToggleMachine(callbacks.note)
+    noteMachine = makeMachine(settings.hotkey.mode, callbacks.note)
     noteDispatcher = new HotkeyDispatcher(noteBinding, noteMachine, MODIFIER_CODES)
   }
   const taken = [pasteBinding, noteBinding].filter((b): b is ParsedBinding => b !== null)
@@ -184,10 +215,7 @@ function apply(settings: Settings, callbacks: HotkeyCallbacks): void {
   transformMachine = null
   transformDispatcher = null
   if (transformBinding && callbacks.transform) {
-    transformMachine =
-      settings.hotkey.mode === 'hold'
-        ? new HoldMachine(callbacks.transform)
-        : new ToggleMachine(callbacks.transform)
+    transformMachine = makeMachine(settings.hotkey.mode, callbacks.transform)
     transformDispatcher = new HotkeyDispatcher(transformBinding, transformMachine, MODIFIER_CODES)
   }
 }
@@ -217,7 +245,24 @@ function transformBindingValid(): boolean {
   return getSettings().transform.binding === '' || transformBinding !== null
 }
 
+/** Arm shortcuts and attach the global hook and lifecycle listeners at boot.
+ *  Settings changes rebuild the dispatchers without restarting the hook. */
 export function initHotkeys(callbacks: HotkeyCallbacks): HotkeysStatus {
+  // Sleep, screen lock, capture suppression, and shutdown may prevent the next
+  // physical release from arriving. Finish only an active Hybrid take through
+  // its owning chord's callback, then clear any remaining gesture timers.
+  finishHybrid = () => {
+    if (machine instanceof HybridMachine && machine.isActive()) callbacks.stop()
+    if (noteMachine instanceof HybridMachine && noteMachine.isActive()) callbacks.note?.stop()
+    if (transformMachine instanceof HybridMachine && transformMachine.isActive()) callbacks.transform?.stop()
+    resetHybrid()
+  }
+  powerMonitor.on('suspend', finishHybrid)
+  powerMonitor.on('lock-screen', finishHybrid)
+  // Cancellation or pipeline completion can happen without another hotkey
+  // event. Drop stale gesture state so the next press starts a fresh take.
+  unsubscribeRecordingEnded?.()
+  unsubscribeRecordingEnded = onRecordingEnded(resetHybrid)
   apply(getSettings(), callbacks)
   onSettingsChanged((settings) => {
     if (chordsKey(settings) !== appliedChords) apply(settings, callbacks)
@@ -263,6 +308,30 @@ export function initHotkeys(callbacks: HotkeyCallbacks): HotkeysStatus {
       )
     })
     .catch(() => undefined)
+
+  registerSmokeCheck('hybridTrigger', () => {
+    // Both taps must share one start with no intermediate stop. Releasing the
+    // second tap keeps recording active; the third press stops it exactly once.
+    let starts = 0
+    let stops = 0
+    const trigger = new HybridMachine({
+      start: () => {
+        starts++
+      },
+      stop: () => {
+        stops++
+      }
+    })
+    trigger.keyDown()
+    trigger.keyUp()
+    trigger.keyDown()
+    trigger.keyUp()
+    const continuous = starts === 1 && stops === 0 && trigger.isActive()
+    trigger.keyDown()
+    trigger.keyUp()
+    trigger.reset()
+    return continuous && stops === 1 && !trigger.isActive()
+  })
 
   registerSmokeCheck('hotkeys', () => {
     // Wiring: binding parsed, machine built, listeners attached.
@@ -348,7 +417,14 @@ function status(): HotkeysStatus {
   }
 }
 
+/** Finish Hybrid recording and cancel its pending timer before stopping the
+ *  hook. No further keyup can be relied on once the listener shuts down. */
 export function stopHotkeys(): void {
+  finishHybrid()
+  unsubscribeRecordingEnded?.()
+  unsubscribeRecordingEnded = null
+  powerMonitor.removeListener('suspend', finishHybrid)
+  powerMonitor.removeListener('lock-screen', finishHybrid)
   if (hookStarted) {
     uIOhook.stop()
     hookStarted = false

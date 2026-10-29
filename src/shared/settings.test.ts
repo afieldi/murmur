@@ -190,3 +190,10 @@ describe('sanitized entry lists', () => {
     expect(mergeSettings(DEFAULT_SETTINGS, { windowZoom: 40 }).windowZoom).toBe(3)
   })
 })
+
+// Stored trigger choices must survive loading without changing existing defaults.
+describe('trigger mode persistence', () => {
+  it.each(['hold', 'toggle', 'hybrid'] as const)('retains %s', (mode) => {
+    expect(mergeSettings(DEFAULT_SETTINGS, { hotkey: { mode } }).hotkey.mode).toBe(mode)
+  })
+})

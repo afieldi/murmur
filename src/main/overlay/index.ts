@@ -92,6 +92,15 @@ function positionOverlay(win: BrowserWindow): void {
   })
 }
 
+const recordingEnded = new Set<() => void>()
+/** Reset pending hotkey gestures when the recording pipeline leaves a take. */
+export function onRecordingEnded(fn: () => void): () => void {
+  recordingEnded.add(fn)
+  return () => {
+    recordingEnded.delete(fn)
+  }
+}
+
 function sendState(state: OverlayState): void {
   aliveOverlay()?.webContents.send(IpcChannels.overlayState, state)
 }
@@ -102,7 +111,11 @@ export function setOverlayPhase(
   wpm: number | null = null,
   extras: TransitionExtras = {}
 ): OverlayState | null {
+  const previousPhase = machine.get().phase
   const state = machine.transition(phase, undefined, wpm, extras)
+  if (state && previousPhase === 'recording' && phase !== 'recording') {
+    for (const fn of recordingEnded) fn()
+  }
   if (!state || !overlayWindow) return state
   if (lingerTimer) {
     clearTimeout(lingerTimer)
@@ -293,6 +306,35 @@ export function initOverlay(): void {
   ipcMain.on(IpcChannels.audioLevel, (_event, level: number) => {
     if (machine.get().phase === 'recording') {
       aliveOverlay()?.webContents.send(IpcChannels.overlayLevel, level)
+    }
+  })
+
+  registerSmokeCheck('recordingEnded', () => {
+    // Hints must not reset a refused hotkey's physical key latch. Only
+    // leaving recording notifies subscribers, and removed listeners stay gone.
+    setOverlayPhase('idle')
+    let ended = 0
+    const unsubscribe = onRecordingEnded(() => {
+      ended++
+    })
+    try {
+      showOverlayHint('smoke')
+      setOverlayPhase('idle')
+      const hintsIgnored = ended === 0
+      setOverlayPhase('recording')
+      setOverlayPhase('processing')
+      setOverlayPhase('idle')
+      const stoppedOnce = ended === 1
+      setOverlayPhase('recording')
+      setOverlayPhase('idle')
+      const canceledOnce = ended === 2
+      unsubscribe()
+      setOverlayPhase('recording')
+      setOverlayPhase('idle')
+      return hintsIgnored && stoppedOnce && canceledOnce && ended === 2
+    } finally {
+      unsubscribe()
+      setOverlayPhase('idle')
     }
   })
 

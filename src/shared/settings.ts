@@ -14,7 +14,7 @@ import { normalizeZoom } from './zoom'
 
 export interface Settings {
   hotkey: {
-    mode: 'hold' | 'toggle'
+    mode: 'hold' | 'toggle' | 'hybrid'
     binding: string
     /** Chord that pastes the newest history entry. Empty means the
      *  feature is disarmed; it only works once the user captures one. */

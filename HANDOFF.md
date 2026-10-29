@@ -196,3 +196,12 @@ The brain dump branch (US-050 to US-052 and US-055 to US-058) merged to main 202
 
 - A real Groq API key on this Mac for live transcription tests (never committed, entered through the app).
 - Your Windows machine for US-025 verification when packaging lands.
+
+## Hybrid recording verification (US-116)
+
+The user manually confirmed double-tap to lock on 2026-10-29. Remaining checks:
+
+1. In Settings, choose Hybrid under Trigger. Hold the hotkey, say “This is a held recording,” and release. Check that the words arrive once.
+2. Start hands-free recording, release the hotkey, say “This is hands-free,” then press again. Check that the bubble looks the same as held recording and the complete words arrive once.
+3. Tap once and wait. Check that recording finishes after a brief pause. Try changing the hotkey and canceling during that pause; check that recording does not stay stuck.
+4. Repeat on macOS and Windows, then select Hold and Toggle and check that each still works as before.

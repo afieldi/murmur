@@ -13,6 +13,7 @@ export interface DictationCallbacks {
 export interface TriggerMachine {
   keyDown: () => void
   keyUp: () => void
+  reset?: () => void
   isActive: () => boolean
 }
 
