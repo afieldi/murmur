@@ -79,6 +79,13 @@ Settings, Dictation, Microphone. **Mac default** (on Windows, **Windows default*
 - **Light**: filler words removed, sentences capitalized
 - **Full**: everything in light, plus spoken punctuation commands ("period", "comma", "new line", "new paragraph"), self-corrections ("scratch that", and with Apply corrections on, spoken fixes like "oh wait, I mean Wednesday"), number style, closing punctuation, and the AI cleanup pass through your configured cleanup model
 
+At Light and Full, repeated commas are merged into one, including commas left
+behind when filler words are removed ("Send it, um, tomorrow" becomes "Send it,
+tomorrow"). The same cleanup runs after a successful AI pass, so removing a
+spoken correction cannot leave doubled commas in the result. Ellipses and
+expressive punctuation such as "?!" are preserved. Off leaves repeated commas
+untouched, and expansion snippets still insert exactly as written.
+
 The cleanup pass fails open: if the model is slow, wrong, or chatty, murmur inserts the deterministically formatted text instead. A dictation is never lost or delayed indefinitely because of the cleanup model.
 
 ## What is Smart lists, and how do I dictate a list?

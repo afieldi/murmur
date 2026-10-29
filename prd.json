@@ -1836,6 +1836,21 @@
       "passes": false,
       "needs_human": true,
       "notes": "2026-10-28: typecheck and production build pass; 867 tests pass, one skipped. Hybrid gesture, persisted modes and unchanged Hold/Toggle tests included. Full Electron smoke passed, including hybridTrigger and recording pipeline checks. Live hardware verification remains in HANDOFF.md. Manual verification 2026-10-29: the user confirmed that double-tap to lock works. Other live checks, including Windows verification, remain open; this confirmation does not establish all acceptance criteria. Pre-PR review 2026-10-29: fixed recording-ended notifications to fire only when leaving recording, added unsubscribe/shutdown listener cleanup and a smoke regression check. Independent re-review cleared. Typecheck, header/design checks, 867 tests (one skipped), and full Electron smoke passed. The existing wizard smoke check failed once and passed on rerun."
+    },
+    {
+      "id": "US-117",
+      "title": "Remove repeated commas after transcript cleanup",
+      "description": "Merge duplicate commas introduced by filler removal or AI self-correction, with the rule defined in the shared formatting spec. Preserve intentional other punctuation, Off formatting, and literal expansion snippets.",
+      "acceptance": [
+        "Light and Full merge consecutive commas, including runs separated by spaces or tabs, without crossing line breaks",
+        "Filler removal and spoken comma commands cannot leave duplicate commas in shared formatter vectors",
+        "Successful AI cleanup applies the same comma rule after response validation; fallback and validation behavior stay unchanged",
+        "Off preserves original punctuation; ellipses, expressive punctuation, and literal expansion snippets remain unchanged",
+        "Typecheck, shared vectors, AI cleanup regression tests, full unit suite, and llmFormatter smoke pass; settings docs describe the behavior"
+      ],
+      "passes": true,
+      "needs_human": false,
+      "notes": "2026-10-29 on fix/duplicate-punctuation, based on origin/main: reproduced Send it, um, tomorrow. becoming Send it,, tomorrow. Five regression cases failed before the fix and pass afterward. The shared spec lists only comma for repeated-punctuation cleanup; deterministic formatting applies it at Light/Full, and accepted AI output applies the same helper after validation. Added 11 shared vectors and one mock AI correction regression, covering filler chains, existing/spoken commas, spaces/tabs, Off, ellipses/expressive punctuation, line boundaries, ordinary commas, and literal expansions. Verified: typecheck, header/design checks, 869 tests passed with one skipped, production build, and full Electron smoke including the extended llmFormatter check. No live provider call required for the deterministic bug or mocked correction regression. Settings docs updated. US-116 is reserved for the separate Hybrid recording PR."
     }
   ]
 }
